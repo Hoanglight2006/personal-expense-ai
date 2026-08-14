@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, Numeric, SmallInteger, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, SmallInteger, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -14,15 +14,19 @@ class Budget(Base):
     user_id = Column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    category_id = Column(
-        Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
-    )
+    category_id = Column(Integer, nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
     month = Column(SmallInteger, nullable=False)
     year = Column(SmallInteger, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["category_id", "user_id"],
+            ["categories.id", "categories.user_id"],
+            name="fk_budget_category_owner",
+            ondelete="CASCADE",
+        ),
         UniqueConstraint(
             "user_id", "category_id", "month", "year",
             name="uq_budget_user_category_period",
@@ -33,4 +37,10 @@ class Budget(Base):
 
     # ---- Relationships ----
     user = relationship("User", back_populates="budgets")
-    category = relationship("Category", back_populates="budgets")
+    category = relationship(
+        "Category",
+        primaryjoin="and_(Budget.category_id == Category.id, "
+        "Budget.user_id == Category.user_id)",
+        foreign_keys=[category_id],
+        back_populates="budgets",
+    )

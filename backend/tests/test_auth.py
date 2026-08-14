@@ -10,8 +10,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.category_defaults import DEFAULT_CATEGORIES
 from app.core.security import get_password_hash
+from app.models.category import Category
 from app.models.user import User
+from conftest import TestingSessionLocal
 import app.api.routes.auth as auth_routes
 
 
@@ -33,6 +36,13 @@ def test_register_user(client: TestClient):
     assert data["username"] == username
     assert data["email"] == email.lower()
     assert "id" in data
+    db = TestingSessionLocal()
+    try:
+        defaults = db.query(Category).filter(Category.user_id == data["id"]).all()
+        assert len(defaults) == len(DEFAULT_CATEGORIES)
+        assert all(category.is_default for category in defaults)
+    finally:
+        db.close()
 
 
 def test_register_duplicate_username(client: TestClient):
@@ -276,3 +286,42 @@ def test_get_current_user_deleted_user(client: TestClient):
     finally:
         db.close()
     assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+def test_update_initial_balance(client: TestClient):
+    username = random_string()
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"},
+    )
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Initial check (default 0)
+    me = client.get("/api/v1/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert float(me.json().get("initial_balance", 0)) == 0.0
+
+    # Update initial balance
+    update_res = client.patch(
+        "/api/v1/auth/me/initial-balance",
+        headers=headers,
+        json={"initial_balance": 15000000.50},
+    )
+    assert update_res.status_code == 200
+    assert float(update_res.json()["initial_balance"]) == 15000000.50
+
+    # Fetch again to verify persistence
+    me_updated = client.get("/api/v1/auth/me", headers=headers)
+    assert me_updated.status_code == 200
+    assert float(me_updated.json()["initial_balance"]) == 15000000.50
+
+    # Negative balance should be rejected
+    neg_res = client.patch(
+        "/api/v1/auth/me/initial-balance",
+        headers=headers,
+        json={"initial_balance": -1000},
+    )
+    assert neg_res.status_code == 422
+

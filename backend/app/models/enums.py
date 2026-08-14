@@ -25,6 +25,13 @@ class ContributionSource(str, enum.Enum):
     MANUAL = "manual"
 
 
+class PaymentMethod(str, enum.Enum):
+    """Accepted payment methods for transactions."""
+
+    CASH = "cash"
+    BANK_TRANSFER = "bank_transfer"
+
+
 class ReportType(str, enum.Enum):
     """Type of AI-generated report."""
 

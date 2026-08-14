@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loginUser, getMe } from '../api/authApi';
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../context/auth-context';
 import AuthLayout, { PasswordField } from '../components/AuthLayout';
 
 const Login = () => {

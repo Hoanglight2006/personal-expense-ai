@@ -20,8 +20,8 @@ AI sinh báo cáo chi tiêu tháng.
 AI gợi ý ngân sách tham khảo dựa trên lịch sử chi tiêu.
 AI trả lời câu hỏi như "tháng này tôi chi nhiều nhất vào đâu?".
 Yêu cầu kỹ thuật
-Backend FastAPI/Flask/Django; frontend React/Vue/HTML.
-CSDL SQLite/MySQL/PostgreSQL.
+Backend FastAPI; frontend React.
+CSDL MySQL.
 AI Engine OpenAI/Gemini/Claude/Hugging Face/Ollama.
 Có kiểm soát dữ liệu tài chính gửi AI.
 Có test cho giao dịch, ngân sách, báo cáo và AI.

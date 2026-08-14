@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registerUser } from '../api/authApi';
+import { registerUser, loginUser, getMe } from '../api/authApi';
+import { AuthContext } from '../context/auth-context';
 import AuthLayout, { PasswordField } from '../components/AuthLayout';
 
 const Register = () => {
@@ -11,6 +12,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -24,10 +26,15 @@ const Register = () => {
     setIsSubmitting(true);
     try {
       await registerUser(username, email, password);
-      setSuccess("Đăng ký thành công! Đang chuyển hướng...");
+      // Auto login after registration
+      const loginData = await loginUser(username, password);
+      login(loginData.access_token);
+      const userData = await getMe();
+      setUser(userData);
+      setSuccess("Đăng ký thành công! Đang chuyển đến bảng điều khiển...");
       setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+        navigate('/', { state: { openInitialBalance: true } });
+      }, 800);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.detail) {
         setError(err.response.data.detail);

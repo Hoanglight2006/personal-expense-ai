@@ -1,0 +1,508 @@
+"""Transaction management API routes.
+
+Supports CRUD, soft-delete/restore, duplicate preparation, search/filter/sort
+and paginated listing.  All endpoints enforce ownership via the current JWT user.
+"""
+
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func as sa_func
+from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, get_db
+from app.models.category import Category
+from app.models.enums import CategoryType, PaymentMethod
+from app.models.transaction import Transaction
+from app.models.user import User
+from app.schemas.transaction import (
+    BulkImportRequest,
+    BulkImportResponse,
+    CategoryInfo,
+    RowResult,
+    TransactionCreate,
+    TransactionListResponse,
+    TransactionResponse,
+    TransactionRestoreResponse,
+    TransactionSort,
+    TransactionUpdate,
+)
+
+router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+TRANSACTION_NOT_FOUND = "Không tìm thấy giao dịch."
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _owned_transaction_or_404(
+    db: Session,
+    transaction_id: int,
+    user_id: int,
+    *,
+    include_deleted: bool = False,
+) -> Transaction:
+    """Return a Transaction owned by *user_id* or raise 404."""
+    query = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.user_id == user_id,
+    )
+    if not include_deleted:
+        query = query.filter(Transaction.is_deleted.is_(False))
+    txn = query.first()
+    if txn is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=TRANSACTION_NOT_FOUND
+        )
+    return txn
+
+
+def _validate_category(
+    db: Session,
+    category_id: int,
+    user_id: int,
+    transaction_type: CategoryType,
+    *,
+    require_active: bool = True,
+) -> Category:
+    """Ensure the category belongs to the user.
+
+    When *require_active* is ``True`` (default for new transactions), the
+    category must also be active.
+    """
+    category = (
+        db.query(Category)
+        .filter(Category.id == category_id, Category.user_id == user_id)
+        .first()
+    )
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy danh mục.",
+        )
+    if require_active and not category.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Không thể sử dụng danh mục đã ẩn cho giao dịch mới.",
+        )
+    return category
+
+
+def _transaction_response(txn: Transaction) -> TransactionResponse:
+    category_info = None
+    if txn.category:
+        category_info = CategoryInfo(
+            id=txn.category.id,
+            name=txn.category.name,
+            icon=txn.category.icon,
+            color=txn.category.color,
+            is_active=txn.category.is_active,
+        )
+    return TransactionResponse(
+        id=txn.id,
+        amount=txn.amount,
+        type=txn.type,
+        category_id=txn.category_id,
+        category=category_info,
+        transaction_date=txn.transaction_date,
+        description=txn.description,
+        payment_method=txn.payment_method,
+        is_deleted=txn.is_deleted,
+        created_at=txn.created_at,
+        updated_at=txn.updated_at,
+        deleted_at=txn.deleted_at,
+    )
+
+
+def _commit_or_raise(db: Session) -> None:
+    try:
+        db.commit()
+    except DataError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Dữ liệu giao dịch vượt quá giới hạn lưu trữ.",
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dữ liệu giao dịch xung đột. Vui lòng thử lại.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
+
+
+@router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_transaction(
+    payload: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    _validate_category(
+        db, payload.category_id, current_user.id, payload.type, require_active=True
+    )
+    txn = Transaction(
+        user_id=current_user.id,
+        category_id=payload.category_id,
+        type=payload.type,
+        amount=payload.amount,
+        description=payload.description,
+        transaction_date=payload.transaction_date,
+        payment_method=payload.payment_method,
+    )
+    db.add(txn)
+    _commit_or_raise(db)
+    db.refresh(txn)
+    return _transaction_response(txn)
+
+
+@router.get("", response_model=TransactionListResponse)
+def list_transactions(
+    search: Annotated[str | None, Query(max_length=255)] = None,
+    date_start: date | None = None,
+    date_end: date | None = None,
+    amount_min: Decimal | None = None,
+    amount_max: Decimal | None = None,
+    type: CategoryType | None = None,
+    category_id: int | None = None,
+    payment_method: PaymentMethod | None = None,
+    sort: TransactionSort = "date_desc",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionListResponse:
+    # Validate ranges
+    if date_start and date_end and date_start > date_end:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Ngày bắt đầu không được sau ngày kết thúc.",
+        )
+    if amount_min is not None and amount_max is not None and amount_min > amount_max:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Số tiền tối thiểu không được lớn hơn số tiền tối đa.",
+        )
+    if category_id is not None:
+        # Ensure the category belongs to the user; hidden categories are OK in filters
+        cat = (
+            db.query(Category)
+            .filter(Category.id == category_id, Category.user_id == current_user.id)
+            .first()
+        )
+        if cat is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy danh mục.",
+            )
+
+    query = db.query(Transaction).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.is_deleted.is_(False),
+    )
+
+    # Apply filters
+    if search:
+        keyword = search.strip()
+        if keyword:
+            query = query.filter(
+                Transaction.description.contains(keyword, autoescape=True)
+            )
+    if date_start:
+        query = query.filter(Transaction.transaction_date >= date_start)
+    if date_end:
+        query = query.filter(Transaction.transaction_date <= date_end)
+    if amount_min is not None:
+        query = query.filter(Transaction.amount >= amount_min)
+    if amount_max is not None:
+        query = query.filter(Transaction.amount <= amount_max)
+    if type:
+        query = query.filter(Transaction.type == type)
+    if category_id is not None:
+        query = query.filter(Transaction.category_id == category_id)
+    if payment_method:
+        query = query.filter(Transaction.payment_method == payment_method)
+
+    total_count = query.count()
+
+    # Apply sort
+    if sort == "date_asc":
+        query = query.order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
+    elif sort == "amount_desc":
+        query = query.order_by(Transaction.amount.desc(), Transaction.id.desc())
+    elif sort == "amount_asc":
+        query = query.order_by(Transaction.amount.asc(), Transaction.id.asc())
+    else:  # date_desc (default)
+        query = query.order_by(
+            Transaction.transaction_date.desc(), Transaction.id.desc()
+        )
+
+    offset = (page - 1) * page_size
+    items = query.offset(offset).limit(page_size).all()
+
+    return TransactionListResponse(
+        items=[_transaction_response(txn) for txn in items],
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/trash", response_model=TransactionListResponse)
+def list_trash(
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+    sort: TransactionSort = "date_desc",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionListResponse:
+    query = db.query(Transaction).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.is_deleted.is_(True),
+    )
+    total_count = query.count()
+
+    if sort == "date_asc":
+        query = query.order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
+    elif sort == "amount_desc":
+        query = query.order_by(Transaction.amount.desc(), Transaction.id.desc())
+    elif sort == "amount_asc":
+        query = query.order_by(Transaction.amount.asc(), Transaction.id.asc())
+    else:
+        query = query.order_by(
+            Transaction.transaction_date.desc(), Transaction.id.desc()
+        )
+
+    offset = (page - 1) * page_size
+    items = query.offset(offset).limit(page_size).all()
+
+    return TransactionListResponse(
+        items=[_transaction_response(txn) for txn in items],
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/{transaction_id}", response_model=TransactionResponse)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
+    return _transaction_response(txn)
+
+
+@router.patch("/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(
+    transaction_id: int,
+    payload: TransactionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
+
+    changes = payload.model_dump(exclude_unset=True)
+
+    # Resolve effective type and category_id after potential changes
+    effective_type = changes.get("type", txn.type)
+    effective_category_id = changes.get("category_id", txn.category_id)
+
+    # If category or type is changing, validate the new combination
+    if "category_id" in changes or "type" in changes:
+        # If the category is changing, the new one must be active
+        category_is_changing = (
+            "category_id" in changes and changes["category_id"] != txn.category_id
+        )
+        _validate_category(
+            db,
+            effective_category_id,
+            current_user.id,
+            effective_type,
+            require_active=category_is_changing,
+        )
+
+    for field, value in changes.items():
+        setattr(txn, field, value)
+
+    _commit_or_raise(db)
+    db.refresh(txn)
+    return _transaction_response(txn)
+
+
+@router.post("/{transaction_id}/trash", response_model=TransactionResponse)
+def trash_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
+    txn.is_deleted = True
+    txn.deleted_at = datetime.now(timezone.utc)
+    _commit_or_raise(db)
+    db.refresh(txn)
+    return _transaction_response(txn)
+
+
+@router.post("/{transaction_id}/restore", response_model=TransactionRestoreResponse)
+def restore_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionRestoreResponse:
+    txn = _owned_transaction_or_404(
+        db, transaction_id, current_user.id, include_deleted=True
+    )
+    if not txn.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Giao dịch này không nằm trong thùng rác.",
+        )
+
+    warning = None
+    category = (
+        db.query(Category)
+        .filter(Category.id == txn.category_id, Category.user_id == current_user.id)
+        .first()
+    )
+    if category and not category.is_active:
+        warning = (
+            f'Danh mục "{category.name}" hiện đã ẩn. '
+            "Giao dịch được khôi phục nhưng bạn nên cập nhật danh mục."
+        )
+
+    txn.is_deleted = False
+    txn.deleted_at = None
+    _commit_or_raise(db)
+    db.refresh(txn)
+    return TransactionRestoreResponse(
+        transaction=_transaction_response(txn),
+        category_warning=warning,
+    )
+
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction_permanently(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    txn = _owned_transaction_or_404(
+        db, transaction_id, current_user.id, include_deleted=True
+    )
+    if not txn.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Giao dịch phải ở trong thùng rác trước khi xóa vĩnh viễn.",
+        )
+    db.delete(txn)
+    _commit_or_raise(db)
+
+
+@router.post("/{transaction_id}/duplicate", response_model=TransactionResponse)
+def duplicate_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    """Return the data of a transaction suitable for pre-filling a create form.
+
+    Does NOT create a new record. The frontend opens a create form with the
+    returned data (except id, timestamps and deletion state).
+    """
+    txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
+    return _transaction_response(txn)
+
+
+# ---------------------------------------------------------------------------
+# Bulk import (confirmed rows from Excel / OCR preview)
+# ---------------------------------------------------------------------------
+
+# In-memory idempotency store – acceptable for single-process dev deployments.
+# For production, swap with Redis or a DB table.
+_processed_import_keys: set[str] = set()
+
+
+@router.post("/import", response_model=BulkImportResponse)
+def import_transactions(
+    payload: BulkImportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BulkImportResponse:
+    """Import a batch of user-confirmed transactions.
+
+    Uses an idempotency key to prevent duplicate submissions.
+    """
+    user_scoped_key = f"{current_user.id}:{payload.idempotency_key}"
+    if user_scoped_key in _processed_import_keys:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Phiên nhập này đã được xử lý. Vui lòng tải lại trang để nhập mới.",
+        )
+
+    results: list[RowResult] = []
+    success_count = 0
+    error_count = 0
+
+    for idx, row in enumerate(payload.rows):
+        try:
+            # Validate category
+            cat = (
+                db.query(Category)
+                .filter(
+                    Category.id == row.category_id,
+                    Category.user_id == current_user.id,
+                )
+                .first()
+            )
+            if cat is None:
+                raise ValueError("Không tìm thấy danh mục.")
+            if not cat.is_active:
+                raise ValueError("Không thể sử dụng danh mục đã ẩn.")
+
+            txn = Transaction(
+                user_id=current_user.id,
+                category_id=row.category_id,
+                type=row.type,
+                amount=row.amount,
+                description=row.description,
+                transaction_date=row.transaction_date,
+                payment_method=row.payment_method,
+            )
+            db.add(txn)
+            db.flush()
+            results.append(
+                RowResult(index=idx, status="success", transaction_id=txn.id)
+            )
+            success_count += 1
+        except (ValueError, HTTPException) as exc:
+            db.rollback()
+            msg = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            results.append(RowResult(index=idx, status="error", error=msg))
+            error_count += 1
+
+    if success_count > 0:
+        _commit_or_raise(db)
+
+    _processed_import_keys.add(user_scoped_key)
+
+    return BulkImportResponse(
+        total=len(payload.rows),
+        success_count=success_count,
+        error_count=error_count,
+        skipped_count=0,
+        results=results,
+    )

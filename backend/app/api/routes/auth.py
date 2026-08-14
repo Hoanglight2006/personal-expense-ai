@@ -13,6 +13,7 @@ import logging
 
 from app.api.deps import get_db, get_current_user
 from app.config import settings
+from app.core.category_defaults import add_missing_default_categories
 from app.core.password_reset import password_version, send_password_reset_email
 from app.core.security import create_access_token, create_password_reset_token, get_password_hash, verify_password
 from app.models.user import User
@@ -22,6 +23,7 @@ from app.schemas.user import (
     PasswordResetRequest,
     Token,
     UserCreate,
+    UserInitialBalanceUpdate,
     UserResponse,
 )
 
@@ -49,6 +51,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
     )
     db.add(user)
     try:
+        db.flush()
+        add_missing_default_categories(db, user.id)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -134,3 +138,19 @@ def read_users_me(current_user: User = Depends(get_current_user)) -> Any:
     Get current user details.
     """
     return current_user
+
+
+@router.patch("/me/initial-balance", response_model=UserResponse)
+def update_initial_balance(
+    balance_in: UserInitialBalanceUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Update the initial balance for current user.
+    """
+    current_user.initial_balance = balance_in.initial_balance
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
