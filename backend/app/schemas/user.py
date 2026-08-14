@@ -61,10 +61,20 @@ class MessageResponse(BaseModel):
     message: str
 
 
+from decimal import Decimal
+
+
+class UserInitialBalanceUpdate(BaseModel):
+    """Model for updating user initial balance."""
+
+    initial_balance: Decimal = Field(..., ge=0, description="Số dư ban đầu không được âm")
+
+
 class UserResponse(UserBase):
     """Model for returning user data."""
 
     id: int
+    initial_balance: Decimal = Decimal("0.00")
     created_at: datetime
     updated_at: Optional[datetime] = None
 

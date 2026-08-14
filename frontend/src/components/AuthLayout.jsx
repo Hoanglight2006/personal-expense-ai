@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 export const PasswordField = ({ id, label = 'Mật khẩu', value, onChange, helper, autoComplete = 'current-password' }) => {
@@ -51,6 +51,23 @@ const AuthLayout = ({ mode, title, subtitle, error, success, children }) => {
   const isAccountPage = mode === 'login' || mode === 'register';
   const errorMessage = formatMessage(error);
 
+  const [isGreeting, setIsGreeting] = useState(false);
+
+  useEffect(() => {
+    let endTimer;
+    const startTimer = setTimeout(() => {
+      setIsGreeting(true);
+      endTimer = setTimeout(() => {
+        setIsGreeting(false);
+      }, 2500);
+    }, 400);
+
+    return () => {
+      clearTimeout(startTimer);
+      if (endTimer) clearTimeout(endTimer);
+    };
+  }, []);
+
   return (
     <main className="auth-container">
       <div className="auth-bg-orb orb-1" aria-hidden="true" />
@@ -72,7 +89,7 @@ const AuthLayout = ({ mode, title, subtitle, error, success, children }) => {
         </aside>
 
         <div className="auth-card">
-          <div className="form-mascot" aria-label="Mascot FinAI">
+          <div className={`form-mascot ${isGreeting ? 'active' : ''}`} aria-label="Mascot FinAI">
             <span className="form-mascot-greeting" aria-hidden="true">Xin chào !</span>
             <img className="form-mascot-image" src="/finai-winged-coin-favicon.png" alt="Đồng coin FinAI có cánh" />
           </div>

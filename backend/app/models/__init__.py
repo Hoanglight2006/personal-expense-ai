@@ -1,7 +1,7 @@
 from app.models.ai_report import AIReport
 from app.models.budget import Budget
 from app.models.category import Category
-from app.models.enums import CategoryType, ContributionSource, GoalStatus, ReportType
+from app.models.enums import CategoryType, ContributionSource, GoalStatus, PaymentMethod, ReportType
 from app.models.saving_contribution import SavingContribution
 from app.models.saving_goal import SavingGoal
 from app.models.transaction import Transaction
@@ -16,6 +16,7 @@ __all__ = [
     "SavingContribution",
     "AIReport",
     "CategoryType",
+    "PaymentMethod",
     "GoalStatus",
     "ContributionSource",
     "ReportType",

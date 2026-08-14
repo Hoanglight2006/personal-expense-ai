@@ -1,7 +1,6 @@
-import React, { createContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getMe } from '../api/authApi';
-
-export const AuthContext = createContext();
+import { AuthContext } from './auth-context';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -24,6 +23,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => setUser(null);
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const login = (token) => {

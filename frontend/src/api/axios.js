@@ -18,4 +18,24 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const PUBLIC_AUTH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const requestUrl = error.config?.url || '';
+    const isPublicAuthRequest = PUBLIC_AUTH_ENDPOINTS.some((path) => requestUrl.includes(path));
+    if (error.response?.status === 401 && !isPublicAuthRequest) {
+      localStorage.removeItem('access_token');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
+    return Promise.reject(error);
+  },
+);
+
 export default api;
