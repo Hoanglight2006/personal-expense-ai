@@ -10,23 +10,26 @@ import Categories from './Categories';
 import {
   createCategory,
   createDefaultCategories,
-  getCategoryStatistics,
+  getCategories,
   hideCategory,
   restoreCategory,
+  deleteCategory,
 } from '../api/categoryApi';
 
 vi.mock('../api/categoryApi', () => ({
-  getCategoryStatistics: vi.fn(),
+  getCategories: vi.fn(),
   createCategory: vi.fn(),
   createDefaultCategories: vi.fn(),
   updateCategory: vi.fn(),
   hideCategory: vi.fn(),
   restoreCategory: vi.fn(),
+  deleteCategory: vi.fn(),
 }));
 
 const category = {
   id: 1,
   name: 'Ăn uống',
+  type: 'expense',
   icon: 'food',
   color: '#C87941',
   is_active: true,
@@ -57,43 +60,43 @@ const renderPage = () => render(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getCategoryStatistics.mockResolvedValue(response());
-  createCategory.mockResolvedValue(category);
+  getCategories.mockResolvedValue(response());
+  createCategory.mockResolvedValue({ ...category, id: 99, name: 'Đi lại' });
   createDefaultCategories.mockResolvedValue([]);
   hideCategory.mockResolvedValue({ ...category, is_active: false });
   restoreCategory.mockResolvedValue(category);
+  deleteCategory.mockResolvedValue({});
 });
 
 describe('Categories page', () => {
-  it('renders loading then category cards and statistics', async () => {
+  it('renders loading then category cards', async () => {
     renderPage();
     expect(screen.getByText('Đang tải danh mục...')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Ăn uống' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Thống kê thu chi' })).toBeInTheDocument();
     expect(screen.getByText(/25.00% tổng chi/)).toBeInTheDocument();
   });
 
   it('renders API error and empty search state', async () => {
-    getCategoryStatistics.mockRejectedValueOnce({ response: { data: { detail: 'Máy chủ từ chối.' } } });
+    getCategories.mockRejectedValueOnce({ response: { data: { detail: 'Máy chủ từ chối.' } } });
     const firstRender = renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent('Máy chủ từ chối.');
     firstRender.unmount();
 
-    getCategoryStatistics.mockResolvedValue(response([]));
+    getCategories.mockResolvedValue(response([]));
     renderPage();
     await userEvent.type(screen.getByPlaceholderText('Nhập tên danh mục...'), 'không có');
     expect(await screen.findByText('Không có kết quả phù hợp')).toBeInTheDocument();
   });
 
   it('distinguishes connection failures from server failures', async () => {
-    getCategoryStatistics.mockRejectedValueOnce({ request: {} });
+    getCategories.mockRejectedValueOnce({ request: {} });
     const networkRender = renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Không thể kết nối đến máy chủ. Hãy kiểm tra backend hoặc cấu hình mạng.',
     );
     networkRender.unmount();
 
-    getCategoryStatistics.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+    getCategories.mockRejectedValueOnce({ response: { status: 500, data: {} } });
     renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Máy chủ gặp lỗi khi xử lý danh mục.',
@@ -102,44 +105,16 @@ describe('Categories page', () => {
 
   it('creates the suggested category set from the empty state', async () => {
     const user = userEvent.setup();
-    getCategoryStatistics.mockResolvedValue(response([]));
+    getCategories.mockResolvedValue(response([]));
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Dùng bộ danh mục gợi ý' }));
     await waitFor(() => expect(createDefaultCategories).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Các danh mục gợi ý đã tồn tại/)).toBeInTheDocument();
   });
 
-  it('clears stale statistics when a custom date range is incomplete', async () => {
+  it('filters locally without sending another network request', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole('heading', { name: 'Ăn uống' });
-    await user.click(screen.getByRole('button', { name: 'Theo ngày' }));
-    await user.clear(screen.getByLabelText('Đến ngày'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Vui lòng chọn đầy đủ ngày');
-    expect(screen.queryByRole('heading', { name: 'Ăn uống' })).not.toBeInTheDocument();
-  });
-
-  it('shows which recent-days shortcut is selected', async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole('heading', { name: 'Ăn uống' });
-
-    const thirtyDays = screen.getByRole('button', { name: '30 ngày' });
-    const ninetyDays = screen.getByRole('button', { name: '90 ngày' });
-    await user.click(thirtyDays);
-    expect(thirtyDays).toHaveClass('active');
-    expect(thirtyDays).toHaveAttribute('aria-pressed', 'true');
-    expect(ninetyDays).toHaveAttribute('aria-pressed', 'false');
-
-    await user.click(ninetyDays);
-    expect(ninetyDays).toHaveClass('active');
-    expect(ninetyDays).toHaveAttribute('aria-pressed', 'true');
-    expect(thirtyDays).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('filters locally without sending another statistics request', async () => {
-    const user = userEvent.setup();
-    getCategoryStatistics.mockResolvedValue(response([
+    getCategories.mockResolvedValue(response([
       category,
       { ...category, id: 2, name: 'Lương', icon: 'salary', is_active: false },
     ]));
@@ -147,32 +122,7 @@ describe('Categories page', () => {
     await screen.findByRole('heading', { name: 'Ăn uống' });
     await user.type(screen.getByPlaceholderText('Nhập tên danh mục...'), 'ăn');
     expect(screen.queryByRole('heading', { name: 'Lương' })).not.toBeInTheDocument();
-    expect(getCategoryStatistics).toHaveBeenCalledTimes(1);
-  });
-
-  it('summarizes income, expenses, transactions, and expense ranking', async () => {
-    getCategoryStatistics.mockResolvedValue(response([
-      category,
-      {
-        ...category,
-        id: 2,
-        name: 'Lương',
-        icon: 'salary',
-        color: '#4B9D67',
-        total_amount: '1000000.00',
-        income_amount: '1000000.00',
-        expense_amount: '0.00',
-        transaction_count: 1,
-        expense_percentage: '0.00',
-      },
-    ]));
-    renderPage();
-    await screen.findByRole('heading', { name: 'Thống kê thu chi' });
-
-    expect(screen.getByText('Thu nhập').closest('article')).toHaveTextContent('1.000.000');
-    expect(screen.getByText('Chi tiêu').closest('article')).toHaveTextContent('250.000');
-    expect(screen.getByText('Giao dịch').closest('article')).toHaveTextContent('4');
-    expect(screen.getByRole('heading', { name: 'Danh mục chi nhiều nhất' })).toBeInTheDocument();
+    expect(getCategories).toHaveBeenCalledTimes(1);
   });
 
   it('opens the add form, prevents repeated submission, and updates locally', async () => {
@@ -191,9 +141,8 @@ describe('Categories page', () => {
     expect(screen.getByRole('button', { name: 'Đang lưu...' })).toBeDisabled();
     expect(createCategory).toHaveBeenCalledTimes(1);
 
-    await act(async () => finishCreate(category));
+    await act(async () => finishCreate({ ...category, id: 99, name: 'Đi lại' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(getCategoryStatistics).toHaveBeenCalledTimes(1);
   });
 
   it('opens an edit form populated from the selected card', async () => {
@@ -210,18 +159,21 @@ describe('Categories page', () => {
 
   it('confirms hide and restores hidden categories', async () => {
     const user = userEvent.setup();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const firstRender = renderPage();
     await screen.findByRole('heading', { name: 'Ăn uống' });
     await user.click(screen.getByRole('button', { name: 'Ẩn' }));
+    
+    expect(screen.getByText('Ẩn danh mục?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ẩn danh mục' }));
     await waitFor(() => expect(hideCategory).toHaveBeenCalledWith(1));
-    expect(confirm).toHaveBeenCalled();
     firstRender.unmount();
 
-    getCategoryStatistics.mockResolvedValue(response([{ ...category, is_active: false }]));
+    getCategories.mockResolvedValue(response([{ ...category, is_active: false }]));
     renderPage();
-    await user.selectOptions(screen.getByLabelText('Trạng thái'), 'hidden');
-    await user.click(await screen.findByRole('button', { name: 'Khôi phục' }));
+    await user.click(screen.getByText('Đang sử dụng'));
+    await user.click(screen.getByText('Đã ẩn'));
+    await screen.findByRole('heading', { name: 'Ăn uống' });
+    await user.click(screen.getByRole('button', { name: 'Khôi phục' }));
     await waitFor(() => expect(restoreCategory).toHaveBeenCalledWith(1));
   });
 });
@@ -268,7 +220,7 @@ describe('Category components', () => {
     const onSubmit = vi.fn();
     render(
       <CategoryFormModal
-        category={{ ...category, name: 'Cà phê', color: '#123456' }}
+        category={{ ...category, name: 'Cà phê', color: '#123456', type: 'expense' }}
         submitting={false}
         apiError=""
         onClose={vi.fn()}
@@ -277,7 +229,12 @@ describe('Category components', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Đi lại' }));
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
-    expect(onSubmit).toHaveBeenCalledWith({ name: 'Cà phê', icon: 'transport', color: '#123456' });
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: 'Cà phê',
+      icon: 'transport',
+      color: '#123456',
+      type: 'expense',
+    });
   });
 
   it('uses a safe icon path and displays a fallback after an asset error', () => {

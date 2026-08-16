@@ -8,7 +8,7 @@ const WELCOME_MESSAGE = {
   content: 'Xin chào! 👋 Mình là FinAI, trợ lý chi tiêu cá nhân của bạn. Hãy hỏi mình bất cứ điều gì về tài chính nhé! 💰',
 };
 
-const ChatPopup = ({ isOpen, onClose }) => {
+const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -54,7 +54,7 @@ const ChatPopup = ({ isOpen, onClose }) => {
         ...prev,
         { role: 'assistant', content: data.reply },
       ]);
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -87,9 +87,20 @@ const ChatPopup = ({ isOpen, onClose }) => {
           <strong>FinAI</strong>
           <span>Trợ lý chi tiêu</span>
         </div>
-        <button className="chat-popup-close" onClick={onClose} aria-label="Đóng chat">
-          ✕
-        </button>
+        <div className="chat-popup-actions">
+          <button
+            type="button"
+            className="chat-popup-minimize"
+            onClick={onMinimize}
+            aria-label="Ẩn trợ lý FinAI"
+            title="Ẩn trợ lý"
+          >
+            −
+          </button>
+          <button type="button" className="chat-popup-close" onClick={onClose} aria-label="Đóng chat" title="Đóng cửa sổ chat">
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Messages */}

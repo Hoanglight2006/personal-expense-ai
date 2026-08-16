@@ -4,8 +4,9 @@ Covers CRUD, ownership enforcement, soft-delete, restore, duplicate,
 filtering, sorting, pagination and bulk import.
 """
 
-import pytest
+from datetime import date
 from decimal import Decimal
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,9 +28,9 @@ def register_and_login(client, username, email, password="Test1234!"):
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_category(client, headers, name="TestCat", icon="other", color="#D69A23"):
+def create_category(client, headers, name="TestCat", icon="other", color="#D69A23", type="expense"):
     resp = client.post(CATEGORIES_URL, json={
-        "name": name, "icon": icon, "color": color,
+        "name": name, "icon": icon, "color": color, "type": type,
     }, headers=headers)
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -65,17 +66,17 @@ def user_b(client):
 
 @pytest.fixture(scope="module")
 def cat_expense_a(client, user_a):
-    return create_category(client, user_a, "Chi phí A")
+    return create_category(client, user_a, "Chi phí A", type="expense")
 
 
 @pytest.fixture(scope="module")
 def cat_income_a(client, user_a):
-    return create_category(client, user_a, "Thu nhập A")
+    return create_category(client, user_a, "Thu nhập A", type="income")
 
 
 @pytest.fixture(scope="module")
 def cat_expense_b(client, user_b):
-    return create_category(client, user_b, "Chi phí B")
+    return create_category(client, user_b, "Chi phí B", type="expense")
 
 
 # ---------------------------------------------------------------------------
@@ -609,3 +610,179 @@ class TestBulkImport:
             headers=user_a,
         )
         assert resp.status_code == 422
+
+    def test_import_partial_success_preserves_valid_rows_across_errors(
+        self, client, user_a, cat_expense_a, cat_expense_b
+    ):
+        """Row 0 is valid, Row 1 is invalid category (other user's), Row 2 is valid.
+        Both Row 0 and Row 2 must be committed into DB without Row 0 being lost.
+        """
+        resp = client.post(
+            f"{TRANSACTIONS_URL}/import",
+            json={
+                "idempotency_key": "test-import-partial-001",
+                "rows": [
+                    {
+                        "amount": "100.00",
+                        "type": "expense",
+                        "category_id": cat_expense_a["id"],
+                        "transaction_date": "2026-08-01",
+                        "description": "Row 0 valid",
+                    },
+                    {
+                        "amount": "200.00",
+                        "type": "expense",
+                        "category_id": cat_expense_b["id"],
+                        "transaction_date": "2026-08-02",
+                        "description": "Row 1 invalid",
+                    },
+                    {
+                        "amount": "300.00",
+                        "type": "expense",
+                        "category_id": cat_expense_a["id"],
+                        "transaction_date": "2026-08-03",
+                        "description": "Row 2 valid",
+                    },
+                ],
+            },
+            headers=user_a,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success_count"] == 2
+        assert data["error_count"] == 1
+        assert data["results"][0]["status"] == "success"
+        assert data["results"][1]["status"] == "error"
+        assert data["results"][2]["status"] == "success"
+
+        # Verify Row 0 and Row 2 are both in the DB
+        list_resp = client.get(TRANSACTIONS_URL, headers=user_a)
+        items = list_resp.json()["items"]
+        descriptions = [i["description"] for i in items]
+        assert "Row 0 valid" in descriptions
+        assert "Row 2 valid" in descriptions
+        assert "Row 1 invalid" not in descriptions
+
+
+class TestTransactionSummary:
+    def test_summary_returns_accurate_balances(self, client):
+        summary_user = register_and_login(client, "summary_tester", "summary_tester@test.com")
+        cat_inc = create_category(client, summary_user, "Thu nhập test", icon="salary", type="income")
+        cat_exp = create_category(client, summary_user, "Chi tiêu test", icon="food", type="expense")
+
+        # Add income: 500.00, expense: 200.00
+        client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "500.00",
+                "type": "income",
+                "category_id": cat_inc["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=summary_user,
+        )
+        del_txn = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "999.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=summary_user,
+        ).json()
+        # Soft delete this 999.00 expense
+        client.post(f"{TRANSACTIONS_URL}/{del_txn['id']}/trash", headers=summary_user)
+
+        client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "200.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=summary_user,
+        )
+
+        resp = client.get(f"{TRANSACTIONS_URL}/summary", headers=summary_user)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["all_time_income"] == "500.00"
+        assert data["all_time_expense"] == "200.00"
+        assert data["available_balance"] == "300.00"
+        assert data["month_income"] == "500.00"
+        assert data["month_expense"] == "200.00"
+        assert data["month_net"] == "300.00"
+
+
+
+class TestCategoryValidationConstraints:
+    """Test validation of category constraints (type matching, soft-delete exclusion)."""
+
+    def test_cannot_create_transaction_with_mismatched_category_type(
+        self, client, user_a, cat_expense_a
+    ):
+        # Attempt to create an 'income' transaction with an 'expense' category
+        res = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100.00",
+                "type": "income",
+                "category_id": cat_expense_a["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user_a,
+        )
+        assert res.status_code == 422
+        assert "không khớp" in res.json()["detail"]
+
+    def test_cannot_create_transaction_with_soft_deleted_category(
+        self, client, user_a
+    ):
+        cat = create_category(client, user_a, "Tam thoi xoa", icon="other", type="expense")
+        cat_id = cat["id"]
+
+        # Soft delete the category
+        del_res = client.delete(f"/api/v1/categories/{cat_id}", headers=user_a)
+        assert del_res.status_code == 204
+
+        # Attempt to create transaction with soft-deleted category
+        res = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "50.00",
+                "type": "expense",
+                "category_id": cat_id,
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user_a,
+        )
+        assert res.status_code == 404
+        assert "Không tìm thấy danh mục" in res.json()["detail"]
+
+    def test_import_transactions_rejects_mismatched_or_deleted_category(
+        self, client, user_a, cat_expense_a
+    ):
+        # 1. Row with mismatched type
+        payload = {
+            "idempotency_key": "test-import-val-1",
+            "rows": [
+                {
+                    "amount": "200.00",
+                    "type": "income",  # Mismatch with expense category
+                    "category_id": cat_expense_a["id"],
+                    "transaction_date": "2026-08-01",
+                    "description": "Income mismatch",
+                }
+            ],
+        }
+        res = client.post(f"{TRANSACTIONS_URL}/import", json=payload, headers=user_a)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success_count"] == 0
+        assert data["error_count"] == 1
+        assert "không khớp" in data["results"][0]["error"]
+
+
+

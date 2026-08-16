@@ -231,12 +231,13 @@ def test_hide_is_soft_delete_and_keeps_historical_transaction(client: TestClient
     assert item["total_amount"] == "125.50"
     assert item["transaction_count"] == 1
 
-    type_is_not_a_category_field = client.patch(
+    type_patch_resp = client.patch(
         f"/api/v1/categories/{category['id']}",
         headers=headers,
         json={"type": "income"},
     )
-    assert type_is_not_a_category_field.status_code == 422
+    assert type_patch_resp.status_code == 200
+    assert type_patch_resp.json()["type"] == "income"
 
 
 def test_statistics_sort_percentage_date_boundary_and_user_isolation(client: TestClient):
@@ -328,3 +329,85 @@ def test_restore_rechecks_legacy_name_conflict(client: TestClient):
         f"/api/v1/categories/{hidden['id']}/restore", headers=headers
     )
     assert response.status_code == 409
+
+
+def test_create_income_category_persists_type(client: TestClient):
+    headers, _ = auth_headers(client)
+    res = client.post(
+        "/api/v1/categories",
+        headers=headers,
+        json={"name": "Lương tháng", "type": "income", "icon": "salary", "color": "#10B981"},
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert data["name"] == "Lương tháng"
+    assert data["type"] == "income"
+
+
+def test_category_stats_excludes_soft_deleted_transactions(client: TestClient):
+    headers, user_id = auth_headers(client)
+    cat = create_category(client, headers, "Mua sắm", icon="shopping").json()
+    db = TestingSessionLocal()
+    try:
+        active_txn = Transaction(
+            user_id=user_id,
+            category_id=cat["id"],
+            type=CategoryType.EXPENSE,
+            amount=Decimal("100.00"),
+            transaction_date=date(2026, 8, 10),
+            is_deleted=False,
+        )
+        deleted_txn = Transaction(
+            user_id=user_id,
+            category_id=cat["id"],
+            type=CategoryType.EXPENSE,
+            amount=Decimal("500.00"),
+            transaction_date=date(2026, 8, 11),
+            is_deleted=True,
+        )
+        db.add_all([active_txn, deleted_txn])
+        db.commit()
+    finally:
+        db.close()
+
+    res = client.get(
+        "/api/v1/categories",
+        headers=headers,
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    )
+    assert res.status_code == 200
+    item = next(i for i in res.json()["items"] if i["id"] == cat["id"])
+    assert item["total_amount"] == "100.00"
+    assert item["transaction_count"] == 1
+
+
+def test_soft_deleted_category_cannot_be_accessed_or_modified(client: TestClient):
+    headers, _ = auth_headers(client)
+    cat = create_category(client, headers, "Tập gym", icon="sports").json()
+    cat_id = cat["id"]
+
+    # Delete category
+    del_res = client.delete(f"/api/v1/categories/{cat_id}", headers=headers)
+    assert del_res.status_code == 204
+
+    # GET /api/v1/categories/{id} should return 404
+    get_res = client.get(f"/api/v1/categories/{cat_id}", headers=headers)
+    assert get_res.status_code == 404
+
+    # PATCH /api/v1/categories/{id} should return 404
+    patch_res = client.patch(
+        f"/api/v1/categories/{cat_id}",
+        headers=headers,
+        json={"name": "Tập gym VIP"},
+    )
+    assert patch_res.status_code == 404
+
+    # POST /api/v1/categories/{id}/hide should return 404
+    hide_res = client.post(f"/api/v1/categories/{cat_id}/hide", headers=headers)
+    assert hide_res.status_code == 404
+
+    # POST /api/v1/categories/{id}/restore should return 404
+    restore_res = client.post(f"/api/v1/categories/{cat_id}/restore", headers=headers)
+    assert restore_res.status_code == 404
+
+

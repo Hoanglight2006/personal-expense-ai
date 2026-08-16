@@ -4,6 +4,8 @@ Supports CRUD, soft-delete/restore, duplicate preparation, search/filter/sort
 and paginated listing.  All endpoints enforce ownership via the current JWT user.
 """
 
+import calendar
+from collections import OrderedDict
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated
@@ -28,6 +30,7 @@ from app.schemas.transaction import (
     TransactionResponse,
     TransactionRestoreResponse,
     TransactionSort,
+    TransactionSummaryResponse,
     TransactionUpdate,
 )
 
@@ -73,14 +76,18 @@ def _validate_category(
     *,
     require_active: bool = True,
 ) -> Category:
-    """Ensure the category belongs to the user.
+    """Ensure the category belongs to the user and is not deleted.
 
     When *require_active* is ``True`` (default for new transactions), the
     category must also be active.
     """
     category = (
         db.query(Category)
-        .filter(Category.id == category_id, Category.user_id == user_id)
+        .filter(
+            Category.id == category_id,
+            Category.user_id == user_id,
+            Category.deleted_at.is_(None),
+        )
         .first()
     )
     if category is None:
@@ -92,6 +99,11 @@ def _validate_category(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Không thể sử dụng danh mục đã ẩn cho giao dịch mới.",
+        )
+    if category.type != transaction_type.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Loại giao dịch không khớp với loại danh mục.",
         )
     return category
 
@@ -296,6 +308,74 @@ def list_trash(
     )
 
 
+@router.get("/summary", response_model=TransactionSummaryResponse)
+def get_transaction_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionSummaryResponse:
+    """Return financial summary metrics: initial balance, all-time flow, and current month flow."""
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    last_of_month = today.replace(day=last_day)
+
+    # 1. All-time income & expense
+    all_time_stats = (
+        db.query(
+            Transaction.type,
+            sa_func.coalesce(sa_func.sum(Transaction.amount), 0).label("total"),
+        )
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.is_deleted.is_(False),
+        )
+        .group_by(Transaction.type)
+        .all()
+    )
+    all_time_income = Decimal("0.00")
+    all_time_expense = Decimal("0.00")
+    for txn_type, total in all_time_stats:
+        if txn_type == CategoryType.INCOME:
+            all_time_income = Decimal(total).quantize(Decimal("0.01"))
+        elif txn_type == CategoryType.EXPENSE:
+            all_time_expense = Decimal(total).quantize(Decimal("0.01"))
+
+    # 2. Month income & expense
+    month_stats = (
+        db.query(
+            Transaction.type,
+            sa_func.coalesce(sa_func.sum(Transaction.amount), 0).label("total"),
+        )
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.is_deleted.is_(False),
+            Transaction.transaction_date >= first_of_month,
+            Transaction.transaction_date <= last_of_month,
+        )
+        .group_by(Transaction.type)
+        .all()
+    )
+    month_income = Decimal("0.00")
+    month_expense = Decimal("0.00")
+    for txn_type, total in month_stats:
+        if txn_type == CategoryType.INCOME:
+            month_income = Decimal(total).quantize(Decimal("0.01"))
+        elif txn_type == CategoryType.EXPENSE:
+            month_expense = Decimal(total).quantize(Decimal("0.01"))
+
+    available_balance = all_time_income - all_time_expense
+    month_net = month_income - month_expense
+
+    return TransactionSummaryResponse(
+        available_balance=available_balance,
+        all_time_income=all_time_income,
+        all_time_expense=all_time_expense,
+        month_income=month_income,
+        month_expense=month_expense,
+        month_net=month_net,
+    )
+
+
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 def get_transaction(
     transaction_id: int,
@@ -431,9 +511,10 @@ def duplicate_transaction(
 # Bulk import (confirmed rows from Excel / OCR preview)
 # ---------------------------------------------------------------------------
 
-# In-memory idempotency store – acceptable for single-process dev deployments.
-# For production, swap with Redis or a DB table.
-_processed_import_keys: set[str] = set()
+# In-memory idempotency store with bounded capacity (LRU-style FIFO eviction).
+# For production cluster, swap with Redis or a DB table.
+MAX_IDEMPOTENCY_KEYS = 2000
+_processed_import_keys: OrderedDict[str, bool] = OrderedDict()
 
 
 @router.post("/import", response_model=BulkImportResponse)
@@ -459,45 +540,49 @@ def import_transactions(
 
     for idx, row in enumerate(payload.rows):
         try:
-            # Validate category
-            cat = (
-                db.query(Category)
-                .filter(
-                    Category.id == row.category_id,
-                    Category.user_id == current_user.id,
+            with db.begin_nested():
+                # Validate category
+                cat = (
+                    db.query(Category)
+                    .filter(
+                        Category.id == row.category_id,
+                        Category.user_id == current_user.id,
+                        Category.deleted_at.is_(None),
+                    )
+                    .first()
                 )
-                .first()
-            )
-            if cat is None:
-                raise ValueError("Không tìm thấy danh mục.")
-            if not cat.is_active:
-                raise ValueError("Không thể sử dụng danh mục đã ẩn.")
+                if cat is None:
+                    raise ValueError("Không tìm thấy danh mục.")
+                if not cat.is_active:
+                    raise ValueError("Không thể sử dụng danh mục đã ẩn.")
+                if cat.type != row.type.value:
+                    raise ValueError("Loại giao dịch không khớp với loại danh mục.")
 
-            txn = Transaction(
-                user_id=current_user.id,
-                category_id=row.category_id,
-                type=row.type,
-                amount=row.amount,
-                description=row.description,
-                transaction_date=row.transaction_date,
-                payment_method=row.payment_method,
-            )
-            db.add(txn)
-            db.flush()
+                txn = Transaction(
+                    user_id=current_user.id,
+                    category_id=row.category_id,
+                    type=row.type,
+                    amount=row.amount,
+                    description=row.description,
+                    transaction_date=row.transaction_date,
+                    payment_method=row.payment_method,
+                )
+                db.add(txn)
+                db.flush()
             results.append(
                 RowResult(index=idx, status="success", transaction_id=txn.id)
             )
             success_count += 1
-        except (ValueError, HTTPException) as exc:
-            db.rollback()
+        except (ValueError, HTTPException, Exception) as exc:
             msg = exc.detail if isinstance(exc, HTTPException) else str(exc)
             results.append(RowResult(index=idx, status="error", error=msg))
             error_count += 1
 
     if success_count > 0:
         _commit_or_raise(db)
-
-    _processed_import_keys.add(user_scoped_key)
+        if len(_processed_import_keys) >= MAX_IDEMPOTENCY_KEYS:
+            _processed_import_keys.popitem(last=False)
+        _processed_import_keys[user_scoped_key] = True
 
     return BulkImportResponse(
         total=len(payload.rows),

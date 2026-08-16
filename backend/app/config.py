@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     MAX_EXCEL_SIZE_MB: int = 5
     OCR_PROVIDER: str = "gemini"  # 'local', 'gemini', or 'none' for fallback
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-3.5-flash"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
     model_config = {"env_file": Path(__file__).resolve().parents[1] / ".env"}
 

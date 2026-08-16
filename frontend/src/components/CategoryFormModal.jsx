@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CATEGORY_COLORS, CATEGORY_PRESETS } from '../constants/categoryIcons';
 import CategoryIcon from './CategoryIcon';
+import { useModalLock } from '../hooks/useModalLock';
 
 const DEFAULT_PRESET = CATEGORY_PRESETS[0];
 const DEFAULT_FORM = {
@@ -11,6 +12,7 @@ const DEFAULT_FORM = {
 };
 
 const CategoryFormModal = ({ category, submitting, apiError, onClose, onSubmit }) => {
+  useModalLock(true, onClose);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [errors, setErrors] = useState({});
 

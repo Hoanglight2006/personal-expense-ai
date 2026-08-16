@@ -1,15 +1,9 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
+import { useModalLock } from '../hooks/useModalLock';
 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Xóa', cancelText = 'Hủy', isDanger = true }) => {
   const overlayRef = useRef(null);
-
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    if (isOpen) document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onCancel]);
+  useModalLock(isOpen, onCancel);
 
   if (!isOpen) return null;
 

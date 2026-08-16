@@ -2,10 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getCategoryStatistics } from '../api/categoryApi';
 import CategoryInsights from '../components/CategoryInsights';
 import CustomDatePicker from '../components/CustomDatePicker';
-import CustomSelect from '../components/CustomSelect';
 
 const pad = (value) => String(value).padStart(2, '0');
 const localDateValue = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const formatVnDate = (isoStr) => {
+  if (!isoStr) return '';
+  const [y, m, d] = isoStr.split('-');
+  return `${d}/${m}/${y}`;
+};
 const currentMonthValue = () => {
   const now = new Date();
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
@@ -46,16 +50,21 @@ const Statistics = () => {
   const [period, setPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
+  const [filterMode, setFilterMode] = useState('month'); // 'month' or 'period'
   const [dateMode, setDateMode] = useState('month');
   const [month, setMonth] = useState(currentMonthValue);
   const initialRange = useMemo(() => monthRange(currentMonthValue()), []);
   const [customStart, setCustomStart] = useState(initialRange.startDate);
   const [customEnd, setCustomEnd] = useState(initialRange.endDate);
 
+  // Mutual exclusivity: only one popup open at a time
+  // Values: null, 'select', 'monthPicker', 'startDate', 'endDate'
+  const [activePopup, setActivePopup] = useState(null);
+
   const selectedRange = useMemo(
-    () => dateMode === 'month' ? monthRange(month) : { startDate: customStart, endDate: customEnd },
-    [dateMode, month, customStart, customEnd],
+    () => filterMode === 'month' ? monthRange(month) : { startDate: customStart, endDate: customEnd },
+    [filterMode, month, customStart, customEnd],
   );
 
   const loadStatistics = useCallback(async (signal) => {
@@ -98,92 +107,202 @@ const Statistics = () => {
 
   return (
     <div className="statistics-page fade-in">
-      <div className="statistics-header">
+      <section className="statistics-hero">
         <div className="statistics-title">
+          <span className="eyebrow">Báo cáo & Xu hướng</span>
           <h1>Thống kê & Báo cáo</h1>
-          <p>Phân tích chi tiết dòng tiền của bạn</p>
+          <p>Phân tích trực quan dòng tiền, cơ cấu thu chi và biến động tài chính.</p>
         </div>
 
-        <div className="statistics-filters">
-          <div className="filter-group">
-            <CustomSelect
-              value={dateMode}
-              onChange={(e) => {
-                setDateMode(e.target.value);
-                if (e.target.value === 'recent7') {
-                  const r = recentDaysRange(7);
-                  setCustomStart(r.startDate);
-                  setCustomEnd(r.endDate);
-                } else if (e.target.value === 'recent30') {
+        <div className="statistics-toolbar" aria-label="Bộ lọc thống kê">
+          {/* Mode Tabs — chọn cái này thì tắt hoàn toàn cái kia */}
+          <div className="stats-mode-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterMode === 'month'}
+              className={`stats-mode-tab ${filterMode === 'month' ? 'active' : ''}`}
+              onClick={() => {
+                setFilterMode('month');
+                setDateMode('month');
+                setActivePopup(null);
+              }}
+            >
+              📅 Theo tháng
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterMode === 'period'}
+              className={`stats-mode-tab ${filterMode === 'period' ? 'active' : ''}`}
+              onClick={() => {
+                setFilterMode('period');
+                if (dateMode === 'month') {
+                  setDateMode('recent30');
                   const r = recentDaysRange(30);
                   setCustomStart(r.startDate);
                   setCustomEnd(r.endDate);
-                } else if (e.target.value === 'thisMonth') {
-                  const r = monthRange(currentMonthValue());
-                  setCustomStart(r.startDate);
-                  setCustomEnd(r.endDate);
                 }
+                setActivePopup(null);
               }}
-              options={[
-                { value: 'month', label: 'Theo tháng' },
-                { value: 'recent7', label: '7 ngày qua' },
-                { value: 'recent30', label: '30 ngày qua' },
-                { value: 'thisMonth', label: 'Tháng này' },
-                { value: 'custom', label: 'Tùy chỉnh' },
-              ]}
-            />
+            >
+              ⏱️ Khoảng ngày
+            </button>
           </div>
 
-          {dateMode === 'month' && (
-            <div className="filter-group">
-              <CustomDatePicker
-                monthMode
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-              />
+          {/* Mode: Theo tháng — chỉ hiện DatePicker, KHÔNG hiện Select */}
+          {filterMode === 'month' && (
+            <div className="stats-month-controls">
+              <div className="stats-month-nav-group">
+                <button
+                  type="button"
+                  className="stats-nav-arrow"
+                  onClick={() => {
+                    const [y, m] = month.split('-').map(Number);
+                    const prev = new Date(y, m - 2, 1);
+                    setMonth(`${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`);
+                    setActivePopup(null);
+                  }}
+                  title="Tháng trước"
+                  aria-label="Tháng trước"
+                >
+                  ‹
+                </button>
+                <div className="stats-month-picker-wrap">
+                  <CustomDatePicker
+                    monthMode
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    open={activePopup === 'monthPicker'}
+                    onCalendarOpen={() => setActivePopup('monthPicker')}
+                    onCalendarClose={() => setActivePopup(null)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="stats-nav-arrow"
+                  onClick={() => {
+                    const [y, m] = month.split('-').map(Number);
+                    const next = new Date(y, m, 1);
+                    setMonth(`${next.getFullYear()}-${pad(next.getMonth() + 1)}`);
+                    setActivePopup(null);
+                  }}
+                  title="Tháng sau"
+                  aria-label="Tháng sau"
+                >
+                  ›
+                </button>
+              </div>
+              {month !== currentMonthValue() && (
+                <button
+                  type="button"
+                  className="btn-return-today stats-return-current"
+                  onClick={() => {
+                    setMonth(currentMonthValue());
+                    setActivePopup(null);
+                  }}
+                  title="Quay về tháng hiện tại"
+                >
+                  Tháng này
+                </button>
+              )}
             </div>
           )}
-          
-          {dateMode !== 'month' && (
-            <div className="date-range-group">
-              <div className="filter-group">
-                <CustomDatePicker
-                  value={customStart}
-                  onChange={(e) => {
-                    setCustomStart(e.target.value);
-                    setDateMode('custom');
+
+          {/* Mode: Khoảng ngày — preset dạng nút, chỉ hiện ô ngày khi chọn tùy chỉnh */}
+          {filterMode === 'period' && (
+            <div className="stats-period-controls">
+              <div className="stats-quick-periods" role="group" aria-label="Chọn nhanh khoảng ngày">
+                <button
+                  type="button"
+                  className={dateMode === 'recent7' ? 'active' : ''}
+                  onClick={() => {
+                    const range = recentDaysRange(7);
+                    setDateMode('recent7');
+                    setCustomStart(range.startDate);
+                    setCustomEnd(range.endDate);
+                    setActivePopup(null);
                   }}
-                  maxDate={customEnd}
-                />
-              </div>
-              <span className="date-separator">-</span>
-              <div className="filter-group">
-                <CustomDatePicker
-                  value={customEnd}
-                  onChange={(e) => {
-                    setCustomEnd(e.target.value);
-                    setDateMode('custom');
+                >
+                  7 ngày
+                </button>
+                <button
+                  type="button"
+                  className={dateMode === 'recent30' ? 'active' : ''}
+                  onClick={() => {
+                    const range = recentDaysRange(30);
+                    setDateMode('recent30');
+                    setCustomStart(range.startDate);
+                    setCustomEnd(range.endDate);
+                    setActivePopup(null);
                   }}
-                  minDate={customStart}
-                />
+                >
+                  30 ngày
+                </button>
+                <button
+                  type="button"
+                  className={dateMode === 'custom' ? 'active' : ''}
+                  onClick={() => {
+                    setDateMode('custom');
+                    setActivePopup(null);
+                  }}
+                >
+                  Tùy chỉnh
+                </button>
               </div>
+
+              {dateMode !== 'custom' && (
+                <div className="stats-range-badge" aria-label="Khoảng thời gian áp dụng">
+                  <span>Áp dụng</span>
+                  <strong>{formatVnDate(customStart)} – {formatVnDate(customEnd)}</strong>
+                </div>
+              )}
+
+              {dateMode === 'custom' && (
+                <div className="stats-date-range">
+                  <div className="stats-filter-field">
+                    <span className="filter-label">Từ ngày</span>
+                    <CustomDatePicker
+                      value={customStart}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                      maxDate={customEnd}
+                      popperPlacement="bottom-start"
+                      open={activePopup === 'startDate'}
+                      onCalendarOpen={() => setActivePopup('startDate')}
+                      onCalendarClose={() => setActivePopup(null)}
+                    />
+                  </div>
+                  <div className="stats-filter-field">
+                    <span className="filter-label">Đến ngày</span>
+                    <CustomDatePicker
+                      value={customEnd}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                      minDate={customStart}
+                      popperPlacement="bottom-end"
+                      open={activePopup === 'endDate'}
+                      onCalendarOpen={() => setActivePopup('endDate')}
+                      onCalendarClose={() => setActivePopup(null)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {error && <div className="error-message" role="alert">{error}</div>}
 
-      <div className="statistics-content" style={{ position: 'relative', minHeight: '400px' }}>
+      <div className="statistics-content">
         {loading && !period && (
-          <div className="loading-state" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+          <div className="statistics-loading loading-state">
             <div className="spinner" aria-hidden="true" />
             <p>Đang tải dữ liệu...</p>
           </div>
         )}
-        
+
         {period && (
-          <div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.3s ease', pointerEvents: loading ? 'none' : 'auto' }}>
+          <div className={`statistics-result ${loading ? 'is-loading' : ''}`} aria-busy={loading}>
             <CategoryInsights categories={period.items} />
           </div>
         )}

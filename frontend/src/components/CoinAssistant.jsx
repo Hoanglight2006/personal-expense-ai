@@ -82,7 +82,7 @@ const CoinAssistant = () => {
   };
 
   const handleMinimize = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     setIsMinimized(true);
     setIsChatOpen(false);
     setBubbleVisible(false);
@@ -98,7 +98,7 @@ const CoinAssistant = () => {
     <div className={`coin-assistant-container ${isMinimized ? 'minimized' : ''} ${isChatOpen ? 'chat-open' : ''}`}>
       {isChatOpen ? (
         /* Chat Popup appears right in place of the assistant */
-        <ChatPopup isOpen={isChatOpen} onClose={handleCloseChat} />
+        <ChatPopup isOpen={isChatOpen} onClose={handleCloseChat} onMinimize={handleMinimize} />
       ) : isMinimized ? (
         /* Minimized mini-button in corner */
         <button

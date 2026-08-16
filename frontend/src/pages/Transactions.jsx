@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TransactionCard from '../components/TransactionCard';
 import TransactionFormModal from '../components/TransactionFormModal';
@@ -70,7 +70,7 @@ const Transactions = () => {
 
   // Excel
   const [excelPreviewData, setExcelPreviewData] = useState(null);
-  const excelInputRef = useRef(null);
+  const [excelLoading, setExcelLoading] = useState(false);
 
   // Load categories once
   useEffect(() => {
@@ -257,15 +257,18 @@ const Transactions = () => {
     if (!file) return;
     e.target.value = null; // reset
 
-    setLoading(true);
+    setExcelLoading(true);
     setError('');
+    setModalError('');
     try {
       const data = await apiParseExcel(file);
+      setModalOpen(false);
       setExcelPreviewData(data.items);
     } catch (err) {
+      setModalError(apiMessage(err));
       setError(apiMessage(err));
     } finally {
-      setLoading(false);
+      setExcelLoading(false);
     }
   };
 
@@ -278,14 +281,14 @@ const Transactions = () => {
         rows: validRows.map((r) => ({
           amount: r.amount,
           type: r.type,
-          category_id: r.category_id || null,
+          category_id: Number(r.category_id),
           transaction_date: r.transaction_date,
           description: r.description,
-          payment_method: r.payment_method,
+          payment_method: r.payment_method || 'bank_transfer',
         })),
       };
       const res = await apiImportTransactions(payload);
-      setSuccess(`Nhập thành công ${res.success_count} giao dịch (thất bại: ${res.failed_count}).`);
+      setSuccess(`Nhập thành công ${res.success_count} giao dịch (thất bại: ${res.error_count}).`);
       setExcelPreviewData(null);
       loadTransactions();
     } catch (err) {
@@ -305,8 +308,8 @@ const Transactions = () => {
             <p>Ghi nhận, tìm kiếm và quản lý mọi khoản thu chi.</p>
           </div>
           <div className="txn-hero-actions">
-            <Link to="/transactions/trash" className="btn-secondary txn-trash-link">🗑️ Thùng rác</Link>
             <button type="button" className="btn-primary add-txn-button" onClick={openCreate}>+ Thêm giao dịch</button>
+            <Link to="/transactions/trash" className="btn-secondary txn-trash-link">🗑️ Thùng rác</Link>
           </div>
         </section>
 
@@ -404,7 +407,7 @@ const Transactions = () => {
             onSubmit={handleSubmit}
             prefillData={prefillData}
             onExcelUpload={handleExcelUpload}
-            isExcelLoading={loading}
+            isExcelLoading={excelLoading}
           />
         )}
 

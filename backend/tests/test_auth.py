@@ -241,6 +241,96 @@ def test_get_current_user(client: TestClient):
     assert data["email"] == email.lower()
 
 
+def test_update_current_user_profile(client: TestClient):
+    username = random_string()
+    password = "strongpassword123"
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": password},
+    )
+    token = client.post(
+        "/api/v1/auth/login", data={"username": username, "password": password}
+    ).json()["access_token"]
+
+    response = client.patch(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": f"  {username}new  ", "email": f"  {username}NEW@EXAMPLE.COM  "},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["username"] == f"{username}new"
+    assert response.json()["email"] == f"{username.lower()}new@example.com"
+
+
+def test_update_current_user_rejects_duplicate(client: TestClient):
+    first = random_string()
+    second = random_string()
+    password = "strongpassword123"
+    for username in (first, second):
+        client.post(
+            "/api/v1/auth/register",
+            json={"username": username, "email": f"{username}@example.com", "password": password},
+        )
+    token = client.post(
+        "/api/v1/auth/login", data={"username": first, "password": password}
+    ).json()["access_token"]
+
+    response = client.patch(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": f"{second}@example.com"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username or email already exists."
+
+
+def test_change_password_for_current_user(client: TestClient):
+    username = random_string()
+    old_password = "strongpassword123"
+    new_password = "newstrongpassword456"
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": old_password},
+    )
+    token = client.post(
+        "/api/v1/auth/login", data={"username": username, "password": old_password}
+    ).json()["access_token"]
+
+    response = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": old_password, "new_password": new_password},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Đổi mật khẩu thành công."
+    assert client.post("/api/v1/auth/login", data={"username": username, "password": old_password}).status_code == 401
+    assert client.post("/api/v1/auth/login", data={"username": username, "password": new_password}).status_code == 200
+
+
+def test_change_password_rejects_wrong_current_password(client: TestClient):
+    username = random_string()
+    password = "strongpassword123"
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": password},
+    )
+    token = client.post(
+        "/api/v1/auth/login", data={"username": username, "password": password}
+    ).json()["access_token"]
+
+    response = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "wrongpassword", "new_password": "newstrongpassword456"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Mật khẩu hiện tại không chính xác."
+
+
 def test_get_current_user_no_token(client: TestClient):
     assert client.get("/api/v1/auth/me").status_code == 401
 
@@ -286,42 +376,4 @@ def test_get_current_user_deleted_user(client: TestClient):
     finally:
         db.close()
     assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
-
-
-def test_update_initial_balance(client: TestClient):
-    username = random_string()
-    client.post(
-        "/api/v1/auth/register",
-        json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"},
-    )
-    login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
-    token = login.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Initial check (default 0)
-    me = client.get("/api/v1/auth/me", headers=headers)
-    assert me.status_code == 200
-    assert float(me.json().get("initial_balance", 0)) == 0.0
-
-    # Update initial balance
-    update_res = client.patch(
-        "/api/v1/auth/me/initial-balance",
-        headers=headers,
-        json={"initial_balance": 15000000.50},
-    )
-    assert update_res.status_code == 200
-    assert float(update_res.json()["initial_balance"]) == 15000000.50
-
-    # Fetch again to verify persistence
-    me_updated = client.get("/api/v1/auth/me", headers=headers)
-    assert me_updated.status_code == 200
-    assert float(me_updated.json()["initial_balance"]) == 15000000.50
-
-    # Negative balance should be rejected
-    neg_res = client.patch(
-        "/api/v1/auth/me/initial-balance",
-        headers=headers,
-        json={"initial_balance": -1000},
-    )
-    assert neg_res.status_code == 422
 

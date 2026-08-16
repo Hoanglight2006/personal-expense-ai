@@ -4,6 +4,8 @@ Provides the GeminiChatService class that builds financial context
 from user transaction data and generates AI-powered responses.
 """
 
+import calendar
+import re
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -30,6 +32,24 @@ QUY TẮC ĐỘ DÀI & VĂN PHONG:
 - BẮT BUỘC phải viết trọn vẹn câu và kết thúc bằng dấu câu hợp lý (., !, ?). Tuyệt đối không dừng lửng lơ giữa chừng."""
 
 
+def mask_sensitive_data(text: str | None) -> str:
+    """Mask bank account numbers, card numbers, and banking transaction codes."""
+    if not text:
+        return ""
+    # Mask transaction reference IDs like FT234234..., MB..., etc.
+    masked = re.sub(
+        r"\b(?:FT|MB|VCB|TCB|BIDV|CTG|VPB|ACB|TPB)[A-Za-z0-9_]{5,}\b",
+        "[MÃ_GD_ĐÃ_ẨN]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Mask sequences of 8 or more consecutive digits (account numbers, card numbers)
+    masked = re.sub(r"\b\d{8,}\b", "[STK_ĐÃ_ẨN]", masked)
+    # Mask sequences of digits with spaces/dashes (e.g. 1234 5678 9012)
+    masked = re.sub(r"\b(?:\d[ -]?){12,19}\b", "[SỐ_THẺ_ĐÃ_ẨN]", masked)
+    return masked
+
+
 def build_financial_context(db: Session, user_id: int) -> str:
     """Build a text summary of the user's financial data for AI context.
 
@@ -37,6 +57,8 @@ def build_financial_context(db: Session, user_id: int) -> str:
     """
     today = date.today()
     first_of_month = today.replace(day=1)
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    last_of_month = today.replace(day=last_day)
 
     # --- Monthly totals by category ---
     monthly_stats = (
@@ -55,7 +77,7 @@ def build_financial_context(db: Session, user_id: int) -> str:
             Transaction.user_id == user_id,
             Transaction.is_deleted.is_(False),
             Transaction.transaction_date >= first_of_month,
-            Transaction.transaction_date <= today,
+            Transaction.transaction_date <= last_of_month,
         )
         .group_by(Category.name, Transaction.type)
         .all()
@@ -95,22 +117,40 @@ def build_financial_context(db: Session, user_id: int) -> str:
     recent_lines = []
     for txn, cat_name in recent:
         prefix = "Thu" if txn.type == CategoryType.INCOME else "Chi"
+        desc_part = f" ({mask_sensitive_data(txn.description)})" if txn.description else ""
         recent_lines.append(
             f"  - [{txn.transaction_date}] {prefix}: {txn.amount:,.0f} VNĐ"
-            f" — {cat_name}"
-            + (f" ({txn.description})" if txn.description else "")
+            f" — {cat_name}{desc_part}"
         )
 
-    # --- Fetch user initial balance ---
-    user = db.query(User).filter(User.id == user_id).first()
-    initial_balance = getattr(user, "initial_balance", Decimal("0")) or Decimal("0")
-    available_balance = initial_balance + total_income - total_expense
+    # --- Fetch all-time totals for available balance ---
+    all_time_stats = (
+        db.query(
+            Transaction.type,
+            sa_func.coalesce(sa_func.sum(Transaction.amount), 0).label("total"),
+        )
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.is_deleted.is_(False),
+        )
+        .group_by(Transaction.type)
+        .all()
+    )
+    all_time_income = Decimal("0")
+    all_time_expense = Decimal("0")
+    for txn_type, total in all_time_stats:
+        if txn_type == CategoryType.INCOME:
+            all_time_income = total or Decimal("0")
+        elif txn_type == CategoryType.EXPENSE:
+            all_time_expense = total or Decimal("0")
+
+    available_balance = all_time_income - all_time_expense
 
     # --- Build context text ---
     context_parts = [
         f"=== DỮ LIỆU TÀI CHÍNH THÁNG {today.month}/{today.year} ===",
         f"Ngày hôm nay: {today.strftime('%d/%m/%Y')}",
-        f"SỐ DƯ BAN ĐẦU (TIỀN CÓ SẴN): {initial_balance:,.0f} VNĐ",
+        f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (TỔNG THU - TỔNG CHI): {available_balance:,.0f} VNĐ",
         "",
         f"TỔNG THU NHẬP THÁNG NÀY: {total_income:,.0f} VNĐ",
     ]
@@ -126,7 +166,7 @@ def build_financial_context(db: Session, user_id: int) -> str:
 
     context_parts.append("")
     context_parts.append(f"CHÊNH LỆCH THU - CHI THÁNG NÀY: {(total_income - total_expense):,.0f} VNĐ")
-    context_parts.append(f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (Số dư ban đầu + Thu - Chi): {available_balance:,.0f} VNĐ")
+    context_parts.append(f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (Số dư ban đầu + Tổng thu - Tổng chi toàn bộ): {available_balance:,.0f} VNĐ")
 
     if recent_lines:
         context_parts.append("")
@@ -165,7 +205,8 @@ class GeminiChatService:
 
         candidate_models = [
             self._model_name,
-            "gemini-3.5-flash",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash",
             "gemini-flash-latest",
         ]
         # Remove duplicates while preserving order

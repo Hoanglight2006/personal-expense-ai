@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { formatVndDecimal } from '../utils/money';
+import { useModalLock } from '../hooks/useModalLock';
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -10,19 +11,54 @@ const formatDate = (value) => {
 };
 
 const ExcelPreviewModal = ({ data, categories, submitting, onCancel, onConfirm }) => {
-  const validRows = useMemo(() => data.filter((row) => !row.is_duplicate), [data]);
-  const duplicateCount = data.length - validRows.length;
+  useModalLock(true, onCancel);
+  const initialValidRows = useMemo(() => {
+    return data
+      .filter((row) => !row.is_duplicate)
+      .map((row) => {
+        let catId = row.category_id;
+        if (!catId) {
+          // Attempt to find a fallback category matching the type
+          const matchingCat = categories.find(
+            (c) => c.is_active !== false && c.type === row.type
+          ) || categories.find((c) => c.is_active !== false);
+          catId = matchingCat ? matchingCat.id : null;
+        }
+        return {
+          ...row,
+          category_id: catId,
+        };
+      });
+  }, [data, categories]);
 
-  const getCategoryName = (id) => {
-    if (!id) return 'Chưa phân loại';
-    return categories.find((c) => c.id === id)?.name || 'Chưa phân loại';
+  const [rows, setRows] = useState(initialValidRows);
+  const duplicateCount = data.length - initialValidRows.length;
+
+  const handleCategoryChange = (index, newCategoryId) => {
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, category_id: newCategoryId } : r))
+    );
+  };
+
+  const handleConfirm = () => {
+    // Ensure every row has a valid category_id fallback
+    const finalRows = rows.map((row) => {
+      if (row.category_id) return row;
+      const fallback = categories.find((c) => c.is_active !== false && c.type === row.type)
+        || categories.find((c) => c.is_active !== false);
+      return {
+        ...row,
+        category_id: fallback ? fallback.id : (categories[0]?.id || 1),
+      };
+    });
+    onConfirm(finalRows);
   };
 
   return (
     <div className="modal-backdrop">
       <div className="category-modal excel-preview-modal" role="dialog" aria-label="Xem trước sao kê">
         <div className="modal-header">
-          <h2>Xem trước sao kê MBBank</h2>
+          <h2>Xem trước dữ liệu sao kê</h2>
           <button type="button" className="modal-close" onClick={onCancel} aria-disabled={submitting}>✕</button>
         </div>
 
@@ -42,12 +78,12 @@ const ExcelPreviewModal = ({ data, categories, submitting, onCancel, onConfirm }
                 <th>Ngày</th>
                 <th>Loại</th>
                 <th>Số tiền</th>
-                <th>Danh mục (Dự đoán)</th>
+                <th>Danh mục</th>
                 <th>Nội dung</th>
               </tr>
             </thead>
             <tbody>
-              {validRows.map((row, idx) => {
+              {rows.map((row, idx) => {
                 const isIncome = row.type === 'income';
                 return (
                   <tr key={idx}>
@@ -60,12 +96,28 @@ const ExcelPreviewModal = ({ data, categories, submitting, onCancel, onConfirm }
                     <td className={`nowrap font-bold ${isIncome ? 'text-success' : 'text-danger'}`}>
                       {isIncome ? '+' : '-'}{formatVndDecimal(row.amount)}
                     </td>
-                    <td>{getCategoryName(row.category_id)}</td>
+                    <td>
+                      <select
+                        className={`excel-category-select ${!row.category_id ? 'unselected' : ''}`}
+                        value={row.category_id || ''}
+                        onChange={(e) => handleCategoryChange(idx, Number(e.target.value))}
+                        aria-label={`Danh mục cho dòng ${idx + 1}`}
+                      >
+                        <option value="" disabled>-- Chọn danh mục --</option>
+                        {categories
+                          .filter((c) => c.is_active !== false && c.type === row.type)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
                     <td className="text-truncate" title={row.description}>{row.description}</td>
                   </tr>
                 );
               })}
-              {validRows.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
                   <td colSpan="5" className="text-center text-muted py-4">
                     Tất cả giao dịch trong file đều đã tồn tại trên hệ thống.
@@ -83,10 +135,10 @@ const ExcelPreviewModal = ({ data, categories, submitting, onCancel, onConfirm }
           <button 
             type="button" 
             className="btn-primary" 
-            onClick={() => onConfirm(validRows)} 
-            disabled={submitting || validRows.length === 0}
+            onClick={handleConfirm} 
+            disabled={submitting || rows.length === 0}
           >
-            {submitting ? 'Đang nhập...' : `Nhập ${validRows.length} giao dịch`}
+            {submitting ? 'Đang nhập...' : `Nhập ${rows.length} giao dịch`}
           </button>
         </div>
       </div>
@@ -95,3 +147,4 @@ const ExcelPreviewModal = ({ data, categories, submitting, onCancel, onConfirm }
 };
 
 export default ExcelPreviewModal;
+

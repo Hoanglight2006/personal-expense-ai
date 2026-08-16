@@ -19,7 +19,7 @@ class GeminiOcrProvider(OcrProvider):
         if not settings.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not configured in .env.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel("gemini-3.5-flash")
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     def extract_transaction(self, image_bytes: bytes, categories: list | None = None) -> ExtractedTransaction:
         categories_context = ""
