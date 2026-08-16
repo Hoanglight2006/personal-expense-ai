@@ -1,5 +1,4 @@
-from decimal import Decimal
-from sqlalchemy import Column, DateTime, Integer, Numeric, String
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,9 +14,6 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    initial_balance = Column(
-        Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0.00"
-    )
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 

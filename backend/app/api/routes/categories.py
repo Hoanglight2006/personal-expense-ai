@@ -47,12 +47,15 @@ def validated_period(start_date: date | None, end_date: date | None) -> tuple[da
     return period_start, period_end
 
 
-def owned_category_or_404(db: Session, category_id: int, user_id: int) -> Category:
-    category = (
-        db.query(Category)
-        .filter(Category.id == category_id, Category.user_id == user_id)
-        .first()
+def owned_category_or_404(
+    db: Session, category_id: int, user_id: int, *, include_deleted: bool = False
+) -> Category:
+    query = db.query(Category).filter(
+        Category.id == category_id, Category.user_id == user_id
     )
+    if not include_deleted:
+        query = query.filter(Category.deleted_at.is_(None))
+    category = query.first()
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CATEGORY_NOT_FOUND)
     return category
@@ -94,6 +97,7 @@ def category_response(db: Session, category: Category) -> CategoryResponse:
     has_transactions = db.query(Transaction.id).filter(
         Transaction.user_id == category.user_id,
         Transaction.category_id == category.id,
+        Transaction.is_deleted.is_(False),
     ).first() is not None
     return CategoryResponse.model_validate(category).model_copy(
         update={"has_transactions": has_transactions}
@@ -136,6 +140,7 @@ def category_rows_with_stats(
         )
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_deleted.is_(False),
             Transaction.transaction_date >= period_start,
             Transaction.transaction_date <= period_end,
         )
@@ -180,6 +185,7 @@ def category_rows_with_stats(
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_deleted.is_(False),
             Transaction.type == CategoryType.EXPENSE,
             Transaction.transaction_date >= period_start,
             Transaction.transaction_date <= period_end,
@@ -190,7 +196,10 @@ def category_rows_with_stats(
     used_category_ids = {
         row[0]
         for row in db.query(Transaction.category_id)
-        .filter(Transaction.user_id == user_id)
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.is_deleted.is_(False),
+        )
         .distinct()
         .all()
     }
@@ -230,6 +239,7 @@ def create_category(
         user_id=current_user.id,
         name=category_in.name,
         name_normalized=normalized_name,
+        type=category_in.type,
         icon=category_in.icon,
         color=category_in.color,
     )
@@ -396,7 +406,8 @@ def delete_category(
 
     import time
     timestamp = str(int(time.time()))
-    category.name_normalized = f"{category.name_normalized}_del_{timestamp}"
+    category.name_normalized = f"{category.name_normalized[:120]}_del_{timestamp}"
     category.deleted_at = func.now()
+    category.is_active = False
     commit_category(db, category)
 

@@ -133,10 +133,6 @@ const Categories = () => {
     setEditing(category);
   }, []);
 
-  const closeModal = () => {
-    if (!submitting) setEditing(undefined);
-  };
-
   const submitCategory = async (payload) => {
     if (submitting) return;
     setSubmitting(true);

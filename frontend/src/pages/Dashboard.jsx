@@ -1,21 +1,23 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getCategories } from '../api/categoryApi';
-import { getTransactions } from '../api/transactionApi';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { getTransactions, getTransactionSummary } from '../api/transactionApi';
+import { getBudgetAlerts } from '../api/budgetApi';
 import TransactionCard from '../components/TransactionCard';
-import InitialBalanceModal from '../components/InitialBalanceModal';
-import { AuthContext } from '../context/auth-context';
+import CategoryIcon from '../components/CategoryIcon';
 
 const Dashboard = () => {
-  const { user, setUser } = useContext(AuthContext);
-  const [metrics, setMetrics] = useState({ income: 0, expense: 0 });
+  const [summary, setSummary] = useState({
+    available_balance: 0,
+    all_time_income: 0,
+    all_time_expense: 0,
+    month_income: 0,
+    month_expense: 0,
+    month_net: 0,
+  });
   const [recentTransactions, setRecentTransactions] = useState([]);
+  const [budgetAlerts, setBudgetAlerts] = useState({ count: 0, items: [] });
   const [loading, setLoading] = useState(true);
-  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const balanceCardRef = useRef(null);
-  const location = useLocation();
-  const navigate = useNavigate();
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -24,60 +26,46 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
-  // Auto-open initial balance modal for new users or upon registration
-  useEffect(() => {
-    if (!user) return;
-    const storageKey = `initial_balance_prompted_${user.id}`;
-    const hasBeenPrompted = localStorage.getItem(storageKey);
-    const isExplicitlyRequested = location.state?.openInitialBalance;
+  const fetchDashboardData = async (signal) => {
+    setLoading(true);
+    try {
+      const [sumData, txnData, alertData] = await Promise.all([
+        getTransactionSummary(signal),
+        getTransactions({ page: 1, page_size: 5 }, signal),
+        getBudgetAlerts({}, signal).catch(() => ({ count: 0, items: [] })),
+      ]);
 
-    if (isExplicitlyRequested || (!hasBeenPrompted && Number(user.initial_balance || 0) === 0)) {
-      setIsBalanceModalOpen(true);
-      localStorage.setItem(storageKey, 'true');
-      if (location.state?.openInitialBalance) {
-        navigate(location.pathname, { replace: true, state: {} });
-      }
-    }
-  }, [user, location, navigate]);
-
-  useEffect(() => {
-    let cancelled = false;
-    
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        const [catData, txnData] = await Promise.all([
-          getCategories({ status: 'all' }),
-          getTransactions({ page: 1, page_size: 5 })
-        ]);
-        
-        if (cancelled) return;
-
-        let totalIncome = 0;
-        let totalExpense = 0;
-        
-        if (catData?.items) {
-          catData.items.forEach(c => {
-            totalIncome += Number(c.income_amount || 0);
-            totalExpense += Number(c.expense_amount || 0);
-          });
-        }
-        
-        setMetrics({
-          income: totalIncome,
-          expense: totalExpense,
+      if (sumData) {
+        setSummary({
+          available_balance: Number(sumData.available_balance || 0),
+          all_time_income: Number(sumData.all_time_income || 0),
+          all_time_expense: Number(sumData.all_time_expense || 0),
+          month_income: Number(sumData.month_income || 0),
+          month_expense: Number(sumData.month_expense || 0),
+          month_net: Number(sumData.month_net || 0),
         });
-        
-        setRecentTransactions(txnData?.items || []);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data', err);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    };
-    
-    fetchDashboardData();
-    return () => { cancelled = true; };
+
+      setRecentTransactions(txnData?.items || []);
+      if (alertData) {
+        setBudgetAlerts({
+          count: alertData.count || 0,
+          items: alertData.items || [],
+        });
+      }
+    } catch (err) {
+      if (err.code !== 'ERR_CANCELED') {
+        console.error('Failed to fetch dashboard data', err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchDashboardData(controller.signal);
+    return () => controller.abort();
   }, []);
 
   const formatMoney = (amount) => {
@@ -91,26 +79,10 @@ const Dashboard = () => {
     return 'Chào buổi tối 🌙';
   };
 
-  const initialBalance = Number(user?.initial_balance || 0);
-  const totalBalance = initialBalance + metrics.income - metrics.expense;
-  const totalActivity = metrics.income + metrics.expense;
-  const incomePercent = totalActivity > 0 ? (metrics.income / totalActivity) * 100 : 50;
-  const expensePercent = totalActivity > 0 ? (metrics.expense / totalActivity) * 100 : 50;
-
-  const handleCloseModal = () => {
-    setIsBalanceModalOpen(false);
-    setTimeout(() => {
-      balanceCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 60);
-  };
-
-  const handleBalanceUpdated = (updatedUser) => {
-    if (setUser) setUser(updatedUser);
-    setToastMessage('Đã cập nhật số dư ban đầu thành công! 💰');
-    setTimeout(() => {
-      balanceCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 60);
-  };
+  const totalBalance = summary.available_balance;
+  const totalActivity = summary.month_income + summary.month_expense;
+  const incomePercent = totalActivity > 0 ? (summary.month_income / totalActivity) * 100 : 50;
+  const expensePercent = totalActivity > 0 ? (summary.month_expense / totalActivity) * 100 : 50;
 
   return (
     <div className="dashboard-page fade-in">
@@ -147,50 +119,71 @@ const Dashboard = () => {
         </div>
       ) : (
         <>
-          <div className="dashboard-metrics-grid">
-            <div className="metric-card balance-card" ref={balanceCardRef}>
-              <div className="metric-content">
-                <div className="metric-title-row">
-                  <span className="metric-title">Số dư khả dụng</span>
-                  <button
-                    type="button"
-                    className="btn-edit-initial-balance"
-                    onClick={() => setIsBalanceModalOpen(true)}
-                    title="Chỉnh sửa số dư ban đầu"
-                  >
-                    ✏️ {initialBalance > 0 ? 'Sửa số dư gốc' : 'Cài số dư gốc'}
-                  </button>
+          {budgetAlerts.count > 0 && (
+            <div className="dashboard-budget-alert-banner" role="alert">
+              <div className="alert-banner-header">
+                <div className="alert-banner-title">
+                  <span className="alert-banner-icon">⚠️</span>
+                  <div>
+                    <strong>Cảnh báo ngân sách ({budgetAlerts.count} danh mục)</strong>
+                    <p>Có danh mục chi tiêu đã chạm ngưỡng cảnh báo (≥ 80%) hoặc vượt hạn mức trong tháng này.</p>
+                  </div>
                 </div>
+                <Link to="/budgets" className="alert-banner-btn">
+                  <span>Quản lý ngân sách</span>
+                  <span className="btn-arrow">→</span>
+                </Link>
+              </div>
+
+              <div className="alert-banner-items">
+                {budgetAlerts.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`alert-mini-card ${item.status === 'exceeded' ? 'mini-exceeded' : 'mini-warning'}`}
+                  >
+                    <CategoryIcon icon={item.category_icon || 'other'} color={item.category_color || '#D69A23'} />
+                    <div className="mini-card-text">
+                      <span className="mini-name">{item.category_name}</span>
+                      <span className="mini-status">
+                        {item.status === 'exceeded' ? `Vượt ${item.percentage_used}%` : `Cảnh báo ${item.percentage_used}%`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="dashboard-metrics-grid">
+            <div className="metric-card balance-card">
+              <div className="metric-content">
+                <span className="metric-title">Số dư khả dụng</span>
                 <h2 className={`metric-value ${totalBalance < 0 ? 'text-error' : ''}`}>
                   {formatMoney(totalBalance)}
                 </h2>
                 <div className="metric-subtext">
-                  {initialBalance > 0 ? (
-                    <span>Đã bao gồm <strong>{formatMoney(initialBalance)}</strong> có sẵn</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="subtext-prompt-btn"
-                      onClick={() => setIsBalanceModalOpen(true)}
-                    >
-                      + Khai báo số dư có sẵn trong ví
-                    </button>
-                  )}
+                  <span>Chênh lệch tháng này: <strong className={summary.month_net >= 0 ? 'text-success' : 'text-error'}>{summary.month_net >= 0 ? '+' : ''}{formatMoney(summary.month_net)}</strong></span>
                 </div>
               </div>
             </div>
             
             <div className="metric-card income-card">
               <div className="metric-content">
-                <span className="metric-title">Tổng thu (Tất cả)</span>
-                <h2 className="metric-value text-success">{formatMoney(metrics.income)}</h2>
+                <span className="metric-title">Thu nhập (Tháng này)</span>
+                <h2 className="metric-value text-success">{formatMoney(summary.month_income)}</h2>
+                <div className="metric-subtext">
+                  <span>Toàn thời gian: <strong>{formatMoney(summary.all_time_income)}</strong></span>
+                </div>
               </div>
             </div>
             
             <div className="metric-card expense-card">
               <div className="metric-content">
-                <span className="metric-title">Tổng chi (Tất cả)</span>
-                <h2 className="metric-value text-error">{formatMoney(metrics.expense)}</h2>
+                <span className="metric-title">Chi tiêu (Tháng này)</span>
+                <h2 className="metric-value text-error">{formatMoney(summary.month_expense)}</h2>
+                <div className="metric-subtext">
+                  <span>Toàn thời gian: <strong>{formatMoney(summary.all_time_expense)}</strong></span>
+                </div>
               </div>
             </div>
           </div>
@@ -214,25 +207,40 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <div className="dashboard-recent">
-            <div className="recent-header">
-              <h2>Giao dịch gần đây</h2>
-              <Link to="/transactions" className="btn-ghost">Xem tất cả →</Link>
+          <div className="dashboard-recent-section">
+            <div className="dashboard-recent-header">
+              <div className="recent-title-group">
+                <div className="recent-badge-icon">⚡</div>
+                <div>
+                  <h2>Giao dịch gần đây</h2>
+                  <p className="recent-subtitle">5 giao dịch phát sinh mới nhất trong tài khoản</p>
+                </div>
+              </div>
+              <Link to="/transactions" className="btn-recent-view-all">
+                Xem tất cả giao dịch →
+              </Link>
             </div>
             
-            <div className="recent-list">
+            <div className="dashboard-recent-content">
               {recentTransactions.length > 0 ? (
-                recentTransactions.map(txn => (
-                  <TransactionCard 
-                    key={txn.id} 
-                    transaction={txn}
-                    hideActions={true}
-                  />
-                ))
+                <div className="recent-txn-grid">
+                  {recentTransactions.map((txn) => (
+                    <TransactionCard 
+                      key={txn.id} 
+                      transaction={txn}
+                      hideActions={true}
+                    />
+                  ))}
+                </div>
               ) : (
-                <div className="empty-state">
-                  <p>Chưa có giao dịch nào.</p>
-                  <Link to="/transactions" state={{ openAddModal: true }} className="btn-secondary">
+                <div className="recent-empty-card">
+                  <div className="recent-empty-icon-wrap">
+                    <span>📜</span>
+                  </div>
+                  <h3>Chưa có giao dịch phát sinh</h3>
+                  <p>Bắt đầu ghi chép các khoản chi tiêu hoặc thu nhập đầu tiên để theo dõi dòng tiền thông minh.</p>
+                  <Link to="/transactions" state={{ openAddModal: true }} className="btn-primary btn-recent-add">
+                    <span className="btn-icon">⚡</span>
                     Thêm giao dịch đầu tiên
                   </Link>
                 </div>
@@ -241,16 +249,9 @@ const Dashboard = () => {
           </div>
         </>
       )}
-
-      {/* Initial Balance Modal */}
-      <InitialBalanceModal
-        isOpen={isBalanceModalOpen}
-        onClose={handleCloseModal}
-        currentInitialBalance={user?.initial_balance}
-        onUpdated={handleBalanceUpdated}
-      />
     </div>
   );
 };
 
 export default Dashboard;
+

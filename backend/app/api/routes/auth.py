@@ -19,12 +19,13 @@ from app.core.security import create_access_token, create_password_reset_token, 
 from app.models.user import User
 from app.schemas.user import (
     MessageResponse,
+    PasswordChange,
     PasswordResetConfirm,
     PasswordResetRequest,
     Token,
     UserCreate,
-    UserInitialBalanceUpdate,
     UserResponse,
+    UserUpdate,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -140,17 +141,50 @@ def read_users_me(current_user: User = Depends(get_current_user)) -> Any:
     return current_user
 
 
-@router.patch("/me/initial-balance", response_model=UserResponse)
-def update_initial_balance(
-    balance_in: UserInitialBalanceUpdate,
+@router.patch("/me", response_model=UserResponse)
+def update_users_me(
+    user_in: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """
-    Update the initial balance for current user.
-    """
-    current_user.initial_balance = balance_in.initial_balance
-    db.commit()
+    """Update the current user's public profile fields."""
+    duplicate = db.query(User).filter(
+        User.id != current_user.id,
+        or_(
+            User.username == user_in.username if user_in.username is not None else False,
+            User.email == user_in.email if user_in.email is not None else False,
+        ),
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=400, detail=USER_ALREADY_EXISTS)
+
+    if user_in.username is not None:
+        current_user.username = user_in.username
+    if user_in.email is not None:
+        current_user.email = user_in.email
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=USER_ALREADY_EXISTS)
     db.refresh(current_user)
     return current_user
+
+
+@router.post("/change-password", response_model=MessageResponse)
+def change_password(
+    request: PasswordChange,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MessageResponse:
+    """Change the current user's password after verifying the old one."""
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không chính xác.")
+    if request.current_password == request.new_password:
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải khác mật khẩu hiện tại.")
+
+    current_user.password_hash = get_password_hash(request.new_password)
+    db.commit()
+    return MessageResponse(message="Đổi mật khẩu thành công.")
 

@@ -3,11 +3,16 @@ import { PAYMENT_METHODS } from '../constants/paymentMethods';
 import { scanImage } from '../api/transactionApi';
 import CustomDatePicker from './CustomDatePicker';
 import CustomSelect from './CustomSelect';
+import { useModalLock } from '../hooks/useModalLock';
 
 const pad = (v) => String(v).padStart(2, '0');
 const todayValue = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const formatMoney = (amount) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 };
 
 const TransactionFormModal = ({
@@ -21,6 +26,7 @@ const TransactionFormModal = ({
   onExcelUpload,
   isExcelLoading,
 }) => {
+  useModalLock(true, onClose);
   const isEdit = transaction !== null && transaction !== undefined;
   const overlayRef = useRef(null);
 
@@ -28,7 +34,7 @@ const TransactionFormModal = ({
     if (prefillData) {
       return {
         amount: prefillData.amount || '',
-        type: prefillData.type || 'expense',
+        type: prefillData.type || '',
         category_id: prefillData.category_id || '',
         transaction_date: prefillData.transaction_date || todayValue(),
         description: prefillData.description || '',
@@ -38,7 +44,7 @@ const TransactionFormModal = ({
     if (isEdit) {
       return {
         amount: transaction.amount || '',
-        type: transaction.type || 'expense',
+        type: transaction.type || '',
         category_id: transaction.category_id || '',
         transaction_date: transaction.transaction_date || '',
         description: transaction.description || '',
@@ -47,7 +53,7 @@ const TransactionFormModal = ({
     }
     return {
       amount: '',
-      type: 'expense',
+      type: '',
       category_id: '',
       transaction_date: todayValue(),
       description: '',
@@ -66,26 +72,60 @@ const TransactionFormModal = ({
     setErrors({});
   }, [initialValues]);
 
-  const filteredCategories = useMemo(
-    () => {
-      if (!categories) return [];
-      const result = categories.filter((c) => c.is_active);
-      // If editing and current category is hidden, still show it
-      if (isEdit && transaction?.category_id) {
-        const current = categories.find((c) => c.id === transaction.category_id);
-        if (current && !current.is_active && !result.some((c) => c.id === current.id)) {
-          result.unshift(current);
-        }
-      }
-      return result;
-    },
-    [categories, isEdit, transaction],
-  );
+  const categorySelectOptions = useMemo(() => {
+    if (!categories) return [];
 
-  const categorySelectOptions = useMemo(() => [
-    { value: '', label: 'Chọn danh mục...' },
-    ...filteredCategories.map((c) => ({ value: c.id, label: `${c.name}${!c.is_active ? ' (đã ẩn)' : ''}` }))
-  ], [filteredCategories]);
+    const formatCatOption = (c) => ({
+      value: c.id,
+      label: `${c.name}${!c.is_active ? ' (đã ẩn)' : ''}`,
+      icon: c.icon,
+      color: c.color,
+      type: c.type,
+    });
+
+    const activeCategories = [...categories];
+
+    // If user filtered by explicit type (e.g. form.type is 'expense')
+    if (form.type === 'expense') {
+      const expenseCats = activeCategories.filter(
+        (c) => (c.is_active || (isEdit && c.id === transaction?.category_id)) && c.type === 'expense'
+      );
+      return [
+        { value: '', label: 'Chọn danh mục chi tiêu...' },
+        ...expenseCats.map(formatCatOption),
+      ];
+    }
+
+    // If user filtered by explicit type (e.g. form.type is 'income')
+    if (form.type === 'income') {
+      const incomeCats = activeCategories.filter(
+        (c) => (c.is_active || (isEdit && c.id === transaction?.category_id)) && c.type === 'income'
+      );
+      return [
+        { value: '', label: 'Chọn danh mục thu nhập...' },
+        ...incomeCats.map(formatCatOption),
+      ];
+    }
+
+    // If no type selected yet (form.type is empty), show ALL categories in groups
+    const expenseCats = activeCategories
+      .filter((c) => (c.is_active || (isEdit && c.id === transaction?.category_id)) && c.type === 'expense')
+      .map(formatCatOption);
+    const incomeCats = activeCategories
+      .filter((c) => (c.is_active || (isEdit && c.id === transaction?.category_id)) && c.type === 'income')
+      .map(formatCatOption);
+
+    return [
+      {
+        label: '💸 Chi tiêu',
+        options: expenseCats,
+      },
+      {
+        label: '💰 Thu nhập',
+        options: incomeCats,
+      },
+    ];
+  }, [categories, isEdit, transaction, form.type]);
 
   const validate = useCallback(() => {
     const errs = {};
@@ -93,7 +133,13 @@ const TransactionFormModal = ({
     if (!form.amount || Number.isNaN(amount) || amount <= 0) {
       errs.amount = 'Số tiền phải lớn hơn 0.';
     }
-    if (!form.type) errs.type = 'Vui lòng chọn loại giao dịch.';
+    
+    let currentType = form.type;
+    if (!currentType && form.category_id) {
+      const cat = categories?.find((c) => String(c.id) === String(form.category_id));
+      if (cat?.type) currentType = cat.type;
+    }
+    if (!currentType) errs.type = 'Vui lòng chọn loại giao dịch.';
     if (!form.category_id) errs.category_id = 'Vui lòng chọn danh mục.';
     if (!form.transaction_date) errs.transaction_date = 'Vui lòng chọn ngày.';
     if (!form.payment_method) errs.payment_method = 'Vui lòng chọn phương thức.';
@@ -102,14 +148,16 @@ const TransactionFormModal = ({
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [form]);
+  }, [form, categories]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (submitting || !validate()) return;
+    const cat = categories?.find((c) => String(c.id) === String(form.category_id));
+    const finalType = form.type || cat?.type || 'expense';
     onSubmit({
       amount: form.amount,
-      type: form.type,
+      type: finalType,
       category_id: Number(form.category_id),
       transaction_date: form.transaction_date,
       description: form.description || null,
@@ -189,7 +237,6 @@ const TransactionFormModal = ({
                   style={{ display: 'none' }}
                   onChange={(e) => {
                     onExcelUpload(e);
-                    onClose(); // Close modal after selecting file because preview modal will open
                   }}
                 />
                 <button
@@ -213,6 +260,24 @@ const TransactionFormModal = ({
           </div>
         </div>
 
+        {(scanning || isExcelLoading) && (
+          <div className="txn-processing-overlay" aria-live="polite">
+            <div className="txn-processing-card">
+              <div className="txn-clean-spinner" />
+              
+              <h3 className="txn-processing-title">
+                {scanning ? 'Đang đọc thông tin hóa đơn...' : 'Đang xử lý tệp Excel...'}
+              </h3>
+              
+              <p className="txn-processing-desc">
+                {scanning
+                  ? 'Hệ thống đang tự động trích xuất số tiền, ngày và phân loại giao dịch.'
+                  : 'Đang đọc các dòng giao dịch và đối chiếu dữ liệu sao kê.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {apiError && <div className="message message-error">{apiError}</div>}
         {scanError && <div className="message message-error">{scanError}</div>}
 
@@ -225,7 +290,7 @@ const TransactionFormModal = ({
                 onChange={(e) => {
                   const catId = e.target.value;
                   const updates = { category_id: catId };
-                  const cat = categories.find(c => String(c.id) === String(catId));
+                  const cat = categories?.find(c => String(c.id) === String(catId));
                   if (cat && cat.type) {
                     updates.type = cat.type;
                   }
@@ -243,14 +308,20 @@ const TransactionFormModal = ({
               <span>Số tiền <em>*</em></span>
               <input
                 type="number"
-                step="0.01"
-                min="0.01"
+                step="any"
+                min="0"
                 value={form.amount}
                 onChange={handleChange('amount')}
+                onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
                 className={errors.amount ? 'input-error' : ''}
               />
               {errors.amount && <span className="field-error">{errors.amount}</span>}
+              {form.amount && !Number.isNaN(parseFloat(form.amount)) && parseFloat(form.amount) > 0 && (
+                <span className="input-helper-text">
+                  💡 Tương đương: <strong>{formatMoney(parseFloat(form.amount))}</strong>
+                </span>
+              )}
             </label>
             <label className="txn-form-field">
               <span>Ngày <em>*</em></span>
@@ -272,12 +343,36 @@ const TransactionFormModal = ({
                 <button
                   type="button"
                   className={`txn-type-btn ${form.type === 'expense' ? 'active expense' : ''}`}
-                  onClick={() => setForm((p) => ({ ...p, type: 'expense' }))}
+                  onClick={() => {
+                    setForm((prev) => {
+                      let updatedCategory = prev.category_id;
+                      if (updatedCategory) {
+                        const cat = categories?.find((c) => String(c.id) === String(updatedCategory));
+                        if (cat && cat.type !== 'expense') {
+                          updatedCategory = '';
+                        }
+                      }
+                      return { ...prev, type: 'expense', category_id: updatedCategory };
+                    });
+                    if (errors.type) setErrors((p) => ({ ...p, type: '' }));
+                  }}
                 >Chi</button>
                 <button
                   type="button"
                   className={`txn-type-btn ${form.type === 'income' ? 'active income' : ''}`}
-                  onClick={() => setForm((p) => ({ ...p, type: 'income' }))}
+                  onClick={() => {
+                    setForm((prev) => {
+                      let updatedCategory = prev.category_id;
+                      if (updatedCategory) {
+                        const cat = categories?.find((c) => String(c.id) === String(updatedCategory));
+                        if (cat && cat.type !== 'income') {
+                          updatedCategory = '';
+                        }
+                      }
+                      return { ...prev, type: 'income', category_id: updatedCategory };
+                    });
+                    if (errors.type) setErrors((p) => ({ ...p, type: '' }));
+                  }}
                 >Thu</button>
               </div>
               {errors.type && <span className="field-error">{errors.type}</span>}

@@ -197,3 +197,15 @@ class BulkImportResponse(BaseModel):
     error_count: int
     skipped_count: int
     results: list[RowResult]
+
+
+class TransactionSummaryResponse(BaseModel):
+    """Financial balance and flow summary response."""
+
+    available_balance: Decimal
+    all_time_income: Decimal
+    all_time_expense: Decimal
+    month_income: Decimal
+    month_expense: Decimal
+    month_net: Decimal
+

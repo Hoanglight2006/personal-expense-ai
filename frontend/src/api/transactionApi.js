@@ -67,3 +67,9 @@ export const importTransactions = async (payload) => {
   const response = await api.post('/transactions/import', payload);
   return response.data;
 };
+
+export const getTransactionSummary = async (signal) => {
+  const response = await api.get('/transactions/summary', { signal });
+  return response.data;
+};
+

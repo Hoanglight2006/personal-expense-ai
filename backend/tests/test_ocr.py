@@ -44,6 +44,7 @@ def test_scan_image_success(client, mock_ocr_factory):
         description="Thanh toán ăn uống",
         type_suggestion=CategoryType.EXPENSE,
         payment_method_suggestion=PaymentMethod.CASH,
+        category_id=None,
     )
     
     # Create fake image

@@ -47,7 +47,8 @@ async def scan_image(
     try:
         active_categories = db.query(Category).filter(
             Category.user_id == current_user.id,
-            Category.is_active.is_(True)
+            Category.is_active.is_(True),
+            Category.deleted_at.is_(None),
         ).all()
         extracted = provider.extract_transaction(file_bytes, active_categories)
     except RuntimeError as e:

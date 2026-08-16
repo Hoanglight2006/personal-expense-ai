@@ -16,6 +16,8 @@ def suggest_category(
     query = db.query(Category).filter(
         Category.user_id == user_id,
         Category.is_active.is_(True),
+        Category.deleted_at.is_(None),
+        Category.type == type_sugg.value,
     )
 
     if description:
@@ -25,6 +27,6 @@ def suggest_category(
         for cat in categories:
             if cat.name.lower() in desc_lower:
                 return cat
-            
+
     # Fallback to the first available category of that type
     return query.first()

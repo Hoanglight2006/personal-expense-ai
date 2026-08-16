@@ -1,18 +1,43 @@
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { vi } from 'date-fns/locale/vi';
 import { format, parse } from 'date-fns';
+import { shift } from '@floating-ui/react';
 import 'react-datepicker/dist/react-datepicker.css';
+import { announcePopupOpen, subscribeToPopupOpen } from '../utils/popupCoordinator';
 
 registerLocale('vi', vi);
 
-const CustomDatePicker = ({ value, onChange, disabled, placeholderText, monthMode = false }) => {
+const CustomDatePicker = ({
+  value,
+  onChange,
+  disabled,
+  placeholderText,
+  monthMode = false,
+  open,
+  onCalendarOpen,
+  onCalendarClose,
+  minDate,
+  maxDate,
+  popperPlacement = 'bottom-start',
+}) => {
+  const popupId = useId();
+  const pickerRef = useRef(null);
+  const isControlled = typeof open === 'boolean';
+
+  useEffect(() => {
+    if (isControlled) return undefined;
+    return subscribeToPopupOpen((event) => {
+      if (event.detail !== popupId) pickerRef.current?.setOpen(false);
+    });
+  }, [isControlled, popupId]);
+
   // value is expected to be 'YYYY-MM-DD' or 'YYYY-MM' (if monthMode)
   let selectedDate = null;
   if (value) {
     try {
       selectedDate = parse(value, monthMode ? 'yyyy-MM' : 'yyyy-MM-dd', new Date());
-    } catch (e) {
+    } catch {
       selectedDate = null;
     }
   }
@@ -25,18 +50,38 @@ const CustomDatePicker = ({ value, onChange, disabled, placeholderText, monthMod
     }
   };
 
+  const handleCalendarOpen = () => {
+    announcePopupOpen(popupId);
+    onCalendarOpen?.();
+  };
+
+  const handleCalendarClose = () => {
+    onCalendarClose?.();
+  };
+
   return (
     <DatePicker
+      ref={pickerRef}
       selected={selectedDate}
       onChange={handleChange}
-      dateFormat={monthMode ? "MM/yyyy" : "dd/MM/yyyy"}
+      dateFormat={monthMode ? "'Tháng' MM, yyyy" : "dd/MM/yyyy"}
       locale="vi"
       disabled={disabled}
-      placeholderText={placeholderText || (monthMode ? "mm/yyyy" : "dd/mm/yyyy")}
+      placeholderText={placeholderText || (monthMode ? "Chọn tháng" : "dd/mm/yyyy")}
       className="custom-datepicker-input"
       popperClassName="custom-datepicker-popper"
+      popperPlacement={popperPlacement}
+      open={open}
+      onCalendarOpen={handleCalendarOpen}
+      onCalendarClose={handleCalendarClose}
+      closeOnScroll
+      minDate={minDate ? parse(minDate, 'yyyy-MM-dd', new Date()) : undefined}
+      maxDate={maxDate ? parse(maxDate, 'yyyy-MM-dd', new Date()) : undefined}
+      popperProps={{ strategy: 'fixed' }}
+      popperModifiers={[shift({ padding: 10, crossAxis: true })]}
       showPopperArrow={false}
       isClearable={false}
+      shouldCloseOnSelect={true}
       showMonthYearPicker={monthMode}
       renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 12px', borderBottom: '1px solid rgba(0,0,0,0.05)', marginBottom: '8px' }}>

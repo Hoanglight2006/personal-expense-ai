@@ -31,7 +31,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_db() -> Generator:
-    from app.models.user import User  # Ensure models are imported
+    from app.models.user import User
+    from app.models.category import Category
+    from app.models.transaction import Transaction
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

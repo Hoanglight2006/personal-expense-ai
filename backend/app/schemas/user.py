@@ -3,7 +3,7 @@ from typing import Optional
 
 import unicodedata
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class UserBase(BaseModel):
@@ -36,6 +36,47 @@ class UserCreate(UserBase):
         return value
 
 
+class UserUpdate(BaseModel):
+    """Editable profile fields for the current user."""
+
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def normalize_username(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        return unicodedata.normalize("NFKC", value.strip())
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        return value.strip().lower()
+
+    @model_validator(mode="after")
+    def require_a_change(self):
+        if self.username is None and self.email is None:
+            raise ValueError("At least one profile field is required")
+        return self
+
+
+class PasswordChange(BaseModel):
+    """Authenticated password change payload."""
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def validate_bcrypt_length(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return value
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
@@ -61,20 +102,10 @@ class MessageResponse(BaseModel):
     message: str
 
 
-from decimal import Decimal
-
-
-class UserInitialBalanceUpdate(BaseModel):
-    """Model for updating user initial balance."""
-
-    initial_balance: Decimal = Field(..., ge=0, description="Số dư ban đầu không được âm")
-
-
 class UserResponse(UserBase):
     """Model for returning user data."""
 
     id: int
-    initial_balance: Decimal = Decimal("0.00")
     created_at: datetime
     updated_at: Optional[datetime] = None
 

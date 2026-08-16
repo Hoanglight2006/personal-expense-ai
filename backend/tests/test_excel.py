@@ -82,3 +82,110 @@ def test_mb_parser_parse_transactions(mb_parser):
     assert income.transaction_date == date(2026, 8, 2)
     assert "FT26214B2" in income.description
     assert "Nhan luong" in income.description
+
+
+def test_is_duplicate_transaction_excludes_soft_deleted(client):
+    from app.core.excel.duplicate_detector import is_duplicate_transaction
+    from app.database import Base
+    from app.models.category import Category
+    from app.models.transaction import Transaction
+    from app.models.user import User
+    from tests.conftest import TestingSessionLocal, engine
+
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    try:
+        user = User(username="dup_user", email="dup@test.com", password_hash="dummy")
+        db.add(user)
+        db.flush()
+
+        cat = Category(name="An uong", name_normalized="an uong", user_id=user.id, icon="food", color="#123456")
+        db.add(cat)
+        db.flush()
+
+        # Active transaction
+        active_txn = Transaction(
+            user_id=user.id,
+            category_id=cat.id,
+            type=CategoryType.EXPENSE,
+            amount=Decimal("100000"),
+            transaction_date=date(2026, 8, 1),
+            description="[FT123] Cafe",
+            is_deleted=False,
+        )
+        # Soft-deleted transaction
+        deleted_txn = Transaction(
+            user_id=user.id,
+            category_id=cat.id,
+            type=CategoryType.EXPENSE,
+            amount=Decimal("200000"),
+            transaction_date=date(2026, 8, 2),
+            description="[FT456] Pizza",
+            is_deleted=True,
+        )
+        db.add_all([active_txn, deleted_txn])
+        db.commit()
+
+        # Active transaction is recognized as duplicate
+        assert is_duplicate_transaction(db, user.id, Decimal("100000"), date(2026, 8, 1), "[FT123] Cafe") is True
+
+        # Soft-deleted transaction is NOT considered a duplicate (can be re-imported)
+        assert is_duplicate_transaction(db, user.id, Decimal("200000"), date(2026, 8, 2), "[FT456] Pizza") is False
+    finally:
+        db.close()
+
+
+def test_is_duplicate_transaction_handles_empty_or_none_description(client):
+    from app.core.excel.duplicate_detector import is_duplicate_transaction
+    from app.database import Base
+    from app.models.category import Category
+    from app.models.transaction import Transaction
+    from app.models.user import User
+    from tests.conftest import TestingSessionLocal, engine
+
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    try:
+        user = User(username="dup_user2", email="dup2@test.com", password_hash="dummy")
+        db.add(user)
+        db.flush()
+
+        cat = Category(name="Khac", name_normalized="khac", user_id=user.id, icon="tag", color="#654321")
+        db.add(cat)
+        db.flush()
+
+        # Txn with description
+        txn_with_desc = Transaction(
+            user_id=user.id,
+            category_id=cat.id,
+            type=CategoryType.EXPENSE,
+            amount=Decimal("50000"),
+            transaction_date=date(2026, 8, 17),
+            description="Ăn trưa",
+            is_deleted=False,
+        )
+        # Txn without description (None)
+        txn_no_desc = Transaction(
+            user_id=user.id,
+            category_id=cat.id,
+            type=CategoryType.EXPENSE,
+            amount=Decimal("70000"),
+            transaction_date=date(2026, 8, 17),
+            description=None,
+            is_deleted=False,
+        )
+        db.add_all([txn_with_desc, txn_no_desc])
+        db.commit()
+
+        # 1. New txn with amount 50000, date 2026-08-17, but description is None -> Should NOT match "Ăn trưa"
+        assert is_duplicate_transaction(db, user.id, Decimal("50000"), date(2026, 8, 17), None) is False
+
+        # 2. New txn with amount 50000, date 2026-08-17, and description "Ăn trưa" -> Should match
+        assert is_duplicate_transaction(db, user.id, Decimal("50000"), date(2026, 8, 17), "Ăn trưa") is True
+
+        # 3. New txn with amount 70000, date 2026-08-17, description is None -> Should match txn_no_desc
+        assert is_duplicate_transaction(db, user.id, Decimal("70000"), date(2026, 8, 17), None) is True
+    finally:
+        db.close()
+
+

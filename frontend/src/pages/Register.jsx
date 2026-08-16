@@ -33,7 +33,7 @@ const Register = () => {
       setUser(userData);
       setSuccess("Đăng ký thành công! Đang chuyển đến bảng điều khiển...");
       setTimeout(() => {
-        navigate('/', { state: { openInitialBalance: true } });
+        navigate('/');
       }, 800);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.detail) {

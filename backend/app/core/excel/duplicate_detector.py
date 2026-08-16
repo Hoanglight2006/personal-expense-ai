@@ -19,6 +19,7 @@ def is_duplicate_transaction(
     
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
+        Transaction.is_deleted.is_(False),
         Transaction.amount == amount,
         Transaction.transaction_date == transaction_date,
     )
@@ -30,6 +31,8 @@ def is_duplicate_transaction(
             query = query.filter(Transaction.description.contains(ref_no))
         else:
             query = query.filter(Transaction.description == description)
-            
+    else:
+        query = query.filter((Transaction.description.is_(None)) | (Transaction.description == ""))
+
     existing = query.first()
     return existing is not None

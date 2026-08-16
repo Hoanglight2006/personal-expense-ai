@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, categories, transactions, ocr, excel, chat
+from app.api.routes import auth, categories, transactions, budgets, ocr, excel, chat
 from app.database import Base, engine
 from app.config import settings
 
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(categories.router, prefix="/api/v1")
     app.include_router(transactions.router, prefix="/api/v1")
+    app.include_router(budgets.router, prefix="/api/v1")
     app.include_router(ocr.router, prefix="/api/v1")
     app.include_router(excel.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
