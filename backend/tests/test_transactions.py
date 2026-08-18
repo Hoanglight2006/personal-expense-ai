@@ -925,6 +925,137 @@ class TestCategoryValidationConstraints:
         assert Decimal(goal_after_restore["current_amount"]) == Decimal("5000000.00")
         assert goal_after_restore["status"] == "completed"
 
+    def test_trash_income_after_withdrawal_rejects_negative_available_balance(self, client):
+        user = register_and_login(
+            client,
+            "trash_withdraw_balance_user",
+            "trash_withdraw_balance@example.com",
+        )
+        income_category = create_category(
+            client, user, "Thu nhập rút rồi trash", type="income"
+        )
+        expense_category = create_category(
+            client, user, "Chi tiêu sau khi rút", type="expense"
+        )
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Mục tiêu kiểm tra số dư", "target_amount": "100000.00"},
+            headers=user,
+        ).json()
+        transaction = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": income_category["id"],
+                "transaction_date": date.today().isoformat(),
+                "saving_goal_id": goal["id"],
+                "saving_goal_amount": "100000.00",
+            },
+            headers=user,
+        ).json()
+        assert client.post(
+            f"/api/v1/saving-goals/{goal['id']}/withdraw",
+            json={
+                "amount": "50000.00",
+                "idempotency_key": "trash-withdraw-balance-1",
+            },
+            headers=user,
+        ).status_code == 200
+        assert client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "30000.00",
+                "type": "expense",
+                "category_id": expense_category["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        ).status_code == 201
+
+        before = client.get(f"{TRANSACTIONS_URL}/summary", headers=user).json()
+        assert Decimal(before["available_balance"]) == Decimal("20000.00")
+        trash = client.post(
+            f"{TRANSACTIONS_URL}/{transaction['id']}/trash", headers=user
+        )
+        assert trash.status_code == 400
+        assert "số dư khả dụng bị âm" in trash.json()["detail"]
+
+        unchanged_goal = client.get(
+            f"/api/v1/saving-goals/{goal['id']}", headers=user
+        ).json()
+        assert Decimal(unchanged_goal["current_amount"]) == Decimal("50000.00")
+        unchanged_summary = client.get(
+            f"{TRANSACTIONS_URL}/summary", headers=user
+        ).json()
+        assert Decimal(unchanged_summary["available_balance"]) == Decimal("20000.00")
+
+    @pytest.mark.parametrize("goal_status", ["active", "completed", "cancelled"])
+    def test_trash_restore_recomputes_allocation_after_withdrawal(
+        self, client, goal_status
+    ):
+        suffix = goal_status
+        user = register_and_login(
+            client,
+            f"recompute_withdraw_{suffix}",
+            f"recompute_withdraw_{suffix}@example.com",
+        )
+        income_category = create_category(
+            client, user, f"Thu nhập tái tính {suffix}", type="income"
+        )
+        target_amount = "100000.00" if goal_status == "completed" else "200000.00"
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": f"Mục tiêu tái tính {suffix}", "target_amount": target_amount},
+            headers=user,
+        ).json()
+        transaction = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": income_category["id"],
+                "transaction_date": date.today().isoformat(),
+                "saving_goal_id": goal["id"],
+                "saving_goal_amount": "100000.00",
+            },
+            headers=user,
+        ).json()
+        assert client.post(
+            f"/api/v1/saving-goals/{goal['id']}/withdraw",
+            json={
+                "amount": "50000.00",
+                "idempotency_key": f"recompute-withdrawal-{suffix}",
+            },
+            headers=user,
+        ).status_code == 200
+        if goal_status == "cancelled":
+            assert client.patch(
+                f"/api/v1/saving-goals/{goal['id']}",
+                json={"status": "cancelled"},
+                headers=user,
+            ).status_code == 200
+
+        assert client.post(
+            f"{TRANSACTIONS_URL}/{transaction['id']}/trash", headers=user
+        ).status_code == 200
+        after_trash = client.get(
+            f"/api/v1/saving-goals/{goal['id']}", headers=user
+        ).json()
+        assert Decimal(after_trash["current_amount"]) == Decimal("0.00")
+
+        assert client.post(
+            f"{TRANSACTIONS_URL}/{transaction['id']}/restore", headers=user
+        ).status_code == 200
+        after_restore = client.get(
+            f"/api/v1/saving-goals/{goal['id']}", headers=user
+        ).json()
+        assert Decimal(after_restore["current_amount"]) == Decimal("50000.00")
+        assert len(after_restore["withdrawals"]) == 1
+        summary = client.get(f"{TRANSACTIONS_URL}/summary", headers=user).json()
+        expected_available = "100000.00" if goal_status == "cancelled" else "50000.00"
+        assert Decimal(summary["available_balance"]) == Decimal(expected_available)
+
     def test_restore_income_allocation_keeps_cancelled_goal_consistent(self, client):
         user = register_and_login(
             client,

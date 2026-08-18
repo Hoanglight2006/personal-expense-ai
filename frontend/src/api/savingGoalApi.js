@@ -50,6 +50,16 @@ export const contributeToGoal = async (goalId, payload) => {
 };
 
 /**
+ * Withdraw saved money from a goal while preserving its audit history.
+ * @param {number} goalId
+ * @param {{ amount: string|number, note?: string, idempotency_key: string }} payload
+ */
+export const withdrawFromGoal = async (goalId, payload) => {
+  const response = await api.post(`/saving-goals/${goalId}/withdraw`, payload);
+  return response.data;
+};
+
+/**
  * Delete a saving goal permanently.
  * @param {number} goalId
  */

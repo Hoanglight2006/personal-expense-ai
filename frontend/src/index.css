@@ -8864,6 +8864,7 @@ body,
   .budget-modal,
   .saving-goal-modal,
   .saving-deposit-modal,
+  .saving-withdraw-modal,
   .saving-history-modal,
   .avatar-select-modal,
   .excel-preview-modal {
@@ -11201,6 +11202,30 @@ body,
   cursor: not-allowed;
 }
 
+.btn-goal-withdraw {
+  flex: 1;
+  border: 1px solid rgba(220, 38, 38, 0.24);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #b91c1c;
+  background: #fff7f7;
+  font-size: 0.88rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-goal-withdraw:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: rgba(220, 38, 38, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-goal-withdraw:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* SKELETON LOADING */
 .skeleton-card {
   min-height: 260px;
@@ -11284,6 +11309,7 @@ body,
 
 .saving-goal-modal,
 .saving-deposit-modal,
+.saving-withdraw-modal,
 .saving-history-modal {
   width: min(540px, 96vw);
   max-height: none !important;
@@ -11305,8 +11331,14 @@ body,
   padding: 24px 26px 22px;
 }
 
+.saving-withdraw-modal {
+  width: min(480px, 96vw);
+  padding: 24px 26px 22px;
+}
+
 .saving-goal-modal .modal-header,
 .saving-deposit-modal .modal-header,
+.saving-withdraw-modal .modal-header,
 .saving-history-modal .modal-header {
   display: flex;
   align-items: center;
@@ -11398,6 +11430,85 @@ body,
   background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
   border-radius: 999px;
   transition: width 0.3s ease;
+}
+
+.saving-withdraw-preview-card {
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.7) 0%, rgba(255, 251, 235, 0.7) 100%);
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.withdraw-balance-hint-card {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.withdraw-balance-hint-card p {
+  margin: 0;
+}
+
+.withdraw-balance-hint-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.withdraw-balance-hint-card strong {
+  color: #047857;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.withdraw-helper-text {
+  color: #b91c1c;
+}
+
+.btn-withdraw-all {
+  width: 100%;
+  margin-top: -4px;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border: 1px dashed rgba(220, 38, 38, 0.4);
+  border-radius: 10px;
+  background: #fff7f7;
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-withdraw-all:hover {
+  background: #fee2e2;
+}
+
+.btn-withdraw-confirm {
+  min-width: 168px;
+  border: 1px solid rgba(151, 94, 24, 0.16);
+  background: linear-gradient(135deg, #dfa84a 0%, #c9852f 100%);
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(160, 104, 34, 0.2);
+  white-space: nowrap;
+}
+
+.btn-withdraw-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d69a23 0%, #b87524 100%);
+  box-shadow: 0 6px 16px rgba(160, 104, 34, 0.28);
+}
+
+.timeline-dot.withdrawal {
+  background: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.28);
+}
+
+.timeline-source-badge.withdrawal {
+  color: #b91c1c;
+  background: #fee2e2;
 }
 
 .quick-amount-section {
@@ -11625,6 +11736,16 @@ body,
 
   .saving-search-box {
     width: 100%;
+  }
+
+  .goal-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .btn-goal-history,
+  .btn-goal-withdraw,
+  .btn-goal-deposit {
+    flex: 1 1 calc(50% - 8px);
   }
 
 }

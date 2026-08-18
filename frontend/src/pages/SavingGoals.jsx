@@ -7,6 +7,7 @@ import {
   updateSavingGoal,
   deleteSavingGoal,
   contributeToGoal,
+  withdrawFromGoal,
 } from '../api/savingGoalApi';
 import { getTransactionSummary } from '../api/transactionApi';
 import ConfirmModal from '../components/ConfirmModal';
@@ -31,6 +32,11 @@ const formatDateTime = (dtStr) => {
   const d = new Date(dtStr);
   if (isNaN(d.getTime())) return dtStr;
   return `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+const createRequestKey = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
 const apiMessage = (error) => {
@@ -85,6 +91,8 @@ const SavingGoals = () => {
   const [editingGoal, setEditingGoal] = useState(null);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [activeDepositGoal, setActiveDepositGoal] = useState(null);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [activeWithdrawGoal, setActiveWithdrawGoal] = useState(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(null);
   const [goalToDelete, setGoalToDelete] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -102,6 +110,12 @@ const SavingGoals = () => {
   const [depositAmount, setDepositAmount] = useState('');
   const [depositNote, setDepositNote] = useState('');
   const [depositError, setDepositError] = useState('');
+
+  // Withdrawal Form state
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawNote, setWithdrawNote] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawIdempotencyKey, setWithdrawIdempotencyKey] = useState('');
 
   const showWarning = useCallback((message, focusId = '') => {
     setWarningPopup({ message, focusId });
@@ -222,6 +236,28 @@ const SavingGoals = () => {
   }, [submitting]);
 
   useModalLock(depositModalOpen, closeDepositModal);
+
+  // Handle Withdrawal Modal open/close
+  const openWithdrawModal = (goal) => {
+    setActiveWithdrawGoal(goal);
+    setWithdrawAmount('');
+    setWithdrawNote('');
+    setWithdrawError('');
+    setWithdrawIdempotencyKey(createRequestKey());
+    setWarningPopup({ message: '', focusId: '' });
+    setWithdrawModalOpen(true);
+    getTransactionSummary()
+      .then((res) => setAvailableBalance(Number(res?.available_balance || 0)))
+      .catch(() => {});
+  };
+
+  const closeWithdrawModal = useCallback(() => {
+    if (submitting) return;
+    setWithdrawModalOpen(false);
+    setActiveWithdrawGoal(null);
+  }, [submitting]);
+
+  useModalLock(withdrawModalOpen, closeWithdrawModal);
 
   // Handle History Modal open/close
   const openHistoryModal = async (goal) => {
@@ -378,6 +414,51 @@ const SavingGoals = () => {
     }
   };
 
+  // Submit Withdrawal
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    const amountVal = parseFloat(withdrawAmount);
+    if (!withdrawAmount || isNaN(amountVal) || amountVal <= 0) {
+      const message = 'Vui lòng nhập số tiền rút hợp lệ lớn hơn 0.';
+      setWithdrawError(message);
+      showWarning(message, 'withdraw-amount');
+      return;
+    }
+
+    const currentAmount = Number(activeWithdrawGoal?.current_amount || 0);
+    if (amountVal > currentAmount) {
+      const message = `Số tiền rút (${formatMoney(amountVal)}) vượt quá số tiền đang tích lũy (${formatMoney(currentAmount)}).`;
+      setWithdrawError(message);
+      showWarning(message, 'withdraw-amount');
+      return;
+    }
+
+    setSubmitting(true);
+    setWithdrawError('');
+
+    try {
+      const payload = {
+        amount: amountVal,
+        note: withdrawNote.trim() || undefined,
+        idempotency_key: withdrawIdempotencyKey,
+      };
+      const updatedGoal = await withdrawFromGoal(activeWithdrawGoal.id, payload);
+      setToastMessage(
+        activeWithdrawGoal.status === 'cancelled'
+          ? `Đã ghi nhận rút ${formatMoney(amountVal)} từ mục tiêu "${updatedGoal.name}".`
+          : `Đã rút ${formatMoney(amountVal)} từ mục tiêu "${updatedGoal.name}" về số dư khả dụng.`
+      );
+      closeWithdrawModal();
+      await fetchGoals();
+    } catch (err) {
+      const message = apiMessage(err);
+      setWithdrawError(message);
+      showWarning(message, 'withdraw-amount');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Handle Delete Confirmation
   const handleDeleteConfirm = async () => {
     if (!goalToDelete) return;
@@ -439,6 +520,21 @@ const SavingGoals = () => {
     if (target <= 0) return 0;
     return Math.min(100, Math.round((current / target) * 1000) / 10);
   }, [data.total_target_amount, data.total_current_amount]);
+
+  const historyItems = useMemo(() => {
+    if (!historyModalOpen) return [];
+    const deposits = (historyModalOpen.contributions || []).map((item) => ({
+      ...item,
+      movementType: 'deposit',
+    }));
+    const withdrawals = (historyModalOpen.withdrawals || []).map((item) => ({
+      ...item,
+      movementType: 'withdrawal',
+    }));
+    return [...deposits, ...withdrawals].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+  }, [historyModalOpen]);
 
   return (
     <div className="saving-goals-container">
@@ -764,8 +860,12 @@ const SavingGoals = () => {
                     />
                   </div>
                   <div className="progress-remaining-text">
-                    {isCompleted ? (
+                    {isCompleted && percent >= 100 ? (
                       <span className="text-emerald font-medium">🎉 Đã hoàn thành 100% mục tiêu!</span>
+                    ) : isCompleted ? (
+                      <span className="text-emerald font-medium">
+                        ✓ Đã hoàn thành • Hiện còn {formatMoney(goal.current_amount)} trong mục tiêu
+                      </span>
                     ) : (
                       <span>Còn thiếu: <strong>{formatMoney(goal.remaining_amount)}</strong></span>
                     )}
@@ -779,6 +879,14 @@ const SavingGoals = () => {
                     onClick={() => openHistoryModal(goal)}
                   >
                     📜 Lịch sử
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-goal-withdraw"
+                    disabled={Number(goal.current_amount || 0) <= 0}
+                    onClick={() => openWithdrawModal(goal)}
+                  >
+                    − Rút tiền
                   </button>
                   <button
                     type="button"
@@ -1104,6 +1212,141 @@ const SavingGoals = () => {
       )}
 
       {/* ==========================================
+          MODAL: WITHDRAW SAVED MONEY
+      ========================================== */}
+      {withdrawModalOpen && activeWithdrawGoal && createPortal(
+        <div
+          className="modal-backdrop saving-modal-backdrop"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeWithdrawModal();
+          }}
+        >
+          <div
+            className="category-modal budget-modal saving-withdraw-modal"
+            role="dialog"
+            aria-labelledby="withdraw-modal-title"
+            aria-modal="true"
+          >
+            <div className="modal-header">
+              <div className="modal-title-wrap">
+                <span className="modal-icon-badge">💸</span>
+                <div>
+                  <span className="eyebrow">Điều chỉnh khoản tiết kiệm</span>
+                  <h2 id="withdraw-modal-title">Rút tiền tiết kiệm</h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeWithdrawModal}
+                disabled={submitting}
+                aria-label="Đóng cửa sổ"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="budget-modal-category-preview saving-deposit-preview-card saving-withdraw-preview-card">
+              <div className="deposit-preview-icon preview-icon-box">🎯</div>
+              <div className="deposit-preview-info preview-text">
+                <strong>{activeWithdrawGoal.name}</strong>
+                <div className="deposit-preview-stats">
+                  <span>Đang tích lũy: <strong className="text-emerald">{formatMoney(activeWithdrawGoal.current_amount)}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div className="withdraw-balance-hint-card">
+              {activeWithdrawGoal.status === 'cancelled' ? (
+                <p>
+                  Mục tiêu đang tạm dừng nên khoản tiết kiệm này đã nằm trong số dư khả dụng.
+                  Rút tiền sẽ giảm số tích lũy và lưu lại lịch sử, không cộng số dư lần hai.
+                </p>
+              ) : (
+                <div>
+                  <span>Số dư khả dụng sau khi rút</span>
+                  <strong>
+                    {formatMoney(availableBalance + Math.min(
+                      Number(withdrawAmount || 0),
+                      Number(activeWithdrawGoal.current_amount || 0)
+                    ))}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="txn-form" noValidate>
+              <label className="txn-form-field">
+                <span>Số tiền muốn rút (VNĐ) <em>*</em></span>
+                <input
+                  id="withdraw-amount"
+                  type="number"
+                  placeholder="Nhập số tiền muốn rút..."
+                  value={withdrawAmount}
+                  onChange={(e) => {
+                    setWithdrawAmount(e.target.value);
+                    if (withdrawError) setWithdrawError('');
+                  }}
+                  min="1"
+                  max={Number(activeWithdrawGoal.current_amount || 0)}
+                  step="any"
+                  className={withdrawError ? 'input-error' : ''}
+                  aria-invalid={Boolean(withdrawError)}
+                  autoFocus
+                  required
+                />
+                {withdrawAmount && Number(withdrawAmount) > 0 && (
+                  <span className="input-helper-text withdraw-helper-text">
+                    Sẽ rút: <strong>{formatMoney(withdrawAmount)}</strong>
+                  </span>
+                )}
+              </label>
+
+              <button
+                type="button"
+                className="btn-withdraw-all"
+                onClick={() => setWithdrawAmount(String(activeWithdrawGoal.current_amount))}
+              >
+                Rút toàn bộ {formatMoney(activeWithdrawGoal.current_amount)}
+              </button>
+
+              <label className="txn-form-field">
+                <span>Ghi chú (tùy chọn)</span>
+                <input
+                  id="withdraw-note"
+                  type="text"
+                  placeholder="Ví dụ: Chi phí khẩn cấp, chuyển sang mục tiêu khác..."
+                  value={withdrawNote}
+                  onChange={(e) => setWithdrawNote(e.target.value)}
+                  maxLength={255}
+                />
+              </label>
+
+              <div className="txn-form-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={closeWithdrawModal}
+                  disabled={submitting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary btn-withdraw-confirm"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Đang xử lý...' : 'Xác nhận rút tiền'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ==========================================
           MODAL: CONTRIBUTION HISTORY TIMELINE
       ========================================== */}
       {historyModalOpen && createPortal(
@@ -1124,8 +1367,8 @@ const SavingGoals = () => {
               <div className="modal-title-wrap">
                 <span className="modal-icon-badge">📜</span>
                 <div>
-                  <span className="eyebrow">Nhật ký đóng góp</span>
-                  <h2 id="history-modal-title">Lịch sử nạp tiền</h2>
+                  <span className="eyebrow">Nhật ký tiết kiệm</span>
+                  <h2 id="history-modal-title">Lịch sử nạp và rút tiền</h2>
                 </div>
               </div>
               <button
@@ -1150,33 +1393,39 @@ const SavingGoals = () => {
                   <span className="stat-value">{formatMoney(historyModalOpen.target_amount)}</span>
                 </div>
                 <div className="history-stat-box">
-                  <span className="stat-label">Lần nạp</span>
-                  <span className="stat-value">{historyModalOpen.contributions?.length || 0}</span>
+                  <span className="stat-label">Biến động</span>
+                  <span className="stat-value">{historyItems.length}</span>
                 </div>
               </div>
             </div>
 
             <div className="history-timeline-body">
-              {(!historyModalOpen.contributions || historyModalOpen.contributions.length === 0) ? (
+              {historyItems.length === 0 ? (
                 <div className="history-empty">
                   <span className="empty-icon">📝</span>
-                  <p>Chưa có lịch sử nạp tiền cho mục tiêu này.</p>
+                  <p>Chưa có lịch sử nạp hoặc rút tiền cho mục tiêu này.</p>
                 </div>
               ) : (
                 <div className="contribution-timeline">
-                  {historyModalOpen.contributions.map((c) => (
-                    <div key={c.id} className="timeline-item">
-                      <div className="timeline-dot" />
+                  {historyItems.map((item) => (
+                    <div key={`${item.movementType}-${item.id}`} className={`timeline-item ${item.movementType}`}>
+                      <div className={`timeline-dot ${item.movementType}`} />
                       <div className="timeline-content">
                         <div className="timeline-header">
-                          <span className="timeline-amount text-emerald">+{formatMoney(c.amount)}</span>
-                          <span className="timeline-date">{formatDateTime(c.created_at)}</span>
+                          <span className={`timeline-amount ${item.movementType === 'withdrawal' ? 'text-danger' : 'text-emerald'}`}>
+                            {item.movementType === 'withdrawal' ? '−' : '+'}{formatMoney(item.amount)}
+                          </span>
+                          <span className="timeline-date">{formatDateTime(item.created_at)}</span>
                         </div>
                         <div className="timeline-meta">
-                          <span className="timeline-source-badge">
-                            {c.source === 'income_allocation' ? 'Trích từ thu nhập' : 'Nạp thủ công'}
+                          <span className={`timeline-source-badge ${item.movementType === 'withdrawal' ? 'withdrawal' : ''}`}>
+                            {item.movementType === 'withdrawal'
+                              ? 'Rút tiền'
+                              : item.source === 'income_allocation'
+                              ? 'Trích từ thu nhập'
+                              : 'Nạp thủ công'}
                           </span>
-                          {c.note && <span className="timeline-note">“{c.note}”</span>}
+                          {item.note && <span className="timeline-note">“{item.note}”</span>}
                         </div>
                       </div>
                     </div>

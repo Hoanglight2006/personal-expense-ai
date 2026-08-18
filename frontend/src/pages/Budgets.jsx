@@ -819,6 +819,9 @@ const Budgets = () => {
         </div>
       )}
 
+        </>
+      )}
+
       {/* Add / Edit Budget Modal */}
       {modalOpen && createPortal(
         <div
@@ -963,9 +966,6 @@ const Budgets = () => {
           </div>
         </div>,
         document.body
-      )}
-
-        </>
       )}
 
       {/* Delete Confirmation Modal */}

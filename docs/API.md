@@ -290,3 +290,41 @@ Excel còn có thể trả `413` khi file vượt giới hạn và `500` nếu p
 Schema dùng `extra="forbid"`: client không được gửi `source` hoặc
 `transaction_id`. `income_allocation` chỉ do service Transaction tạo trong cùng
 transaction database với income nguồn.
+
+## Saving Goal withdrawal
+
+`POST /saving-goals/{goal_id}/withdraw` rút một phần hoặc toàn bộ số tiền đang
+tích lũy và lưu một bản ghi audit riêng:
+
+```json
+{
+  "amount": "50000.00",
+  "note": "Chi phí khẩn cấp",
+  "idempotency_key": "550e8400-e29b-41d4-a716-446655440001"
+}
+```
+
+Quy tắc:
+
+- `amount` phải dương và không vượt `goal.current_amount`.
+- `idempotency_key` dài 1–64 ký tự và ổn định cho một hành động rút. Retry cùng
+  key và cùng payload trả kết quả hiện tại mà không tạo withdrawal mới. Dùng lại
+  key với amount/note khác trả `409`.
+- Không có prefix bị dành riêng; key như `legacy-2` vẫn là key công khai hợp lệ.
+  Migration nhận diện dữ liệu draft bằng metadata database riêng, không suy luận
+  từ nội dung key do client gửi.
+- Frontend sinh key khi mở modal và giữ nguyên key nếu response bị timeout hoặc
+  người dùng thử lại.
+- Endpoint khóa User trước rồi Saving Goal để tuần tự hóa với Transaction và
+  các thao tác số dư khác.
+- Với Goal active/completed, phần tiền rút được giải phóng trở lại
+  `available_balance` thông qua công thức số dư.
+- Goal completed vẫn giữ trạng thái completed sau khi rút; trạng thái này ghi
+  nhận mục tiêu đã từng hoàn thành, còn `current_amount` phản ánh số đang giữ.
+- Goal cancelled vốn không nằm trong `saving_balance`; rút khi cancelled chỉ
+  giảm số tích lũy và ghi lịch sử, không cộng số dư khả dụng lần hai.
+- Goal phải thuộc user hiện tại; Goal của user khác trả `404`.
+- Response là `SavingGoalResponse`, gồm cả `contributions` và `withdrawals`.
+- Mỗi withdrawal được phân bổ vào các contribution mà nó đã tiêu thụ.
+  Trash/restore chỉ cộng hoặc trừ phần contribution chưa từng được rút, không
+  cộng/trừ trực tiếp toàn bộ allocation nguồn.

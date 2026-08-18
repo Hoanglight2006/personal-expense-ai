@@ -1,7 +1,7 @@
 """Saving goals API routes.
 
 Provides endpoints for creating, retrieving, updating, deleting saving goals,
-and recording saving contributions (deposits) within atomic database transactions.
+and recording deposits and withdrawals within atomic database transactions.
 """
 
 from datetime import date
@@ -9,13 +9,16 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func as sa_func
+from sqlalchemy import and_, desc, func as sa_func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.models.enums import CategoryType, ContributionSource, GoalStatus
 from app.models.saving_contribution import SavingContribution
 from app.models.saving_goal import SavingGoal
+from app.models.saving_withdrawal import SavingWithdrawal
+from app.models.saving_withdrawal_allocation import SavingWithdrawalAllocation
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.saving_goal import (
@@ -25,6 +28,8 @@ from app.schemas.saving_goal import (
     SavingGoalListResponse,
     SavingGoalResponse,
     SavingGoalUpdate,
+    SavingWithdrawalCreate,
+    SavingWithdrawalResponse,
 )
 
 router = APIRouter(prefix="/saving-goals", tags=["saving-goals"])
@@ -38,7 +43,10 @@ def _get_goal_or_404(
     """Retrieve a saving goal owned by *user_id* or raise HTTP 404."""
     query = (
         db.query(SavingGoal)
-        .options(selectinload(SavingGoal.contributions))
+        .options(
+            selectinload(SavingGoal.contributions),
+            selectinload(SavingGoal.withdrawals),
+        )
         .filter(SavingGoal.id == goal_id, SavingGoal.user_id == user_id)
     )
     if lock:
@@ -115,6 +123,15 @@ def _enrich_goal_response(goal: SavingGoal) -> SavingGoalResponse:
     contrib_responses = [
         SavingContributionResponse.model_validate(c) for c in sorted_contributions
     ]
+    sorted_withdrawals = sorted(
+        goal.withdrawals,
+        key=lambda withdrawal: withdrawal.created_at,
+        reverse=True,
+    )
+    withdrawal_responses = [
+        SavingWithdrawalResponse.model_validate(withdrawal)
+        for withdrawal in sorted_withdrawals
+    ]
 
     return SavingGoalResponse(
         id=goal.id,
@@ -128,6 +145,7 @@ def _enrich_goal_response(goal: SavingGoal) -> SavingGoalResponse:
         remaining_amount=remaining,
         days_remaining=days_left,
         contributions=contrib_responses,
+        withdrawals=withdrawal_responses,
         created_at=goal.created_at,
     )
 
@@ -200,7 +218,10 @@ def list_saving_goals(
     # Query all goals of user for summary metrics
     all_goals = (
         db.query(SavingGoal)
-        .options(selectinload(SavingGoal.contributions))
+        .options(
+            selectinload(SavingGoal.contributions),
+            selectinload(SavingGoal.withdrawals),
+        )
         .filter(SavingGoal.user_id == current_user.id)
         .order_by(desc(SavingGoal.created_at))
         .all()
@@ -373,6 +394,161 @@ def contribute_to_goal(
         goal.status = GoalStatus.COMPLETED
 
     db.commit()
+    db.refresh(goal)
+    return _enrich_goal_response(goal)
+
+
+@router.post(
+    "/{goal_id}/withdraw",
+    response_model=SavingGoalResponse,
+    summary="Rút tiền khỏi mục tiêu tiết kiệm",
+)
+def withdraw_from_goal(
+    goal_id: int,
+    payload: SavingWithdrawalCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Withdraw saved money, preserve history, and release available balance."""
+    _lock_user_balance(db, current_user.id)
+    goal = _get_goal_or_404(db, goal_id, current_user.id, lock=True)
+    request_note = payload.note.strip() if payload.note else None
+
+    existing_withdrawal = (
+        db.query(SavingWithdrawal)
+        .filter(
+            SavingWithdrawal.saving_goal_id == goal.id,
+            SavingWithdrawal.idempotency_key == payload.idempotency_key,
+        )
+        .first()
+    )
+    if existing_withdrawal is not None:
+        if (
+            Decimal(str(existing_withdrawal.amount)) != payload.amount
+            or existing_withdrawal.note != request_note
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Khóa rút tiền này đã được dùng với nội dung khác.",
+            )
+        return _enrich_goal_response(goal)
+
+    current_amount = Decimal(str(goal.current_amount))
+    if current_amount <= Decimal("0"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mục tiêu chưa có tiền để rút.",
+        )
+    if payload.amount > current_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Số tiền rút ({payload.amount:,.0f} đ) vượt quá số tiền đang "
+                f"tích lũy ({current_amount:,.0f} đ)."
+            ),
+        )
+
+    eligible_contributions = (
+        db.query(SavingContribution)
+        .outerjoin(Transaction, Transaction.id == SavingContribution.transaction_id)
+        .filter(
+            SavingContribution.saving_goal_id == goal.id,
+            or_(
+                SavingContribution.source == ContributionSource.MANUAL,
+                and_(
+                    SavingContribution.source == ContributionSource.INCOME_ALLOCATION,
+                    Transaction.is_deleted.is_(False),
+                ),
+            ),
+        )
+        .order_by(SavingContribution.created_at, SavingContribution.id)
+        .all()
+    )
+    contribution_ids = [contribution.id for contribution in eligible_contributions]
+    allocated_by_contribution = {
+        contribution_id: Decimal(str(allocated_amount))
+        for contribution_id, allocated_amount in (
+            db.query(
+                SavingWithdrawalAllocation.contribution_id,
+                sa_func.coalesce(sa_func.sum(SavingWithdrawalAllocation.amount), 0),
+            )
+            .filter(SavingWithdrawalAllocation.contribution_id.in_(contribution_ids))
+            .group_by(SavingWithdrawalAllocation.contribution_id)
+            .all()
+            if contribution_ids
+            else []
+        )
+    }
+
+    withdrawal = SavingWithdrawal(
+        saving_goal=goal,
+        amount=payload.amount,
+        idempotency_key=payload.idempotency_key,
+        note=request_note,
+    )
+    db.add(withdrawal)
+    db.flush()
+
+    remaining_to_allocate = payload.amount
+    for contribution in eligible_contributions:
+        already_allocated = allocated_by_contribution.get(
+            contribution.id, Decimal("0.00")
+        )
+        available_from_contribution = max(
+            Decimal("0.00"),
+            Decimal(str(contribution.amount)) - already_allocated,
+        )
+        allocated_amount = min(remaining_to_allocate, available_from_contribution)
+        if allocated_amount > Decimal("0"):
+            db.add(
+                SavingWithdrawalAllocation(
+                    withdrawal_id=withdrawal.id,
+                    contribution_id=contribution.id,
+                    amount=allocated_amount,
+                )
+            )
+            remaining_to_allocate -= allocated_amount
+        if remaining_to_allocate == Decimal("0"):
+            break
+
+    if remaining_to_allocate > Decimal("0"):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Lịch sử mục tiêu không khớp với số tiền đang tích lũy. "
+                "Vui lòng tải lại trước khi rút."
+            ),
+        )
+    goal.current_amount = current_amount - payload.amount
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        goal = _get_goal_or_404(db, goal_id, current_user.id)
+        existing_withdrawal = (
+            db.query(SavingWithdrawal)
+            .filter(
+                SavingWithdrawal.saving_goal_id == goal.id,
+                SavingWithdrawal.idempotency_key == payload.idempotency_key,
+            )
+            .first()
+        )
+        if existing_withdrawal is not None:
+            if (
+                Decimal(str(existing_withdrawal.amount)) != payload.amount
+                or existing_withdrawal.note != request_note
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Khóa rút tiền này đã được dùng với nội dung khác.",
+                ) from exc
+            return _enrich_goal_response(goal)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Không thể ghi nhận lần rút tiền do xung đột dữ liệu.",
+        ) from exc
     db.refresh(goal)
     return _enrich_goal_response(goal)
 

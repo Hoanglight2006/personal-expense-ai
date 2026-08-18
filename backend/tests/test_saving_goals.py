@@ -6,6 +6,7 @@ Covers:
 - Summary metrics and status filtering
 - Goal details and contribution history
 - Deposit flow (atomic contribution, current_amount update, auto-completion at 100%)
+- Withdrawal flow (partial/full withdrawal, balance release, and audit history)
 - Goal updating and deletion
 - Ownership and IDOR protection
 - Authentication checks
@@ -563,12 +564,236 @@ class TestSavingContributions:
         assert resp_after_del.json()["status"] == "completed"
 
 
+class TestSavingWithdrawals:
+    """Test withdrawal validation, balance release, status, and history."""
+
+    def test_partial_withdrawal_releases_available_balance(self, client):
+        user = register_and_login(
+            client,
+            "withdraw_balance_user",
+            "withdraw_balance@example.com",
+            add_income=False,
+        )
+        category = client.post(
+            "/api/v1/categories",
+            json={
+                "name": "Thu nhập để rút",
+                "type": "income",
+                "icon": "other",
+                "color": "#10B981",
+            },
+            headers=user,
+        ).json()
+        client.post(
+            "/api/v1/transactions",
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": category["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        goal = client.post(
+            GOALS_URL,
+            json={
+                "name": "Quỹ có thể rút",
+                "target_amount": "100000.00",
+                "initial_deposit": "60000.00",
+            },
+            headers=user,
+        ).json()
+
+        before = client.get("/api/v1/transactions/summary", headers=user).json()
+        assert Decimal(before["available_balance"]) == Decimal("40000.00")
+
+        response = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={
+                "amount": "20000.00",
+                "note": "Chi việc khẩn cấp",
+                "idempotency_key": "partial-withdrawal-1",
+            },
+            headers=user,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert Decimal(data["current_amount"]) == Decimal("40000.00")
+        assert data["status"] == "active"
+        assert len(data["withdrawals"]) == 1
+        assert Decimal(data["withdrawals"][0]["amount"]) == Decimal("20000.00")
+        assert data["withdrawals"][0]["note"] == "Chi việc khẩn cấp"
+
+        after = client.get("/api/v1/transactions/summary", headers=user).json()
+        assert Decimal(after["available_balance"]) == Decimal("60000.00")
+
+    def test_withdrawal_from_completed_goal_keeps_completed_status(self, client, user_a):
+        goal = client.post(
+            GOALS_URL,
+            json={
+                "name": "Mục tiêu hoàn thành rồi rút",
+                "target_amount": "1000000.00",
+                "initial_deposit": "1000000.00",
+            },
+            headers=user_a,
+        ).json()
+        assert goal["status"] == "completed"
+
+        response = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={"amount": "250000.00", "idempotency_key": "completed-withdrawal-1"},
+            headers=user_a,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "completed"
+        assert Decimal(data["current_amount"]) == Decimal("750000.00")
+        assert Decimal(data["remaining_amount"]) == Decimal("250000.00")
+
+    def test_withdrawal_idempotency_replays_once_and_rejects_changed_payload(
+        self, client, user_a
+    ):
+        goal = client.post(
+            GOALS_URL,
+            json={
+                "name": "Mục tiêu chống rút lặp",
+                "target_amount": "1000000.00",
+                "initial_deposit": "100000.00",
+            },
+            headers=user_a,
+        ).json()
+        payload = {
+            "amount": "20000.00",
+            "note": "Rút một lần",
+            "idempotency_key": "withdrawal-retry-key-1",
+        }
+
+        first = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json=payload,
+            headers=user_a,
+        )
+        second = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json=payload,
+            headers=user_a,
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert Decimal(first.json()["current_amount"]) == Decimal("80000.00")
+        assert Decimal(second.json()["current_amount"]) == Decimal("80000.00")
+        assert len(second.json()["withdrawals"]) == 1
+
+        changed_payload = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={
+                **payload,
+                "amount": "10000.00",
+            },
+            headers=user_a,
+        )
+        assert changed_payload.status_code == 409
+        unchanged = client.get(f"{GOALS_URL}/{goal['id']}", headers=user_a).json()
+        assert Decimal(unchanged["current_amount"]) == Decimal("80000.00")
+        assert len(unchanged["withdrawals"]) == 1
+
+    def test_withdrawal_validation_preserves_goal(self, client, user_a):
+        goal = client.post(
+            GOALS_URL,
+            json={
+                "name": "Mục tiêu kiểm tra rút",
+                "target_amount": "1000000.00",
+                "initial_deposit": "300000.00",
+            },
+            headers=user_a,
+        ).json()
+
+        too_much = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={"amount": "300001.00", "idempotency_key": "too-much-withdrawal-1"},
+            headers=user_a,
+        )
+        assert too_much.status_code == 400
+        assert "vượt quá số tiền đang tích lũy" in too_much.json()["detail"]
+
+        invalid = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={"amount": "0.00", "idempotency_key": "invalid-withdrawal-1"},
+            headers=user_a,
+        )
+        assert invalid.status_code == 422
+
+        unchanged = client.get(f"{GOALS_URL}/{goal['id']}", headers=user_a).json()
+        assert Decimal(unchanged["current_amount"]) == Decimal("300000.00")
+        assert unchanged["withdrawals"] == []
+
+    def test_withdrawal_from_cancelled_goal_does_not_credit_balance_twice(self, client):
+        user = register_and_login(
+            client,
+            "cancelled_withdraw_user",
+            "cancelled_withdraw@example.com",
+            add_income=False,
+        )
+        category = client.post(
+            "/api/v1/categories",
+            json={
+                "name": "Thu nhập mục tiêu tạm dừng",
+                "type": "income",
+                "icon": "other",
+                "color": "#10B981",
+            },
+            headers=user,
+        ).json()
+        client.post(
+            "/api/v1/transactions",
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": category["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        goal = client.post(
+            GOALS_URL,
+            json={
+                "name": "Mục tiêu tạm dừng rồi rút",
+                "target_amount": "100000.00",
+                "initial_deposit": "60000.00",
+            },
+            headers=user,
+        ).json()
+        client.patch(
+            f"{GOALS_URL}/{goal['id']}",
+            json={"status": "cancelled"},
+            headers=user,
+        )
+        before = client.get("/api/v1/transactions/summary", headers=user).json()
+        assert Decimal(before["available_balance"]) == Decimal("100000.00")
+
+        response = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={"amount": "20000.00", "idempotency_key": "cancelled-withdrawal-1"},
+            headers=user,
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "cancelled"
+        assert Decimal(response.json()["current_amount"]) == Decimal("40000.00")
+
+        after = client.get("/api/v1/transactions/summary", headers=user).json()
+        assert Decimal(after["available_balance"]) == Decimal("100000.00")
+
+
 class TestSavingGoalsSecurityAndIDOR:
     """Ensure strict authorization and IDOR prevention."""
 
     def test_unauthorized_access(self, client):
         assert client.get(GOALS_URL).status_code == 401
         assert client.post(GOALS_URL, json={"name": "Hack", "target_amount": "1000"}).status_code == 401
+        assert client.post(
+            f"{GOALS_URL}/1/withdraw",
+            json={"amount": "1", "idempotency_key": "unauthorized-withdrawal-1"},
+        ).status_code == 401
 
     def test_user_cannot_access_or_modify_other_users_goal(self, client, user_a, user_b):
         # User A creates a goal
@@ -598,6 +823,14 @@ class TestSavingGoalsSecurityAndIDOR:
             headers=user_b,
         )
         assert resp_contrib.status_code == 404
+
+        # User B cannot withdraw from User A's goal
+        resp_withdraw = client.post(
+            f"{GOALS_URL}/{goal_id}/withdraw",
+            json={"amount": "1.00", "idempotency_key": "idor-withdrawal-1"},
+            headers=user_b,
+        )
+        assert resp_withdraw.status_code == 404
 
         # User B cannot delete User A's goal
         resp_del = client.delete(f"{GOALS_URL}/{goal_id}", headers=user_b)

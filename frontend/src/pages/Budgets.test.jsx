@@ -277,4 +277,18 @@ describe('Budgets Page', () => {
       });
     });
   });
+
+  it('opens the manual budget modal from the AI suggestion tab', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const aiTab = screen.getByRole('tab', { name: /AI Gợi Ý Ngân Sách/i });
+    await user.click(aiTab);
+    expect(aiTab).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: /Thiết lập ngân sách/i }));
+
+    expect(screen.getByRole('dialog', { name: 'Thiết lập ngân sách mới' })).toBeInTheDocument();
+    expect(aiTab).toHaveAttribute('aria-selected', 'true');
+  });
 });

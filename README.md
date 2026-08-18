@@ -2,7 +2,7 @@
 
 Ứng dụng quản lý thu chi cá nhân gồm FastAPI, React và MySQL. Hệ thống hỗ trợ
 Transaction CRUD, thùng rác, danh mục tùy chỉnh, ngân sách, mục tiêu tiết kiệm,
-phân bổ thu nhập vào mục tiêu và nhập sao kê Excel.
+nạp/rút tiền, phân bổ thu nhập vào mục tiêu và nhập sao kê Excel.
 
 ## Tài liệu
 
@@ -96,6 +96,11 @@ Mở `http://localhost:5173`.
 - `income_allocation` chỉ được tạo trong `POST /transactions` bằng
   `saving_goal_id` và `saving_goal_amount`. API contribution công khai của
   Saving Goal chỉ nhận khoản nạp thủ công `amount` và `note`.
+- `POST /saving-goals/{id}/withdraw` cho phép rút một phần hoặc toàn bộ số đang
+  tích lũy. Khoản rút được lưu lịch sử riêng; Goal đã completed vẫn giữ trạng
+  thái hoàn thành như một mốc thành tựu. Goal cancelled đã được loại khỏi
+  `saving_balance`, nên rút khi đang cancelled không cộng số dư khả dụng lần hai.
+  Mỗi lần rút dùng `idempotency_key` ổn định để retry không trừ tiền lần hai.
 - Excel gồm hai bước: parse để preview, sau đó import các dòng đã xác nhận. Mỗi
   import phải có `idempotency_key` duy nhất theo user để chống submit lặp.
 

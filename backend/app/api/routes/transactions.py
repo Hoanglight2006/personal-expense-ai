@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func as sa_func
+from sqlalchemy import func as sa_func, or_
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from app.models.enums import CategoryType, ContributionSource, GoalStatus, Payme
 from app.models.idempotency import ImportIdempotencyKey
 from app.models.saving_contribution import SavingContribution
 from app.models.saving_goal import SavingGoal
+from app.models.saving_withdrawal_allocation import SavingWithdrawalAllocation
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.transaction import (
@@ -46,6 +47,74 @@ MAX_PAGE_SIZE = 100
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _recomputed_goal_current_amount(
+    db: Session,
+    goal_id: int,
+    *,
+    exclude_transaction_id: int | None = None,
+    restore_transaction_id: int | None = None,
+) -> Decimal:
+    """Rebuild savings from effective deposits minus their consumed amounts."""
+    manual_contributions = (
+        db.query(SavingContribution)
+        .filter(
+            SavingContribution.saving_goal_id == goal_id,
+            SavingContribution.source == ContributionSource.MANUAL,
+        )
+        .all()
+    )
+
+    allocation_query = (
+        db.query(SavingContribution)
+        .join(Transaction, Transaction.id == SavingContribution.transaction_id)
+        .filter(
+            SavingContribution.saving_goal_id == goal_id,
+            SavingContribution.source == ContributionSource.INCOME_ALLOCATION,
+        )
+    )
+    if restore_transaction_id is not None:
+        allocation_query = allocation_query.filter(
+            or_(
+                Transaction.is_deleted.is_(False),
+                Transaction.id == restore_transaction_id,
+            )
+        )
+    else:
+        allocation_query = allocation_query.filter(Transaction.is_deleted.is_(False))
+    if exclude_transaction_id is not None:
+        allocation_query = allocation_query.filter(
+            Transaction.id != exclude_transaction_id
+        )
+
+    effective_contributions = manual_contributions + allocation_query.all()
+    contribution_ids = [contribution.id for contribution in effective_contributions]
+    allocated_by_contribution = {
+        contribution_id: Decimal(str(allocated_amount))
+        for contribution_id, allocated_amount in (
+            db.query(
+                SavingWithdrawalAllocation.contribution_id,
+                sa_func.coalesce(sa_func.sum(SavingWithdrawalAllocation.amount), 0),
+            )
+            .filter(SavingWithdrawalAllocation.contribution_id.in_(contribution_ids))
+            .group_by(SavingWithdrawalAllocation.contribution_id)
+            .all()
+            if contribution_ids
+            else []
+        )
+    }
+    return sum(
+        (
+            max(
+                Decimal("0.00"),
+                Decimal(str(contribution.amount))
+                - allocated_by_contribution.get(contribution.id, Decimal("0.00")),
+            )
+            for contribution in effective_contributions
+        ),
+        Decimal("0.00"),
+    )
 
 
 def _owned_transaction_or_404(
@@ -610,11 +679,32 @@ def trash_transaction(
         .filter(SavingContribution.transaction_id == txn.id)
         .all()
     )
+    goal_ids = sorted({contribution.saving_goal_id for contribution in contributions})
+    linked_goals = (
+        db.query(SavingGoal)
+        .filter(
+            SavingGoal.id.in_(goal_ids),
+            SavingGoal.user_id == current_user.id,
+        )
+        .order_by(SavingGoal.id)
+        .with_for_update()
+        .all()
+        if goal_ids
+        else []
+    )
+    projected_goal_amounts = {
+        goal.id: _recomputed_goal_current_amount(
+            db,
+            goal.id,
+            exclude_transaction_id=txn.id,
+        )
+        for goal in linked_goals
+    }
     released_savings = sum(
         (
-            Decimal(str(c.amount))
-            for c in contributions
-            if c.saving_goal and c.saving_goal.status != GoalStatus.CANCELLED
+            Decimal(str(goal.current_amount)) - projected_goal_amounts[goal.id]
+            for goal in linked_goals
+            if goal.status != GoalStatus.CANCELLED
         ),
         Decimal("0"),
     )
@@ -624,19 +714,10 @@ def trash_transaction(
         -_balance_effect(txn.type, Decimal(str(txn.amount))) + released_savings,
         "Không thể xóa nguồn thu vì thao tác này sẽ làm số dư khả dụng bị âm.",
     )
-    for c in contributions:
-        goal = (
-            db.query(SavingGoal)
-            .filter(SavingGoal.id == c.saving_goal_id)
-            .with_for_update()
-            .first()
-        )
-        if goal:
-            goal.current_amount = max(
-                Decimal("0.00"), Decimal(str(goal.current_amount)) - Decimal(str(c.amount))
-            )
-            if goal.status == GoalStatus.COMPLETED and goal.current_amount < goal.target_amount:
-                goal.status = GoalStatus.ACTIVE
+    for goal in linked_goals:
+        goal.current_amount = projected_goal_amounts[goal.id]
+        if goal.status == GoalStatus.COMPLETED and goal.current_amount < goal.target_amount:
+            goal.status = GoalStatus.ACTIVE
 
     txn.is_deleted = True
     txn.deleted_at = datetime.now(timezone.utc)
@@ -670,11 +751,32 @@ def restore_transaction(
         .filter(SavingContribution.transaction_id == txn.id)
         .all()
     )
+    goal_ids = sorted({contribution.saving_goal_id for contribution in contributions})
+    linked_goals = (
+        db.query(SavingGoal)
+        .filter(
+            SavingGoal.id.in_(goal_ids),
+            SavingGoal.user_id == current_user.id,
+        )
+        .order_by(SavingGoal.id)
+        .with_for_update()
+        .all()
+        if goal_ids
+        else []
+    )
+    projected_goal_amounts = {
+        goal.id: _recomputed_goal_current_amount(
+            db,
+            goal.id,
+            restore_transaction_id=txn.id,
+        )
+        for goal in linked_goals
+    }
     restored_savings = sum(
         (
-            Decimal(str(c.amount))
-            for c in contributions
-            if c.saving_goal and c.saving_goal.status != GoalStatus.CANCELLED
+            projected_goal_amounts[goal.id] - Decimal(str(goal.current_amount))
+            for goal in linked_goals
+            if goal.status != GoalStatus.CANCELLED
         ),
         Decimal("0"),
     )
@@ -688,17 +790,10 @@ def restore_transaction(
             else "Không thể khôi phục giao dịch vì thao tác này sẽ làm số dư khả dụng bị âm."
         ),
     )
-    for c in contributions:
-        goal = (
-            db.query(SavingGoal)
-            .filter(SavingGoal.id == c.saving_goal_id)
-            .with_for_update()
-            .first()
-        )
-        if goal:
-            goal.current_amount = Decimal(str(goal.current_amount)) + Decimal(str(c.amount))
-            if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
-                goal.status = GoalStatus.COMPLETED
+    for goal in linked_goals:
+        goal.current_amount = projected_goal_amounts[goal.id]
+        if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
+            goal.status = GoalStatus.COMPLETED
 
     warning = None
     category = (

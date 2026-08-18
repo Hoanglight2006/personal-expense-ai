@@ -50,6 +50,43 @@ class SavingContributionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SavingWithdrawalCreate(BaseModel):
+    """Public payload for withdrawing saved money from a goal."""
+
+    amount: Decimal = Field(
+        ...,
+        gt=Decimal("0"),
+        max_digits=15,
+        decimal_places=2,
+        description="Số tiền rút khỏi mục tiêu (VNĐ)",
+    )
+    idempotency_key: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="Khóa retry duy nhất cho một lần rút tiền",
+    )
+    note: str | None = Field(
+        None,
+        max_length=255,
+        description="Ghi chú cho lần rút tiền",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SavingWithdrawalResponse(BaseModel):
+    """Response model for a saving withdrawal record."""
+
+    id: int
+    saving_goal_id: int
+    amount: Decimal
+    note: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ==========================================
 # SAVING GOAL SCHEMAS
 # ==========================================
@@ -134,7 +171,8 @@ class SavingGoalResponse(BaseModel):
     progress_percentage: float = 0.0
     remaining_amount: Decimal = Decimal("0.00")
     days_remaining: int | None = None
-    contributions: list[SavingContributionResponse] = []
+    contributions: list[SavingContributionResponse] = Field(default_factory=list)
+    withdrawals: list[SavingWithdrawalResponse] = Field(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -148,4 +186,4 @@ class SavingGoalListResponse(BaseModel):
     total_goals_count: int = 0
     active_goals_count: int = 0
     completed_goals_count: int = 0
-    items: list[SavingGoalResponse] = []
+    items: list[SavingGoalResponse] = Field(default_factory=list)

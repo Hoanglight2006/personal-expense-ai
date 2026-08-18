@@ -41,16 +41,30 @@ application validation bị bỏ qua.
 - Composite FK `(category_id, user_id) -> categories(id, user_id)`.
 - Unique `(user_id, category_id, month, year)`.
 
-### `saving_goals` và `saving_contributions`
+### Saving Goal ledger
 
 - `target_amount`, `current_amount`, contribution `amount` đều `NUMERIC(15,2)`.
-- `current_amount` là giá trị denormalized phải nhất quán với contribution hiệu
-  lực.
+- `current_amount` là giá trị denormalized bằng tổng phần chưa bị rút của các
+  contribution hiệu lực và phải luôn không âm.
 - Contribution `manual` có `transaction_id = NULL`.
 - Contribution `income_allocation` liên kết income Transaction;
   `transaction_id -> transactions.id ON DELETE SET NULL` ở cấp model.
 - Trash/restore Transaction điều chỉnh `current_amount`; xóa vĩnh viễn Transaction
   xóa contribution liên kết trước.
+- Withdrawal lưu amount dương, note, `idempotency_key` và thời điểm trong
+  `saving_withdrawals`; `saving_goal_id` dùng `ON DELETE CASCADE`.
+- Unique `(saving_goal_id, idempotency_key)` chống retry trùng và request đồng
+  thời. Goal đã thuộc duy nhất một user nên constraint này tương đương scope
+  user/Goal.
+- `saving_withdrawal_allocations` phân bổ amount của mỗi withdrawal vào đúng các
+  `saving_contributions` đã bị tiêu thụ. Unique `(withdrawal_id, contribution_id)`;
+  cả hai foreign key dùng `ON DELETE CASCADE`.
+- Rút tiền giảm `current_amount` trong cùng transaction và giải phóng số dư khả
+  dụng với Goal active/completed. Goal cancelled không cộng số dư lần hai.
+- Khi trash/restore income nguồn, backend cộng phần còn lại của từng contribution:
+  `max(contribution.amount - withdrawal_allocated, 0)`, rồi mới kiểm tra số dư
+  dự kiến. Vì vậy allocation đã rút không bị giải phóng hoặc khôi phục thêm lần
+  nữa, còn contribution nạp sau đó vẫn được tính đầy đủ.
 
 ### `import_idempotency_keys`
 
@@ -117,6 +131,15 @@ Các script MySQL 8 nằm tại `backend/migrations`:
 2. `002_transaction_management.sql`: thêm payment method, soft-delete fields và
    index Transaction.
 3. `003_category_soft_delete.sql`: thêm `categories.deleted_at` và index.
+4. `004_saving_withdrawals.sql`: thêm sổ lịch sử rút tiền cho Saving Goal. Script
+   cũng nâng cấp bản draft đã có bảng withdrawal nhưng thiếu `idempotency_key`,
+   backfill dữ liệu cũ bằng `legacy-<id>` rồi thêm unique constraint. Allocation
+   suy luận được dựng và kiểm tra trong temporary table; chỉ publish vào bảng
+   thật trong transaction sau khi toàn bộ preflight đạt. Exception handler sẽ
+   rollback nên preflight lỗi không để lại allocation trung gian. Một bảng marker
+   tạm thời ở cấp migration ghi lại đúng các row từng thiếu key; nội dung key API
+   không được dùng để nhận diện legacy. Marker được giữ nếu migration lỗi để hỗ
+   trợ retry và được drop sau khi migration thành công.
 
 Script dùng stored procedure và `information_schema` guards để có thể retry sau
 DDL bị gián đoạn. Việc merge Category trong `001` không rollback được; phải phục
@@ -133,13 +156,14 @@ Ví dụ chạy thủ công bằng MySQL client sau khi backup:
 Get-Content -Raw backend/migrations/001_category_management.sql | mysql --host=localhost --user=root --password personal_expense
 Get-Content -Raw backend/migrations/002_transaction_management.sql | mysql --host=localhost --user=root --password personal_expense
 Get-Content -Raw backend/migrations/003_category_soft_delete.sql | mysql --host=localhost --user=root --password personal_expense
+Get-Content -Raw backend/migrations/004_saving_withdrawals.sql | mysql --host=localhost --user=root --password personal_expense
 ```
 
 Không chạy các SQL này trên SQLite.
 
 ## Test migration MySQL bằng database dùng một lần
 
-Test `backend/tests/test_category_migration_mysql.py`:
+Test `backend/tests/test_category_migration_mysql.py` kiểm tra migration 001:
 
 - Kết nối tới MySQL server từ `DATABASE_URL`.
 - Tạo database ngẫu nhiên `category_migration_test_<suffix>`.
@@ -148,6 +172,19 @@ Test `backend/tests/test_category_migration_mysql.py`:
 - Kiểm tra merge, budget roll-up và composite constraints.
 - Drop database trong `finally`, kể cả khi test thất bại.
 
+Test `backend/tests/test_saving_withdrawal_migration_mysql.py` kiểm tra migration
+004:
+
+- Tạo schema mới rồi chạy migration hai lần.
+- Nâng cấp schema draft có withdrawal cũ và backfill allocation FIFO.
+- Giữ nguyên ledger của withdrawal mới có key công khai giống `legacy-<id>` khi
+  chạy lại migration.
+- Kiểm tra trash/restore vẫn giữ đúng phần contribution chưa bị rút.
+- Xác nhận preflight dừng migration khi ledger suy luận không khớp
+  `current_amount`, bảng allocation thật vẫn rỗng và có thể sửa dữ liệu rồi chạy
+  migration lại an toàn.
+- Mỗi test dùng database ngẫu nhiên và drop trong `finally`.
+
 Tài khoản MySQL trong `DATABASE_URL` phải có quyền `CREATE DATABASE` và
 `DROP DATABASE`. Tuyệt đối không trỏ test vào database chứa dữ liệu cần giữ.
 
@@ -155,14 +192,14 @@ PowerShell, từ repository root:
 
 ```powershell
 $env:RUN_MYSQL_MIGRATION_TEST = '1'
-pytest -q backend/tests/test_category_migration_mysql.py -p no:cacheprovider
+pytest -q backend/tests/test_category_migration_mysql.py backend/tests/test_saving_withdrawal_migration_mysql.py -p no:cacheprovider
 Remove-Item Env:RUN_MYSQL_MIGRATION_TEST
 ```
 
 Bash:
 
 ```bash
-RUN_MYSQL_MIGRATION_TEST=1 pytest -q backend/tests/test_category_migration_mysql.py -p no:cacheprovider
+RUN_MYSQL_MIGRATION_TEST=1 pytest -q backend/tests/test_category_migration_mysql.py backend/tests/test_saving_withdrawal_migration_mysql.py -p no:cacheprovider
 ```
 
 Nếu `RUN_MYSQL_MIGRATION_TEST` khác `1`, test được skip. Nếu `DATABASE_URL` không

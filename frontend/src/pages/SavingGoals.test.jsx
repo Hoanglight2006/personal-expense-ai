@@ -10,6 +10,7 @@ import {
   updateSavingGoal,
   deleteSavingGoal,
   contributeToGoal,
+  withdrawFromGoal,
 } from '../api/savingGoalApi';
 
 vi.mock('../api/savingGoalApi', () => ({
@@ -19,6 +20,7 @@ vi.mock('../api/savingGoalApi', () => ({
   updateSavingGoal: vi.fn(),
   deleteSavingGoal: vi.fn(),
   contributeToGoal: vi.fn(),
+  withdrawFromGoal: vi.fn(),
 }));
 
 vi.mock('../api/transactionApi', () => ({
@@ -52,6 +54,7 @@ const mockGoalActive = {
       created_at: '2026-08-01T10:00:00',
     },
   ],
+  withdrawals: [],
   created_at: '2026-08-10T10:00:00',
 };
 
@@ -76,6 +79,7 @@ const mockGoalCompleted = {
       created_at: '2026-08-05T12:00:00',
     },
   ],
+  withdrawals: [],
   created_at: '2026-08-05T12:00:00',
 };
 
@@ -266,6 +270,90 @@ describe('SavingGoals Page', () => {
     await waitFor(() => expect(amountInput).toHaveFocus());
   });
 
+  it('opens withdrawal modal and returns part of the saved amount', async () => {
+    const user = userEvent.setup();
+    withdrawFromGoal.mockResolvedValue({
+      ...mockGoalActive,
+      current_amount: 8000000,
+      remaining_amount: 17000000,
+      withdrawals: [
+        {
+          id: 201,
+          saving_goal_id: 1,
+          amount: 2000000,
+          note: 'Chi phí khẩn cấp',
+          created_at: '2026-08-18T10:00:00',
+        },
+      ],
+    });
+
+    renderPage();
+    const laptopCard = (await screen.findByText('Mua laptop mới')).closest('article');
+    await user.click(within(laptopCard).getByRole('button', { name: /Rút tiền/i }));
+
+    expect(screen.getByRole('dialog', { name: 'Rút tiền tiết kiệm' })).toBeInTheDocument();
+    const amountInput = screen.getByPlaceholderText('Nhập số tiền muốn rút...');
+    await user.type(amountInput, '2000000');
+    await user.type(
+      screen.getByPlaceholderText(/Ví dụ: Chi phí khẩn cấp/i),
+      'Chi phí khẩn cấp'
+    );
+    await user.click(screen.getByRole('button', { name: 'Xác nhận rút tiền' }));
+
+    await waitFor(() => {
+      expect(withdrawFromGoal).toHaveBeenCalledWith(1, {
+        amount: 2000000,
+        note: 'Chi phí khẩn cấp',
+        idempotency_key: expect.any(String),
+      });
+    });
+  });
+
+  it('shows a popup and refocuses amount when withdrawal exceeds saved money', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const laptopCard = (await screen.findByText('Mua laptop mới')).closest('article');
+    await user.click(within(laptopCard).getByRole('button', { name: /Rút tiền/i }));
+
+    const amountInput = screen.getByPlaceholderText('Nhập số tiền muốn rút...');
+    await user.type(amountInput, '11000000');
+    await user.click(screen.getByRole('button', { name: 'Xác nhận rút tiền' }));
+
+    const popup = screen.getByRole('alertdialog', { name: 'Không thể thực hiện' });
+    expect(popup).toHaveTextContent('vượt quá số tiền đang tích lũy');
+    expect(screen.getAllByText(/vượt quá số tiền đang tích lũy/)).toHaveLength(1);
+    expect(amountInput).toHaveClass('input-error');
+    expect(withdrawFromGoal).not.toHaveBeenCalled();
+    await user.click(within(popup).getByRole('button', { name: 'Đã hiểu' }));
+    await waitFor(() => expect(amountInput).toHaveFocus());
+  });
+
+  it('reuses the same withdrawal idempotency key when retrying after a network error', async () => {
+    const user = userEvent.setup();
+    withdrawFromGoal
+      .mockRejectedValueOnce(new Error('Network timeout'))
+      .mockResolvedValue({
+        ...mockGoalActive,
+        current_amount: 8000000,
+      });
+
+    renderPage();
+    const laptopCard = (await screen.findByText('Mua laptop mới')).closest('article');
+    await user.click(within(laptopCard).getByRole('button', { name: /Rút tiền/i }));
+    await user.type(screen.getByPlaceholderText('Nhập số tiền muốn rút...'), '2000000');
+    await user.click(screen.getByRole('button', { name: 'Xác nhận rút tiền' }));
+
+    const popup = await screen.findByRole('alertdialog', { name: 'Không thể thực hiện' });
+    await user.click(within(popup).getByRole('button', { name: 'Đã hiểu' }));
+    await user.click(screen.getByRole('button', { name: 'Xác nhận rút tiền' }));
+
+    await waitFor(() => expect(withdrawFromGoal).toHaveBeenCalledTimes(2));
+    const firstPayload = withdrawFromGoal.mock.calls[0][1];
+    const retryPayload = withdrawFromGoal.mock.calls[1][1];
+    expect(firstPayload.idempotency_key).toBeTruthy();
+    expect(retryPayload.idempotency_key).toBe(firstPayload.idempotency_key);
+  });
+
   it('opens edit modal and updates a goal', async () => {
     const user = userEvent.setup();
     updateSavingGoal.mockResolvedValue({
@@ -314,10 +402,23 @@ describe('SavingGoals Page', () => {
     // Deposit button should show '✓ Đã hoàn thành' and be disabled
     const depositBtn = within(completedCard).getByRole('button', { name: /✓ Đã hoàn thành/i });
     expect(depositBtn).toBeDisabled();
+    expect(within(completedCard).getByRole('button', { name: /Rút tiền/i })).toBeEnabled();
   });
 
   it('opens history modal and displays contributions timeline', async () => {
     const user = userEvent.setup();
+    getSavingGoalById.mockResolvedValue({
+      ...mockGoalActive,
+      withdrawals: [
+        {
+          id: 201,
+          saving_goal_id: 1,
+          amount: 500000,
+          note: 'Rút thử nghiệm',
+          created_at: '2026-08-18T10:00:00',
+        },
+      ],
+    });
 
     renderPage();
 
@@ -329,11 +430,13 @@ describe('SavingGoals Page', () => {
     await user.click(historyBtns[0]);
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: 'Lịch sử nạp tiền' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Lịch sử nạp và rút tiền' })).toBeInTheDocument();
     });
 
     expect(screen.getByText('“Khoản nạp ban đầu”')).toBeInTheDocument();
     expect(screen.getByText('Nạp thủ công')).toBeInTheDocument();
+    expect(screen.getByText('Rút tiền')).toBeInTheDocument();
+    expect(screen.getByText('“Rút thử nghiệm”')).toBeInTheDocument();
   });
 
   it('deletes a goal after confirmation', async () => {
