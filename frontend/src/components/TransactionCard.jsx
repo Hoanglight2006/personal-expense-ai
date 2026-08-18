@@ -3,17 +3,18 @@ import CategoryIcon from './CategoryIcon';
 import { formatVndDecimal } from '../utils/money';
 import { paymentMethodLabel } from '../constants/paymentMethods';
 
+const transactionDateFormatter = new Intl.DateTimeFormat('vi-VN', {
+  day: '2-digit', month: '2-digit', year: 'numeric',
+});
+
 const formatDate = (value) => {
   if (!value) return '—';
   const [year, month, day] = value.split('-').map(Number);
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  }).format(new Date(year, month - 1, day));
+  return transactionDateFormatter.format(new Date(year, month - 1, day));
 };
 
 const TransactionCard = ({
   transaction,
-  index = 0,
   onEdit,
   onTrash,
   onRestore,
@@ -29,10 +30,6 @@ const TransactionCard = ({
   return (
     <article
       className={`txn-card${transaction.is_deleted ? ' txn-card-deleted' : ''}`}
-      style={{
-        '--txn-card-delay': `${Math.min(index, 12) * 18}ms`,
-        '--category-color': cat?.color || '#D69A23',
-      }}
     >
       <div className="txn-card-left">
         {cat && (
@@ -41,6 +38,7 @@ const TransactionCard = ({
             color={cat.color}
             className="txn-card-icon"
             loading="lazy"
+            compact
           />
         )}
         <div className="txn-card-info">

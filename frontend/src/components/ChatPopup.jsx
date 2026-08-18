@@ -8,12 +8,26 @@ const WELCOME_MESSAGE = {
   content: 'Xin chào! 👋 Mình là FinAI, trợ lý chi tiêu cá nhân của bạn. Hãy hỏi mình bất cứ điều gì về tài chính nhé! 💰',
 };
 
-const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
+const QUICK_SUGGESTIONS = [
+  'Tháng này tôi chi nhiều nhất vào đâu?',
+  'Tình hình ngân sách tháng này?',
+  'Gợi ý cách tiết kiệm tiền',
+  'Tóm tắt thu chi tháng này',
+];
+
+const ChatPopup = ({ isOpen, onClose }) => {
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const chipsContainerRef = useRef(null);
+
+  const scrollChips = (offset) => {
+    if (chipsContainerRef.current) {
+      chipsContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
@@ -29,8 +43,8 @@ const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
     }
   }, [isOpen]);
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const sendQuery = async (queryText) => {
+    const trimmed = (queryText || input).trim();
     if (!trimmed || isTyping) return;
 
     const userMsg = { role: 'user', content: trimmed };
@@ -59,13 +73,15 @@ const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
         ...prev,
         {
           role: 'assistant',
-          content: 'Xin lỗi, mình đang gặp sự cố. Vui lòng thử lại sau! 🙏',
+          content: 'Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏',
         },
       ]);
     } finally {
       setIsTyping(false);
     }
   };
+
+  const handleSend = () => sendQuery(input);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -88,15 +104,6 @@ const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
           <span>Trợ lý chi tiêu</span>
         </div>
         <div className="chat-popup-actions">
-          <button
-            type="button"
-            className="chat-popup-minimize"
-            onClick={onMinimize}
-            aria-label="Ẩn trợ lý FinAI"
-            title="Ẩn trợ lý"
-          >
-            −
-          </button>
           <button type="button" className="chat-popup-close" onClick={onClose} aria-label="Đóng chat" title="Đóng cửa sổ chat">
             ✕
           </button>
@@ -133,6 +140,49 @@ const ChatPopup = ({ isOpen, onClose, onMinimize }) => {
           </div>
         )}
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick Suggestion Chips (Compact row with navigation arrows) */}
+      <div className="chat-quick-chips-wrapper">
+        <button
+          type="button"
+          className="chip-nav-btn chip-nav-left"
+          onClick={() => scrollChips(-150)}
+          aria-label="Lướt sang trái"
+          title="Lướt sang trái"
+        >
+          ‹
+        </button>
+        <div
+          ref={chipsContainerRef}
+          className="chat-quick-chips-track"
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+        >
+          {QUICK_SUGGESTIONS.map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className="quick-chip-btn"
+              onClick={() => sendQuery(chip)}
+              disabled={isTyping}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="chip-nav-btn chip-nav-right"
+          onClick={() => scrollChips(150)}
+          aria-label="Lướt sang phải"
+          title="Lướt sang phải"
+        >
+          ›
+        </button>
       </div>
 
       {/* Input */}

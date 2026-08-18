@@ -11,6 +11,7 @@ class UserBase(BaseModel):
 
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
+    avatar_url: Optional[str] = None
 
     @field_validator("username", mode="before")
     @classmethod
@@ -41,6 +42,7 @@ class UserUpdate(BaseModel):
 
     username: Optional[str] = Field(default=None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
+    avatar_url: Optional[str] = None
 
     @field_validator("username", mode="before")
     @classmethod
@@ -58,7 +60,7 @@ class UserUpdate(BaseModel):
 
     @model_validator(mode="after")
     def require_a_change(self):
-        if self.username is None and self.email is None:
+        if self.username is None and self.email is None and self.avatar_url is None:
             raise ValueError("At least one profile field is required")
         return self
 

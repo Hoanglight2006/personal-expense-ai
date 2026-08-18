@@ -119,6 +119,7 @@ def create_budget(
             Category.user_id == current_user.id,
             Category.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
     if category is None:

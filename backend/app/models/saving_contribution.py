@@ -42,3 +42,8 @@ class SavingContribution(Base):
     # ---- Relationships ----
     saving_goal = relationship("SavingGoal", back_populates="contributions")
     transaction = relationship("Transaction", back_populates="saving_contributions")
+    withdrawal_allocations = relationship(
+        "SavingWithdrawalAllocation",
+        back_populates="contribution",
+        cascade="all, delete-orphan",
+    )

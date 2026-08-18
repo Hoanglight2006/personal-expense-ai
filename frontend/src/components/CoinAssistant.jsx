@@ -98,7 +98,7 @@ const CoinAssistant = () => {
     <div className={`coin-assistant-container ${isMinimized ? 'minimized' : ''} ${isChatOpen ? 'chat-open' : ''}`}>
       {isChatOpen ? (
         /* Chat Popup appears right in place of the assistant */
-        <ChatPopup isOpen={isChatOpen} onClose={handleCloseChat} onMinimize={handleMinimize} />
+        <ChatPopup isOpen={isChatOpen} onClose={handleCloseChat} />
       ) : isMinimized ? (
         /* Minimized mini-button in corner */
         <button

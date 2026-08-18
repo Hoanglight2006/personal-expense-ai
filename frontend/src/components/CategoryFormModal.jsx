@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CATEGORY_COLORS, CATEGORY_PRESETS } from '../constants/categoryIcons';
 import CategoryIcon from './CategoryIcon';
+import WarningPopup from './WarningPopup';
 import { useModalLock } from '../hooks/useModalLock';
 
 const DEFAULT_PRESET = CATEGORY_PRESETS[0];
@@ -15,6 +17,16 @@ const CategoryFormModal = ({ category, submitting, apiError, onClose, onSubmit }
   useModalLock(true, onClose);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [errors, setErrors] = useState({});
+  const [warningPopup, setWarningPopup] = useState('');
+
+  useEffect(() => {
+    if (apiError) setWarningPopup(apiError);
+  }, [apiError]);
+
+  const closeWarningPopup = useCallback(() => {
+    setWarningPopup('');
+    window.requestAnimationFrame(() => document.getElementById('category-name')?.focus());
+  }, []);
 
   useEffect(() => {
     setForm(category ? {
@@ -63,7 +75,7 @@ const CategoryFormModal = ({ category, submitting, apiError, onClose, onSubmit }
     onSubmit({ ...form, name: form.name.trim(), color: form.color.toUpperCase() });
   };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !submitting) onClose();
     }}>
@@ -76,8 +88,6 @@ const CategoryFormModal = ({ category, submitting, apiError, onClose, onSubmit }
           </div>
           <button type="button" className="modal-close" onClick={onClose} disabled={submitting} aria-label="Đóng">×</button>
         </div>
-
-        {apiError && <div className="message message-error" role="alert">{apiError}</div>}
 
         <form className="category-form" onSubmit={handleSubmit} noValidate>
           <fieldset className="preset-picker">
@@ -175,7 +185,13 @@ const CategoryFormModal = ({ category, submitting, apiError, onClose, onSubmit }
           </div>
         </form>
       </section>
-    </div>
+      <WarningPopup
+        isOpen={Boolean(warningPopup)}
+        message={warningPopup}
+        onClose={closeWarningPopup}
+      />
+    </div>,
+    document.body
   );
 };
 

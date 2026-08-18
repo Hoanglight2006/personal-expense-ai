@@ -236,8 +236,38 @@ def test_hide_is_soft_delete_and_keeps_historical_transaction(client: TestClient
         headers=headers,
         json={"type": "income"},
     )
-    assert type_patch_resp.status_code == 200
-    assert type_patch_resp.json()["type"] == "income"
+    assert type_patch_resp.status_code == 409
+    assert "Không thể đổi loại danh mục" in type_patch_resp.json()["detail"]
+
+    detail = client.get(
+        f"/api/v1/categories/{category['id']}", headers=headers
+    )
+    assert detail.status_code == 200
+    assert detail.json()["type"] == "expense"
+
+
+def test_category_type_change_is_rejected_when_budget_exists(client: TestClient):
+    headers, _ = auth_headers(client)
+    category = create_category(client, headers, "Ngân sách cố định").json()
+    budget = client.post(
+        "/api/v1/budgets",
+        headers=headers,
+        json={
+            "category_id": category["id"],
+            "amount": "500000.00",
+            "month": 8,
+            "year": 2026,
+        },
+    )
+    assert budget.status_code == 201
+
+    response = client.patch(
+        f"/api/v1/categories/{category['id']}",
+        headers=headers,
+        json={"type": "income"},
+    )
+    assert response.status_code == 409
+    assert "Không thể đổi loại danh mục" in response.json()["detail"]
 
 
 def test_statistics_sort_percentage_date_boundary_and_user_isolation(client: TestClient):
@@ -409,5 +439,4 @@ def test_soft_deleted_category_cannot_be_accessed_or_modified(client: TestClient
     # POST /api/v1/categories/{id}/restore should return 404
     restore_res = client.post(f"/api/v1/categories/{cat_id}/restore", headers=headers)
     assert restore_res.status_code == 404
-
 

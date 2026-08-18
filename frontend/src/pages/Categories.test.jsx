@@ -14,6 +14,7 @@ import {
   hideCategory,
   restoreCategory,
   deleteCategory,
+  updateCategory,
 } from '../api/categoryApi';
 
 vi.mock('../api/categoryApi', () => ({
@@ -66,6 +67,7 @@ beforeEach(() => {
   hideCategory.mockResolvedValue({ ...category, is_active: false });
   restoreCategory.mockResolvedValue(category);
   deleteCategory.mockResolvedValue({});
+  updateCategory.mockResolvedValue({ ...category, type: 'income', has_transactions: false });
 });
 
 describe('Categories page', () => {
@@ -80,12 +82,26 @@ describe('Categories page', () => {
     getCategories.mockRejectedValueOnce({ response: { data: { detail: 'Máy chủ từ chối.' } } });
     const firstRender = renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent('Máy chủ từ chối.');
+    expect(screen.queryByText('Chưa có danh mục nào')).not.toBeInTheDocument();
     firstRender.unmount();
 
     getCategories.mockResolvedValue(response([]));
     renderPage();
     await userEvent.type(screen.getByPlaceholderText('Nhập tên danh mục...'), 'không có');
     expect(await screen.findByText('Không có kết quả phù hợp')).toBeInTheDocument();
+  });
+
+  it('retries the category list after an initial loading failure', async () => {
+    const user = userEvent.setup();
+    getCategories
+      .mockRejectedValueOnce({ response: { data: { detail: 'Tải danh mục thất bại.' } } })
+      .mockResolvedValueOnce(response([]));
+    renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tải danh mục thất bại.');
+    await user.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(await screen.findByText('Chưa có danh mục nào')).toBeInTheDocument();
+    expect(getCategories).toHaveBeenCalledTimes(2);
   });
 
   it('distinguishes connection failures from server failures', async () => {
@@ -157,6 +173,19 @@ describe('Categories page', () => {
     expect(within(dialog).getByRole('button', { name: 'Ăn uống' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('keeps the updated category type in local state', async () => {
+    const user = userEvent.setup();
+    getCategories.mockResolvedValue(response([{ ...category, has_transactions: false }]));
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Sửa' }));
+    await user.click(screen.getByRole('button', { name: 'Dành cho Thu' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(updateCategory).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Sửa' }));
+    expect(screen.getByRole('button', { name: 'Dành cho Thu' })).toHaveClass('active', 'income');
+  });
+
   it('confirms hide and restores hidden categories', async () => {
     const user = userEvent.setup();
     const firstRender = renderPage();
@@ -197,6 +226,20 @@ describe('Category components', () => {
     expect(screen.getByText(/250\.000/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Khôi phục' }));
     expect(onRestore).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
+  it('does not label an income category as a percentage of total expense', () => {
+    render(
+      <CategoryCard
+        category={{ ...category, type: 'income', name: 'Lương', expense_percentage: '0.00' }}
+        onEdit={vi.fn()}
+        onHide={vi.fn()}
+        onRestore={vi.fn()}
+        busy={false}
+      />,
+    );
+    expect(screen.getByText('3 giao dịch')).toBeInTheDocument();
+    expect(screen.queryByText(/tổng chi/)).not.toBeInTheDocument();
   });
 
   it('formats large decimal amounts without IEEE-754 precision loss', () => {
@@ -274,7 +317,7 @@ describe('Category components', () => {
         onSubmit={vi.fn()}
       />,
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Tên danh mục đã tồn tại');
+    expect(screen.getByRole('alertdialog', { name: 'Không thể thực hiện' })).toHaveTextContent('Tên danh mục đã tồn tại');
     expect(screen.getByRole('button', { name: 'Đang lưu...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Hủy' })).toBeDisabled();
   });

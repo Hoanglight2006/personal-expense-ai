@@ -54,7 +54,20 @@ def create_transaction(client, headers, category_id, amount, txn_date, txn_type=
 
 @pytest.fixture(scope="module")
 def user_a(client):
-    return register_and_login(client, "budget_user_a", "budget_a@test.com")
+    headers = register_and_login(client, "budget_user_a", "budget_a@test.com")
+    cat_inc = create_category(client, headers, "Thu nhập ngân sách A", type="income")
+    client.post(
+        TRANSACTIONS_URL,
+        json={
+            "amount": "100000000.00",
+            "type": "income",
+            "category_id": cat_inc["id"],
+            "transaction_date": "2026-01-01",
+            "description": "Khoản thu ngân sách",
+        },
+        headers=headers,
+    )
+    return headers
 
 
 @pytest.fixture(scope="module")

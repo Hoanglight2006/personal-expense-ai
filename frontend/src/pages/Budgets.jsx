@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getBudgets, createBudget, updateBudget, deleteBudget } from '../api/budgetApi';
 import { getCategories } from '../api/categoryApi';
 import { getTransactionSummary } from '../api/transactionApi';
 import CategoryIcon from '../components/CategoryIcon';
 import CustomSelect from '../components/CustomSelect';
 import ConfirmModal from '../components/ConfirmModal';
+import AiBudgetTab from '../components/AiBudgetTab';
 import { useModalLock } from '../hooks/useModalLock';
 
 const formatMoney = (amount) => {
@@ -28,6 +30,7 @@ const Budgets = () => {
   const today = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [activeTab, setActiveTab] = useState('manage'); // 'manage' | 'aiSuggest'
 
   const [budgetData, setBudgetData] = useState({
     month: today.getMonth() + 1,
@@ -237,6 +240,13 @@ const Budgets = () => {
     const amountNum = parseFloat(formAmount);
     if (!formAmount || Number.isNaN(amountNum) || amountNum <= 0) {
       errs.amount = 'Hạn mức ngân sách phải lớn hơn 0.';
+    } else {
+      const projectedTotal = editingBudget
+        ? Math.max(0, (budgetData.total_budget || 0) - (editingBudget.amount || 0) + amountNum)
+        : (budgetData.total_budget || 0) + amountNum;
+      if (availableBalance !== null && projectedTotal > availableBalance) {
+        errs.amount = `Tổng ngân sách không được vượt quá số dư khả dụng (${formatMoney(availableBalance)}).`;
+      }
     }
     if (!editingBudget && !formCategory) {
       errs.category = 'Vui lòng chọn danh mục chi tiêu.';
@@ -387,10 +397,50 @@ const Budgets = () => {
         </div>
       </section>
 
-      {error && <div className="message message-error">{error}</div>}
+      {/* 2. Unified Tab Navigation */}
+      <section className="budget-tabs-bar-section">
+        <div className="budget-unified-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'manage'}
+            className={`budget-tab-item ${activeTab === 'manage' ? 'active' : ''}`}
+            onClick={() => setActiveTab('manage')}
+          >
+            <span className="budget-tab-icon">📋</span> Quản Lý Ngân Sách
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'aiSuggest'}
+            className={`budget-tab-item tab-ai-highlight ${activeTab === 'aiSuggest' ? 'active' : ''}`}
+            onClick={() => setActiveTab('aiSuggest')}
+          >
+            <span className="budget-tab-icon">✨</span> AI Gợi Ý Ngân Sách
+          </button>
+        </div>
+      </section>
 
-      {/* 2. Executive Overview Dashboard Panel */}
-      <section className={`budget-overview-panel ${isFetching ? 'is-refreshing' : ''}`}>
+      {activeTab === 'aiSuggest' ? (
+        <AiBudgetTab
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          onApplied={(targetMonth, targetYear) => {
+            if (targetMonth && targetYear) {
+              setCurrentMonth(targetMonth);
+              setCurrentYear(targetYear);
+            }
+            fetchBudgets();
+            setActiveTab('manage');
+            setToastMessage('Đã áp dụng thành công ngân sách gợi ý từ AI!');
+          }}
+        />
+      ) : (
+        <>
+          {error && <div className="message message-error">{error}</div>}
+
+          {/* 2. Executive Overview Dashboard Panel */}
+          <section className={`budget-overview-panel ${isFetching ? 'is-refreshing' : ''}`}>
         <div className="overview-main-metric">
           <div className="overview-metric-header">
             <div className="metric-header-left">
@@ -769,8 +819,11 @@ const Budgets = () => {
         </div>
       )}
 
+        </>
+      )}
+
       {/* Add / Edit Budget Modal */}
-      {modalOpen && (
+      {modalOpen && createPortal(
         <div
           className="modal-backdrop"
           ref={overlayRef}
@@ -878,14 +931,14 @@ const Budgets = () => {
               </label>
 
               {availableBalance !== null && targetTotalBudget > availableBalance && parseFloat(formAmount) > 0 && (
-                <div className="budget-balance-warning-banner" role="status">
+                <div className="budget-balance-warning-banner is-required" role="alert">
                   <div className="warning-banner-top">
-                    <span className="warning-banner-icon">💡</span>
+                    <span className="warning-banner-icon">⚠️</span>
                     <div className="warning-banner-body">
-                      <strong>Lưu ý về dòng tiền</strong>
+                      <strong>Ngân sách vượt số dư khả dụng</strong>
                       <p>
                         Tổng ngân sách dự kiến tháng {formMonth} (<strong>{formatMoney(targetTotalBudget)}</strong>) đang cao hơn số dư khả dụng hiện có (<strong>{formatMoney(availableBalance)}</strong>).
-                        Bạn cần bổ sung thu nhập trong tháng để tránh bị thâm hụt số dư khi chi tiêu hết hạn mức.
+                        Bạn phải giảm hạn mức để tổng ngân sách không vượt quá số dư trước khi lưu.
                       </p>
                     </div>
                   </div>
@@ -904,14 +957,15 @@ const Budgets = () => {
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={submitting}
+                  disabled={submitting || (availableBalance !== null && targetTotalBudget > availableBalance)}
                 >
                   {submitting ? 'Đang lưu...' : editingBudget ? 'Cập nhật hạn mức' : 'Tạo ngân sách'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}

@@ -7,7 +7,7 @@ from app.models.enums import GoalStatus
 
 
 class SavingGoal(Base):
-    """Saving goal with denormalized current_amount = SUM(contributions)."""
+    """Saving goal with a denormalized effective saved amount."""
 
     __tablename__ = "saving_goals"
 
@@ -33,6 +33,11 @@ class SavingGoal(Base):
     user = relationship("User", back_populates="saving_goals")
     contributions = relationship(
         "SavingContribution",
+        back_populates="saving_goal",
+        cascade="all, delete-orphan",
+    )
+    withdrawals = relationship(
+        "SavingWithdrawal",
         back_populates="saving_goal",
         cascade="all, delete-orphan",
     )

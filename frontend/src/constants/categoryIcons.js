@@ -13,6 +13,17 @@ import transportAsset from '../assets/transport.png';
 import sportsAsset from '../assets/sports.png';
 import petsAsset from '../assets/pets.png';
 import travelAsset from '../assets/travel.png';
+import compactBonusAsset from '../assets/avatars/Bonus.png';
+import compactEducationAsset from '../assets/avatars/education.png';
+import compactEntertainmentAsset from '../assets/avatars/entertainment.png';
+import compactFoodAsset from '../assets/avatars/food.png';
+import compactGiftAsset from '../assets/avatars/Gift.png';
+import compactHomeAsset from '../assets/avatars/Home.png';
+import compactInvestmentAsset from '../assets/avatars/investment.png';
+import compactPetsAsset from '../assets/avatars/pets.png';
+import compactShoppingAsset from '../assets/avatars/shopping.png';
+import compactSportsAsset from '../assets/avatars/sports.png';
+import compactTravelAsset from '../assets/avatars/travel.png';
 
 export const CATEGORY_PRESETS = [
   { value: 'food', label: 'Ăn uống', type: 'expense', fallback: '🍜', asset: foodAsset, scale: 1.05, color: '#E76452' },
@@ -45,6 +56,22 @@ export const categoryIcon = (icon) => (
 );
 
 export const iconAssetPath = (icon) => categoryIcon(icon).asset;
+const COMPACT_ICON_ASSETS = {
+  bonus: compactBonusAsset,
+  education: compactEducationAsset,
+  entertainment: compactEntertainmentAsset,
+  food: compactFoodAsset,
+  gift: compactGiftAsset,
+  home: compactHomeAsset,
+  investment: compactInvestmentAsset,
+  pets: compactPetsAsset,
+  shopping: compactShoppingAsset,
+  sports: compactSportsAsset,
+  travel: compactTravelAsset,
+};
+export const compactIconAssetPath = (icon, compact = false) => (
+  compact ? COMPACT_ICON_ASSETS[icon] || iconAssetPath(icon) : iconAssetPath(icon)
+);
 export const iconFallback = (icon) => categoryIcon(icon).fallback;
 export const iconScale = (icon) => categoryIcon(icon).scale;
 

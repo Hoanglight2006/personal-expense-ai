@@ -11,6 +11,7 @@ import Statistics from './pages/Statistics';
 import Transactions from './pages/Transactions';
 import TransactionTrash from './pages/TransactionTrash';
 import Budgets from './pages/Budgets';
+import SavingGoals from './pages/SavingGoals';
 import Profile from './pages/Profile';
 import AppLayout from './components/AppLayout';
 
@@ -45,6 +46,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/statistics" element={<Statistics />} />
         <Route path="/budgets" element={<Budgets />} />
+        <Route path="/saving-goals" element={<SavingGoals />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/transactions" element={<Transactions />} />

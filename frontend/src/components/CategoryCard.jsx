@@ -29,7 +29,10 @@ const CategoryCard = ({ category, index = 0, onEdit, onHide, onRestore, onDelete
 
       <div className="category-amount">
         <strong>{formatVndDecimal(category.total_amount)}</strong>
-        <span>{category.transaction_count} giao dịch · {category.expense_percentage === null ? '—' : `${category.expense_percentage ?? '0.00'}% tổng chi`}</span>
+        <span>
+          {category.transaction_count} giao dịch
+          {category.type === 'expense' && ` · ${category.expense_percentage === null ? '—' : `${category.expense_percentage ?? '0.00'}% tổng chi`}`}
+        </span>
       </div>
 
       <div className="category-card-actions">

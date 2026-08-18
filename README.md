@@ -1,283 +1,328 @@
-# 💰 Hệ Thống Quản Lý Chi Tiêu Cá Nhân Tích Hợp AI (Personal Expense AI)
+# Chi tiêu cá nhân — Personal Expense AI
 
-Hệ thống quản lý tài chính và chi tiêu cá nhân toàn diện, kết hợp trợ lý AI thông minh giúp theo dõi dòng tiền, lập ngân sách chi tiêu, quét hóa đơn tự động và phân tích tài chính cá nhân hóa.
+Ứng dụng quản lý thu chi cá nhân gồm FastAPI, React và MySQL. Hệ thống hỗ trợ
+Transaction CRUD, thùng rác, danh mục tùy chỉnh, ngân sách, mục tiêu tiết kiệm,
+nạp/rút tiền, phân bổ thu nhập vào mục tiêu và nhập sao kê Excel.
 
----
+## Tài liệu
 
-## 📑 Mục Lục
-1. [Giới Thiệu & Kiến Trúc Hệ Thống](#-giới-thiệu--kiến-trúc-hệ-thống)
-2. [Các Tính Năng Chính](#-các-tính-năng-chính)
-3. [Yêu Cầu Môi Trường](#-yêu-cầu-môi-trường)
-4. [Hướng Dẫn Cài Đặt & Cấu Hình Chi Tiết](#-hướng-dẫn-cài-đặt--cấu-hình-chi-tiết)
-5. [Hướng Dẫn Khởi Chạy Ứng Dụng](#-hướng-dẫn-khởi-chạy-ứng-dụng)
-6. [Hướng Dẫn Kiểm Thử (Testing & Linting)](#-hướng-dẫn-kiểm-thử-testing--linting)
-7. [Tóm Tắt Các Thay Đổi Mới Nhất (Changelog)](#-tóm-tắt-các-thay-đổi-mới-nhất-changelog)
-8. [Quy Trình Phát Triển Với AI Agents](#-quy-trình-phát-triển-với-ai-agents)
+- [API Transaction và Category](docs/API.md)
+- [Database và migration](docs/DATABASE.md)
+- [Changelog](CHANGELOG.md)
+- Swagger UI khi backend đang chạy: `http://127.0.0.1:8000/docs`
 
----
+## Yêu cầu
 
-## 🏛️ Giới Thiệu & Kiến Trúc Hệ Thống
+- Python 3.11 trở lên.
+- Node.js tương thích Vite 8 và npm.
+- MySQL 8 cho môi trường ứng dụng thực tế.
 
-Dự án được xây dựng theo kiến trúc Client-Server hiện đại, tách biệt hoàn toàn giữa Frontend và Backend qua RESTful API.
+Test backend mặc định sử dụng SQLite in-memory. Test migration MySQL là test tùy
+chọn và luôn tạo một database dùng một lần.
 
-### Tech Stack
-* **Backend:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.10+ / 3.14), Pydantic v2, SQLAlchemy ORM, PyMySQL.
-* **Frontend:** [React 19](https://react.dev/), [Vite](https://vitejs.dev/), React Router v7, Vanilla CSS (Glassmorphism & Micro-animations), Axios.
-* **Cơ sở dữ liệu:** MySQL 8.0+.
-* **AI & OCR Engine:** [Google Gemini API](https://ai.google.dev/) (`gemini-1.5-flash`), Tesseract / Vision OCR.
-* **Kiểm thử tự động:** `pytest` (111 tests backend), `vitest` + `@testing-library/react` (24 tests frontend), `oxlint`.
+## Cấu hình môi trường
 
----
+Tạo file cấu hình từ các mẫu; không commit file `.env`.
 
-## ✨ Các Tính Năng Chính
-
-### 1. Xác thực & Quản lý Tài khoản (Authentication & Profile)
-- Đăng ký tài khoản mới (tự động khởi tạo bộ danh mục Thu/Chi mặc định chuẩn).
-- Đăng nhập bảo mật qua JSON Web Token (JWT Bearer).
-- Quên mật khẩu & Đặt lại mật khẩu an toàn qua Email xác thực token một lần (dựa trên HMAC password version hash).
-- Xem và chỉnh sửa hồ sơ cá nhân (Username, Email).
-- Đổi mật khẩu có xác thực mật khẩu hiện tại.
-
-### 2. Quản lý Danh mục Thu & Chi (Categories)
-- Phân loại rõ ràng Danh mục **Chi tiêu (Expense)** và **Thu nhập (Income)**.
-- Tùy biến linh hoạt Icon và Mã màu sắc nhận diện.
-- Tính năng **Ẩn / Hiện danh mục** giúp tối ưu danh sách chọn khi không dùng đến.
-- **Xóa mềm (Soft Delete)** bảo toàn nguyên vẹn lịch sử các giao dịch trong quá khứ.
-- Thống kê tổng tiền và tỷ trọng chi tiêu trực tiếp theo từng danh mục.
-
-### 3. Quản lý Giao dịch Tài chính (Transactions)
-- Ghi nhận chi tiết: Số tiền, Ngày phát sinh, Loại (Thu/Chi), Danh mục, Phương thức thanh toán (Tiền mặt, Chuyển khoản, Thẻ tín dụng, Ví điện tử), Ghi chú.
-- **Nhân bản nhanh (Duplicate Transaction):** Tự động điền dữ liệu giao dịch mẫu để ghi nhận chi tiêu định kỳ nhanh chóng.
-- **Bộ lọc đa tiêu chí:** Lọc từ khóa ghi chú, khoảng ngày (Custom Date Picker), khoảng số tiền (Min-Max), loại giao dịch, danh mục, phương thức thanh toán.
-- **Thùng rác giao dịch (Trash):** Khôi phục giao dịch đã xóa hoặc xóa vĩnh viễn.
-
-### 4. Nhập liệu Thông minh & Tích hợp AI (Smart Import & AI)
-- **Quét hóa đơn OCR (Receipt Scanner):** Chụp/Tải ảnh hóa đơn để AI tự động trích xuất số tiền, ngày giao dịch, nội dung và gợi ý danh mục phù hợp.
-- **Nhập sao kê Excel hàng loạt (Excel Importer):** Tải file Excel sao kê ngân hàng (.xlsx, .xls). Hệ thống tự động nhận diện mẫu, gợi ý danh mục và **phát hiện giao dịch trùng lặp** trước khi xác nhận lưu.
-- **Trợ lý AI Tài chính (FinAI Chatbot):** Trò chuyện trực tiếp cùng trợ lý ảo. AI phân tích số dư khả dụng, tổng thu chi thực tế trong tháng và đưa ra lời khuyên tài chính cá nhân hóa (đã tích hợp bộ lọc tự động che giấu số tài khoản / số thẻ ngân hàng để bảo vệ quyền riêng tư).
-
-### 5. Quản lý Ngân sách & Cảnh báo Chi tiêu (Budgets & Alerts)
-- Thiết lập ngân sách tối đa cho từng danh mục Chi tiêu theo tháng/năm.
-- Tính toán tiến độ chi tiêu theo thời gian thực (Đã chi, Còn lại, % Đã sử dụng).
-- **Hệ thống cảnh báo thông minh 3 cấp độ:**
-  - 🟢 **Bình thường (Normal):** Chi tiêu `< 80%` hạn mức.
-  - 🟡 **Cảnh báo (Warning):** Chi tiêu `≥ 80%` hạn mức.
-  - 🔴 **Vượt hạn mức (Exceeded):** Chi tiêu `≥ 100%` hạn mức.
-- Tự động tính toán **Hạn mức an toàn chi tiêu mỗi ngày** (Daily Safe Spend) dựa trên số tiền còn lại và số ngày còn lại trong tháng.
-- Banner cảnh báo trực quan xuất hiện ngay tại Trang chủ (Dashboard) và Trang Ngân sách.
-
-### 6. Bảng điều khiển Tổng quan & Thống kê (Dashboard & Analytics)
-- Hiển thị Số dư khả dụng hiện tại, Tổng thu/chi trong tháng và toàn thời gian.
-- Thanh tỷ trọng dòng tiền Thu / Chi sinh động.
-- Danh sách 5 giao dịch gần nhất.
-- Báo cáo thống kê trực quan dòng tiền theo chu kỳ thời gian.
-
----
-
-## 💻 Yêu Cầu Môi Trường
-
-Trước khi bắt đầu, hãy đảm bảo máy tính của bạn đã cài đặt:
-- **Python:** Phiên bản `3.10` trở lên (Khuyến nghị 3.11 hoặc 3.12).
-- **Node.js:** Phiên bản `18.x` trở lên (kèm `npm`).
-- **MySQL Server:** Phiên bản `8.0` trở lên đang chạy cục bộ hoặc remote.
-- **Git:** Để quản lý mã nguồn.
-
----
-
-## 🛠️ Hướng Dẫn Cài Đặt & Cấu Hình Chi Tiết
-
-### Bước 1: Clone mã nguồn từ GitHub
-```bash
-git clone https://github.com/Hoanglight2006/personal-expense-ai.git
-cd personal-expense-ai
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
 ```
 
-### Bước 2: Tạo Cơ Sở Dữ Liệu MySQL
-Mở MySQL Workbench hoặc Command Line và tạo database:
-```sql
-CREATE DATABASE personal_expense CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+Biến backend:
 
----
+| Biến | Bắt buộc | Ý nghĩa |
+|---|---:|---|
+| `DATABASE_URL` | Có | SQLAlchemy URL, ví dụ `mysql+pymysql://user:password@localhost:3306/personal_expense`. |
+| `SECRET_KEY` | Có | Secret ký JWT; phải là chuỗi ngẫu nhiên dài và không dùng giá trị mẫu. |
+| `CORS_ORIGINS` | Có khi chạy frontend riêng | JSON array origin được phép, ví dụ `["http://localhost:5173"]`. |
+| `ALGORITHM` | Không | Thuật toán JWT, mặc định `HS256`. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Không | Thời hạn access token, mặc định 30 phút. |
+| `FRONTEND_BASE_URL` | Không | URL frontend dùng trong luồng reset mật khẩu. |
+| `SMTP_*` | Theo tính năng | Cần khi gửi email reset mật khẩu qua SMTP. |
+| `MAX_IMAGE_SIZE_MB`, `MAX_EXCEL_SIZE_MB` | Không | Giới hạn upload, mặc định lần lượt 10 MB và 5 MB. |
+| `OCR_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Theo tính năng | Cần cho OCR/AI khi chọn Gemini; không bắt buộc cho CRUD cơ bản. |
 
-### Bước 3: Cài đặt và Cấu hình Backend
+Frontend dùng `VITE_API_BASE_URL`; nếu bỏ trống, mặc định là
+`http://localhost:8000/api/v1`.
 
-1. **Di chuyển vào thư mục `backend`:**
-   ```bash
-   cd backend
-   ```
+Nếu username hoặc password MySQL chứa ký tự đặc biệt như `@`, `#`, `/`, `%`,
+hãy URL-encode trước khi đưa vào `DATABASE_URL`.
 
-2. **Tạo và kích hoạt môi trường ảo Python (Virtual Environment):**
-   - **Trên Windows:**
-     ```bash
-     python -m venv .venv
-     .venv\Scripts\activate
-     ```
-   - **Trên macOS / Linux:**
-     ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
-     ```
+## Chạy backend
 
-3. **Cài đặt các gói phụ thuộc (Dependencies):**
-   ```bash
-   pip install -r requirements.txt
-   ```
+Từ thư mục gốc:
 
-4. **Tạo file cấu hình môi trường `.env`:**
-   Sao chép từ `.env.example`:
-   - Trên Windows (PowerShell):
-     ```powershell
-     copy .env.example .env
-     ```
-   - Trên Linux/macOS:
-     ```bash
-     cp .env.example .env
-     ```
-
-5. **Chỉnh sửa file `backend/.env` phù hợp với máy của bạn:**
-   ```env
-   # Kết nối MySQL (thay root và mật khẩu của bạn)
-   DATABASE_URL=mysql+pymysql://root:MatKhauCuaBan@localhost:3306/personal_expense
-
-   # Khóa bí mật JWT (sinh một chuỗi ngẫu nhiên an toàn)
-   SECRET_KEY=mot_chuoi_bi_mat_ngau_nhien_rat_dai_va_an_toan_123456
-
-   # Cấu hình CORS & Frontend
-   CORS_ORIGINS=["http://localhost:5173"]
-   FRONTEND_BASE_URL=http://localhost:5173
-
-   # Cấu hình AI Chatbot & OCR Scanner (Google Gemini)
-   OCR_PROVIDER=gemini
-   GEMINI_API_KEY=AIzaSyD...Điền_API_Key_Gemini_Của_Bạn_Tại_Đây...
-   GEMINI_MODEL=gemini-1.5-flash
-
-   # Giới hạn kích thước upload (MB)
-   MAX_IMAGE_SIZE_MB=10
-   MAX_EXCEL_SIZE_MB=5
-
-   # Cấu hình Email gửi link Reset Password (Tùy chọn - Gmail SMTP)
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USERNAME=email_cua_ban@gmail.com
-   SMTP_PASSWORD=app_password_16_ky_tu
-   SMTP_FROM_EMAIL=email_cua_ban@gmail.com
-   ```
-
----
-
-### Bước 4: Cài đặt và Cấu hình Frontend
-
-1. **Mở một cửa sổ Terminal mới và di chuyển vào thư mục `frontend`:**
-   ```bash
-   cd frontend
-   ```
-
-2. **Cài đặt các thư viện Node.js:**
-   ```bash
-   npm install
-   ```
-
-3. **Tạo file cấu hình môi trường `.env` cho Frontend:**
-   - Trên Windows (PowerShell):
-     ```powershell
-     copy .env.example .env
-     ```
-   - Trên Linux/macOS:
-     ```bash
-     cp .env.example .env
-     ```
-
-4. **Kiểm tra file `frontend/.env`:**
-   ```env
-   VITE_API_BASE_URL=http://localhost:8000/api/v1
-   ```
-
----
-
-## 🚀 Hướng Dẫn Khởi Chạy Ứng Dụng
-
-### 1. Khởi chạy Backend Server (FastAPI)
-Từ thư mục gốc của dự án, mở Terminal và chạy lệnh sau (chú ý cờ `--reload-dir backend` để tránh lag do theo dõi `node_modules`):
-
-```bash
-# Đảm bảo đã kích hoạt môi trường ảo .venv
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend/requirements.txt
 python -m uvicorn app.main:app --reload --reload-dir backend --app-dir backend --host 127.0.0.1 --port 8000
 ```
-* Backend API Documentation (Swagger UI): **`http://127.0.0.1:8000/docs`**
-* Health Check Endpoint: **`http://127.0.0.1:8000/health`**
 
-### 2. Khởi chạy Frontend Dev Server (React Vite)
-Mở một cửa sổ Terminal khác:
+Backend tự tạo các bảng còn thiếu bằng SQLAlchemy metadata khi khởi động. Với
+database legacy, hãy đọc [tài liệu migration](docs/DATABASE.md) trước khi chạy
+ứng dụng. Health check: `GET http://127.0.0.1:8000/health`.
 
-```bash
-cd frontend
+## Chạy frontend
+
+Trong terminal khác:
+
+```powershell
+Set-Location frontend
+npm ci
 npm run dev
 ```
-* Giao diện người dùng Web App: **`http://localhost:5173`**
 
----
+Mở `http://localhost:5173`.
 
-## 🧪 Hướng Dẫn Kiểm Thử (Testing & Linting)
+## Quy tắc nghiệp vụ chính
 
-Dự án duy trì bộ kiểm thử tự động toàn diện để bảo đảm không xảy ra lỗi hồi quy (regression bugs).
+- Tất cả Transaction, Category, Budget và Saving Goal đều thuộc user lấy từ JWT;
+  client không được truyền `user_id` để thay quyền sở hữu.
+- Transaction hỗ trợ tạo, xem, sửa, đưa vào thùng rác, restore và xóa vĩnh viễn.
+  Xóa vĩnh viễn chỉ hợp lệ sau khi Transaction đã ở trong thùng rác.
+- Category có ba trạng thái thực tế: active, hidden (`is_active=false`) và
+  soft-deleted (`deleted_at` khác null). Hidden có thể restore; deleted không có
+  endpoint restore và bị loại khỏi danh sách Category.
+- Không thể đổi `Category.type` khi danh mục đã từng được dùng bởi Transaction
+  hoặc Budget.
+- Transaction mới và Excel import chỉ được dùng Category active, chưa xóa và
+  cùng loại `income`/`expense`.
+- `total_balance = all_time_income - all_time_expense`.
+- `saving_balance` là tổng `current_amount` của Saving Goal không cancelled.
+- `available_balance = total_balance - saving_balance`. Các thao tác làm số dư
+  khả dụng âm sẽ bị từ chối và được tuần tự hóa bằng khóa hàng User trên MySQL.
+- `income_allocation` chỉ được tạo trong `POST /transactions` bằng
+  `saving_goal_id` và `saving_goal_amount`. API contribution công khai của
+  Saving Goal chỉ nhận khoản nạp thủ công `amount` và `note`.
+- `POST /saving-goals/{id}/withdraw` cho phép rút một phần hoặc toàn bộ số đang
+  tích lũy. Khoản rút được lưu lịch sử riêng; Goal đã completed vẫn giữ trạng
+  thái hoàn thành như một mốc thành tựu. Goal cancelled đã được loại khỏi
+  `saving_balance`, nên rút khi đang cancelled không cộng số dư khả dụng lần hai.
+  Mỗi lần rút dùng `idempotency_key` ổn định để retry không trừ tiền lần hai.
+- Excel gồm hai bước: parse để preview, sau đó import các dòng đã xác nhận. Mỗi
+  import phải có `idempotency_key` duy nhất theo user để chống submit lặp.
 
-### 1. Chạy Backend Unit & Integration Tests
-```bash
-cd backend
-pytest
+## Checklist xác minh
+
+Từ thư mục gốc:
+
+```powershell
+pytest -q -p no:cacheprovider
+Set-Location frontend
+npm test -- --run
+npm run lint
+npm run build
+Set-Location ..
+git diff --check
 ```
-> **Kết quả chuẩn:** `110 passed, 1 skipped, 0 warnings` (Bao phủ Auth, Categories, Transactions, Budgets, OCR, Excel import).
 
-### 2. Chạy Frontend Tests
-```bash
-cd frontend
-npm test
+Test migration MySQL không nằm trong suite mặc định; xem lệnh chạy với database
+dùng một lần tại [docs/DATABASE.md](docs/DATABASE.md#test-migration-mysql-bằng-database-dùng-một-lần).
+
+---
+
+## 🤖 Hướng dẫn làm việc với AI Agents
+
+Dự án sử dụng **2 AI Agents** để hỗ trợ quy trình phát triển phần mềm. Toàn bộ cấu hình AI được lưu trong thư mục `.agents`.
+
+### 1. Công nghệ của dự án
+
+* **Backend:** FastAPI (Python).
+* **Frontend:** React.
+* **Cơ sở dữ liệu:** MySQL.
+* **IDE:** Antigravity IDE.
+* **Quản lý mã nguồn:** Git và GitHub.
+
+Mỗi thành viên tự cấu hình API Key trong phần cài đặt LLM của IDE. Tuyệt đối không ghi API Key, mật khẩu MySQL, token hoặc secret trực tiếp vào source code.
+
+Các biến môi trường nhạy cảm phải được lưu trong file `.env`. Không commit hoặc push file `.env` lên GitHub.
+
+### 2. Danh sách AI Agents
+
+Dự án chỉ sử dụng đúng **2 Agent**:
+
+#### `/agent-1-dev` — Full-stack Developer
+
+Agent 1 chịu trách nhiệm phát triển toàn bộ tính năng:
+
+* Xây dựng backend bằng FastAPI.
+* Thiết kế model và thao tác dữ liệu MySQL.
+* Xây dựng REST API.
+* Xử lý authentication và phân quyền.
+* Validation dữ liệu.
+* Xây dựng giao diện bằng React.
+* Quản lý state và tích hợp frontend với API.
+* Xử lý loading, lỗi và trạng thái không có dữ liệu.
+* Sửa lỗi sau khi nhận báo cáo từ Agent 3.
+* Chạy test, lint và production build trước khi báo hoàn thành.
+
+Agent 1 phải đọc `REQUIREMENTS.md` và kiểm tra code hiện tại trước khi sửa. Không được tự suy đoán cấu trúc dự án hoặc viết lại toàn bộ hệ thống khi không cần thiết.
+
+#### `/agent-3-qa` — QA và Code Reviewer
+
+Agent 3 chỉ chịu trách nhiệm kiểm thử và đánh giá:
+
+* Review code FastAPI và React.
+* Kiểm tra logic nghiệp vụ.
+* Kiểm tra validation.
+* Kiểm tra authentication và phân quyền.
+* Kiểm tra nguy cơ SQL Injection và lộ dữ liệu.
+* Kiểm tra quyền sở hữu Transaction và Category.
+* Kiểm tra tích hợp frontend với backend.
+* Kiểm tra Unit Test và Integration Test.
+* Phát hiện regression và lỗi bảo mật.
+* Đề xuất cách sửa cho Agent 1.
+
+Agent 3 chỉ được đọc, kiểm tra và báo cáo. Agent 3 không được triển khai tính năng mới, tự sửa code, commit hoặc push.
+
+Dự án **không sử dụng Agent 2**.
+
+### 3. Quy trình làm việc chuẩn
+
+Mỗi tính năng phải thực hiện theo quy trình sau:
+
+1. Mở một chat mới và gọi `/agent-1-dev`.
+2. Giao cho Agent 1 đúng một tính năng cần triển khai.
+3. Agent 1 phát triển backend FastAPI, frontend React và tích hợp MySQL.
+4. Lập trình viên chạy thử và kiểm tra code.
+5. Khi tính năng đã hoạt động, mở một chat mới hoàn toàn.
+6. Gọi `/agent-3-qa` và cung cấp các file hoặc đoạn code cần đánh giá.
+7. Agent 3 review, chạy test nếu phù hợp và lập báo cáo lỗi.
+8. Lập trình viên kiểm tra, chọn lọc các nhận xét hợp lý.
+9. Quay lại chat của Agent 1 và gửi báo cáo QA để Agent 1 sửa lỗi.
+10. Chạy lại toàn bộ test, frontend lint và production build.
+11. Chỉ commit khi tính năng đã vượt qua kiểm tra.
+
+### 4. Quy tắc sử dụng Agent
+
+* Một tính năng tương ứng với một luồng chat.
+* Không gọi Agent 1 và Agent 3 trong cùng một chat.
+* Khi chuyển từ phát triển sang QA, phải mở chat mới.
+* Agent 1 là Agent duy nhất được viết hoặc sửa code tính năng.
+* Agent 3 chỉ review và kiểm thử.
+* Không sử dụng hoặc tạo Agent 2.
+* Không yêu cầu AI đọc toàn bộ repository nếu không cần thiết.
+* Nên tag chính xác file cần xử lý, ví dụ `@transactions.py` hoặc `@TransactionPage.jsx`.
+* Mô tả rõ hàm, API hoặc lỗi cần xử lý.
+* Không sao chép code do AI tạo ra vào nhánh chính khi chưa đọc và chạy thử.
+* Không cho AI tự commit, push hoặc tạo Pull Request nếu chưa được yêu cầu rõ ràng.
+
+### 5. Bảo mật dữ liệu
+
+* Chỉ sử dụng dữ liệu giả trong prompt, test và báo cáo mẫu.
+* Không gửi thông tin tài chính hoặc thông tin cá nhân thật cho AI.
+* Không đưa API Key, access token, JWT, mật khẩu MySQL hoặc secret vào chat.
+* Không hardcode thông tin nhạy cảm trong FastAPI hoặc React.
+* Không commit file `.env`.
+* Chỉ commit `.env.example` với giá trị minh họa.
+* Không ghi token hoặc mật khẩu vào log.
+* Mọi API liên quan đến dữ liệu cá nhân phải giới hạn theo người dùng hiện tại.
+* Người dùng không được xem, sửa hoặc xóa dữ liệu của tài khoản khác.
+
+Ví dụ cấu hình an toàn:
+
+```env
+DATABASE_URL=mysql+pymysql://DB_USER:DB_PASSWORD@localhost:3306/personal_expense
+SECRET_KEY=replace-with-a-secure-secret
 ```
-> **Kết quả chuẩn:** `24 passed` (Bao phủ Categories, Budgets, Profile, PopupCoordination, Axios Interceptors).
 
-### 3. Chạy Frontend Linter
+Nếu tên người dùng hoặc mật khẩu chứa ký tự đặc biệt như `@`, `#`, `/` hoặc `%`, cần mã hóa URL trước khi đưa vào `DATABASE_URL`.
+
+### 6. Git Workflow
+
+#### Bảo vệ nhánh `main`
+
+Nhánh `main` chỉ chứa code đã được kiểm thử thành công.
+
+Không code hoặc push trực tiếp lên `main`.
+
+#### Tạo Feature Branch
+
+Mỗi tính năng phải được phát triển trên một nhánh riêng, được tạo từ `main`.
+
+Ví dụ:
+
 ```bash
-cd frontend
-npx oxlint
+git switch main
+git pull origin main
+git switch -c feature/transaction-management
 ```
-> **Kết quả chuẩn:** `0 errors, 0 warnings`.
 
----
+Tên nhánh phải mô tả tính năng, không đặt theo tên thành viên.
 
-## 📦 Tóm Tắt Các Thay Đổi Mới Nhất (Changelog)
+Ví dụ hợp lệ:
 
-### Nhánh: `feature/budgets-and-profile`
-1. **Module Quản lý Ngân sách (Budgets):**
-   - Bổ sung trọn bộ API CRUD ngân sách theo tháng/năm và danh mục.
-   - Cơ chế tính toán số tiền đã tiêu, % sử dụng và trạng thái cảnh báo (`normal`, `warning`, `exceeded`).
-   - Giao diện quản lý ngân sách trực quan với thanh tiến độ, bộ lọc trạng thái, chỉ số "Hạn mức chi an toàn mỗi ngày".
-   - Tích hợp Banner cảnh báo vượt ngân sách tại Dashboard.
-2. **Module Hồ sơ Người dùng (Profile):**
-   - API & Giao diện xem/cập nhật thông tin tài khoản (Username, Email).
-   - Chức năng đổi mật khẩu có kiểm tra bảo mật mật khẩu cũ.
-3. **Tối ưu hóa AI Assistant & OCR:**
-   - Chuẩn hóa model Google Gemini mặc định sang `gemini-1.5-flash` kèm cơ chế fallback thông minh.
-   - Thêm bộ lọc bảo mật tự động che giấu số tài khoản, mã giao dịch, số thẻ ngân hàng trong mô tả trước khi gửi đến AI.
-4. **Cải tiến Nhập liệu Excel & Khử trùng lặp (Duplicate Detection):**
-   - Nâng cấp thuật toán phát hiện giao dịch trùng lặp khi import sao kê ngân hàng, xử lý chính xác các trường hợp không có mô tả (`description is None`).
-5. **Đồng bộ & Chuẩn hóa Codebase:**
-   - Chuẩn hóa HTTP Status Code `422_UNPROCESSABLE_CONTENT`.
-   - Cung cấp đầy đủ file mẫu `.env.example` cho cả Frontend và Backend.
-   - Khóa cuộn trang khi mở modal (`useModalLock`) và điều phối popup (`popupCoordinator`) chống tràn giao diện.
+```text
+feature/api-transaction
+feature/ui-transaction
+feature/transaction-management
+fix/transaction-validation
+```
 
----
+#### Commit Message
 
-## 🤖 Quy Trình Phát Triển Với AI Agents
+Commit message sử dụng định dạng:
 
-Dự án sử dụng mô hình pair-programming với **2 AI Agents** theo phân vai nghiêm ngặt:
+```text
+[Loại thao tác] Mô tả ngắn gọn
+```
 
-* **`/agent-1-dev` (Full-stack Developer):** Chuyên trách triển khai mã nguồn Backend, Frontend, Cơ sở dữ liệu, viết Unit test và sửa lỗi.
-* **`/agent-3-qa` (Senior QA & Security Reviewer):** Chuyên trách đọc, phân tích, kiểm thử bảo mật, review code độc lập và lập báo cáo phát hiện lỗi (không trực tiếp sửa file).
+Ví dụ:
 
-### Quy tắc an toàn dữ liệu:
-* Tuyệt đối không commit file `.env` chứa API Key thật hoặc mật khẩu cơ sở dữ liệu lên GitHub.
-* Mọi thay đổi lớn phải chạy qua bộ kiểm thử `pytest` và `npm test` trước khi tạo Pull Request vào nhánh `main`.
+```text
+[Add] Hoàn thiện chức năng quản lý giao dịch
+[Fix] Kiểm tra quyền sở hữu danh mục khi tạo giao dịch
+[Test] Bổ sung kiểm thử phân quyền transaction
+[Docs] Cập nhật hướng dẫn sử dụng AI Agents
+```
 
----
-*Tài liệu được cập nhật tự động phục vụ bàn giao và phát triển dự án.*
+Không sử dụng commit message không rõ nghĩa như:
+
+```text
+update
+fix bug
+code moi
+```
+
+#### Điều kiện trước khi commit
+
+Chỉ commit khi:
+
+* Backend test thành công.
+* Frontend lint thành công.
+* Frontend production build thành công.
+* Không có API Key, mật khẩu, token hoặc secret trong diff.
+* Không có `.env`, `node_modules`, cache hoặc build output trong commit.
+* Lập trình viên đã đọc và kiểm tra code do AI tạo ra.
+
+#### Gộp vào `main`
+
+Trước khi merge, cập nhật nhánh tính năng từ `main`:
+
+```bash
+git switch feature/transaction-management
+git pull origin main
+```
+
+Sau đó xử lý conflict, chạy lại toàn bộ kiểm tra và mới tạo Pull Request hoặc merge vào `main`.
+
+Khi có conflict lớn, các thành viên phải trao đổi trực tiếp. Không tự ý ghi đè code của người khác.
+
+### 7. Checklist trước khi hoàn thành tính năng
+
+* [ ] Đã dùng `/agent-1-dev` để phát triển.
+* [ ] Backend sử dụng FastAPI.
+* [ ] Frontend sử dụng React.
+* [ ] Cơ sở dữ liệu sử dụng MySQL.
+* [ ] Đã chạy thử tính năng bằng dữ liệu giả.
+* [ ] Đã mở chat mới và dùng `/agent-3-qa` để review.
+* [ ] Đã kiểm tra và xử lý báo cáo QA.
+* [ ] Backend test thành công.
+* [ ] Frontend lint thành công.
+* [ ] Frontend production build thành công.
+* [ ] Không có dữ liệu thật hoặc secret trong source code.
+* [ ] Không có `.env` hoặc `node_modules` trong commit.
+* [ ] Commit message đúng quy chuẩn.
+* [ ] Feature branch đã được cập nhật từ `main`.
