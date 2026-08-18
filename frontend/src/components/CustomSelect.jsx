@@ -50,6 +50,8 @@ const CustomSelect = ({
   menuIsOpen,
   onMenuOpen,
   onMenuClose,
+  hasError = false,
+  className = '',
 }) => {
   const popupId = useId();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
@@ -98,10 +100,14 @@ const CustomSelect = ({
       options={options}
       isDisabled={disabled}
       placeholder={placeholder || 'Chọn...'}
-      className="custom-select-container"
+      className={`custom-select-container ${hasError ? 'custom-select--has-error' : ''} ${className}`.trim()}
       classNamePrefix="custom-select"
       isSearchable={isSearchable}
       closeMenuOnSelect={true}
+      closeMenuOnScroll={(event) => {
+        const target = event?.target;
+        return !(target instanceof Element && target.closest('.custom-select__menu-list'));
+      }}
       blurInputOnSelect={true}
       menuIsOpen={effectiveMenuOpen}
       onMenuOpen={handleMenuOpen}
@@ -120,4 +126,4 @@ const CustomSelect = ({
   );
 };
 
-export default CustomSelect;
+export default React.memo(CustomSelect);

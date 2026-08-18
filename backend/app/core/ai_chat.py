@@ -14,8 +14,10 @@ from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.budget import Budget
 from app.models.category import Category
-from app.models.enums import CategoryType
+from app.models.enums import CategoryType, GoalStatus
+from app.models.saving_goal import SavingGoal
 from app.models.transaction import Transaction
 from app.models.user import User
 
@@ -123,7 +125,7 @@ def build_financial_context(db: Session, user_id: int) -> str:
             f" — {cat_name}{desc_part}"
         )
 
-    # --- Fetch all-time totals for available balance ---
+    # --- Fetch all-time totals for balances ---
     all_time_stats = (
         db.query(
             Transaction.type,
@@ -144,13 +146,57 @@ def build_financial_context(db: Session, user_id: int) -> str:
         elif txn_type == CategoryType.EXPENSE:
             all_time_expense = total or Decimal("0")
 
-    available_balance = all_time_income - all_time_expense
+    saving_balance_raw = (
+        db.query(sa_func.coalesce(sa_func.sum(SavingGoal.current_amount), 0))
+        .filter(
+            SavingGoal.user_id == user_id,
+            SavingGoal.status != GoalStatus.CANCELLED,
+        )
+        .scalar()
+    )
+    saving_balance = Decimal(str(saving_balance_raw or 0))
+
+    total_balance = all_time_income - all_time_expense
+    available_balance = total_balance - saving_balance
+
+    # --- Monthly Budgets status ---
+    budgets = (
+        db.query(Budget, Category.name)
+        .join(Category, Budget.category_id == Category.id)
+        .filter(
+            Budget.user_id == user_id,
+            Budget.month == today.month,
+            Budget.year == today.year,
+        )
+        .all()
+    )
+    budget_lines = []
+    for b, cat_name in budgets:
+        spent = next(
+            (
+                total
+                for name, txn_type, total, _ in monthly_stats
+                if name == cat_name and txn_type != CategoryType.INCOME
+            ),
+            Decimal("0"),
+        )
+        pct = round(float((spent / b.amount) * 100), 1) if b.amount > 0 else 0.0
+        status_text = (
+            "ĐÃ VƯỢT NGÂN SÁCH"
+            if spent > b.amount
+            else ("CẢNH BÁO SẮP CHẠM HẠN MỨC" if spent >= b.amount * Decimal("0.8") else "Trong hạn mức")
+        )
+        budget_lines.append(
+            f"  - {cat_name}: Hạn mức {b.amount:,.0f} VNĐ | Đã chi {spent:,.0f} VNĐ ({pct}% - {status_text})"
+        )
 
     # --- Build context text ---
     context_parts = [
         f"=== DỮ LIỆU TÀI CHÍNH THÁNG {today.month}/{today.year} ===",
         f"Ngày hôm nay: {today.strftime('%d/%m/%Y')}",
-        f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (TỔNG THU - TỔNG CHI): {available_balance:,.0f} VNĐ",
+        f"TỔNG TÀI SẢN (TỔNG THU - TỔNG CHI TOÀN BỘ): {total_balance:,.0f} VNĐ",
+        f"ĐANG TÍCH LŨY TRONG CÁC MỤC TIÊU TIẾT KIỆM: {saving_balance:,.0f} VNĐ",
+        f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (CÓ THỂ CHI TIÊU / NẠP THÊM): {available_balance:,.0f} VNĐ",
         "",
         f"TỔNG THU NHẬP THÁNG NÀY: {total_income:,.0f} VNĐ",
     ]
@@ -164,9 +210,14 @@ def build_financial_context(db: Session, user_id: int) -> str:
         context_parts.append("Chi tiết chi tiêu theo danh mục:")
         context_parts.extend(expense_lines)
 
+    if budget_lines:
+        context_parts.append("")
+        context_parts.append("TÌNH HÌNH THỰC HIỆN NGÂN SÁCH THÁNG NÀY:")
+        context_parts.extend(budget_lines)
+
     context_parts.append("")
     context_parts.append(f"CHÊNH LỆCH THU - CHI THÁNG NÀY: {(total_income - total_expense):,.0f} VNĐ")
-    context_parts.append(f"SỐ DƯ KHẢ DỤNG HIỆN TẠI (Số dư ban đầu + Tổng thu - Tổng chi toàn bộ): {available_balance:,.0f} VNĐ")
+    context_parts.append(f"SỐ DƯ KHẢ DỤNG HIỆN TẠI: {available_balance:,.0f} VNĐ (Tổng tài sản: {total_balance:,.0f} VNĐ | Tiết kiệm: {saving_balance:,.0f} VNĐ)")
 
     if recent_lines:
         context_parts.append("")

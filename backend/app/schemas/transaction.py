@@ -47,6 +47,8 @@ class TransactionCreate(BaseModel):
         default=None, max_length=MAX_TRANSACTION_NOTE_LENGTH
     )
     payment_method: PaymentMethod = PaymentMethod.CASH
+    saving_goal_id: int | None = None
+    saving_goal_amount: Decimal | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -55,10 +57,28 @@ class TransactionCreate(BaseModel):
     def validate_amount(cls, value) -> Decimal:
         return _validate_amount(value)
 
+    @field_validator("saving_goal_amount", mode="before")
+    @classmethod
+    def validate_saving_goal_amount(cls, value) -> Decimal | None:
+        if value is None or value == "":
+            return None
+        return _validate_amount(value)
+
     @field_validator("description", mode="before")
     @classmethod
     def validate_description(cls, value) -> str | None:
         return _clean_description(value)
+
+    @model_validator(mode="after")
+    def validate_saving_goal_allocation(self):
+        if self.saving_goal_id is not None:
+            if self.type != CategoryType.INCOME:
+                raise ValueError("Chỉ có thể trích tiền vào mục tiêu tiết kiệm đối với giao dịch thu nhập.")
+            if self.saving_goal_amount is None or self.saving_goal_amount <= 0:
+                raise ValueError("Vui lòng nhập số tiền hợp lệ cần trích vào mục tiêu tiết kiệm.")
+            if self.saving_goal_amount > self.amount:
+                raise ValueError("Số tiền trích vào mục tiêu tiết kiệm không được vượt quá số tiền thu nhập.")
+        return self
 
 
 class TransactionUpdate(BaseModel):
@@ -75,11 +95,23 @@ class TransactionUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @field_validator(
+        "amount",
+        "type",
+        "category_id",
+        "transaction_date",
+        "payment_method",
+        mode="before",
+    )
+    @classmethod
+    def reject_null_required_fields(cls, value):
+        if value is None:
+            raise ValueError("Trường cập nhật này không được để trống.")
+        return value
+
     @field_validator("amount", mode="before")
     @classmethod
-    def validate_amount(cls, value) -> Decimal | None:
-        if value is None:
-            return None
+    def validate_amount(cls, value) -> Decimal:
         return _validate_amount(value)
 
     @field_validator("description", mode="before")
@@ -202,10 +234,11 @@ class BulkImportResponse(BaseModel):
 class TransactionSummaryResponse(BaseModel):
     """Financial balance and flow summary response."""
 
+    total_balance: Decimal
     available_balance: Decimal
+    saving_balance: Decimal
     all_time_income: Decimal
     all_time_expense: Decimal
     month_income: Decimal
     month_expense: Decimal
     month_net: Decimal
-

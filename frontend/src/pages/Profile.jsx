@@ -1,7 +1,9 @@
 import React, { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { AuthContext } from '../context/auth-context';
-import { changePassword, updateProfile } from '../api/authApi';
+import { changePassword, updateProfile, uploadAvatar } from '../api/authApi';
 import { useModalLock } from '../hooks/useModalLock';
+import AvatarSelectModal from '../components/AvatarSelectModal';
+import { getAvatarSrc } from '../utils/avatar';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -214,6 +216,13 @@ const Profile = () => {
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatar_url]);
 
   // Success Modal State
   const [modalState, setModalState] = useState({
@@ -286,6 +295,63 @@ const Profile = () => {
     setPasswordForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSavePresetAvatar = async (presetUrl) => {
+    setSavingAvatar(true);
+    try {
+      const updated = await updateProfile({ avatar_url: presetUrl });
+      setUser(updated);
+      setAvatarModalOpen(false);
+      setModalState({
+        isOpen: true,
+        title: 'Đổi ảnh đại diện thành công!',
+        message: 'Linh vật FinAI đã được chọn làm ảnh đại diện của bạn.',
+        type: 'profile',
+      });
+    } catch (err) {
+      setProfileApiError(errorMessage(err, 'Không thể cập nhật ảnh đại diện. Vui lòng thử lại.'));
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
+  const handleUploadAvatar = async (file) => {
+    setSavingAvatar(true);
+    try {
+      const updated = await uploadAvatar(file);
+      setUser(updated);
+      setAvatarModalOpen(false);
+      setModalState({
+        isOpen: true,
+        title: 'Tải ảnh đại diện thành công!',
+        message: 'Ảnh chân dung đã được tải lên và lưu làm đại diện tài khoản.',
+        type: 'profile',
+      });
+    } catch (err) {
+      setProfileApiError(errorMessage(err, 'Không thể tải ảnh đại diện lên. Vui lòng thử lại.'));
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
+  const handleResetDefaultAvatar = async () => {
+    setSavingAvatar(true);
+    try {
+      const updated = await updateProfile({ avatar_url: '' });
+      setUser(updated);
+      setAvatarModalOpen(false);
+      setModalState({
+        isOpen: true,
+        title: 'Đặt lại thành công!',
+        message: 'Ảnh đại diện đã được hoàn về chữ cái mặc định.',
+        type: 'profile',
+      });
+    } catch (err) {
+      setProfileApiError(errorMessage(err, 'Không thể đặt lại ảnh đại diện. Vui lòng thử lại.'));
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
   const submitProfile = async (event) => {
     event.preventDefault();
     setProfileTouched({ username: true, email: true });
@@ -349,6 +415,18 @@ const Profile = () => {
 
   return (
     <div className="profile-page">
+      {/* Avatar Selection Modal */}
+      <AvatarSelectModal
+        isOpen={avatarModalOpen}
+        currentAvatarUrl={user?.avatar_url}
+        username={user?.username}
+        loading={savingAvatar}
+        onClose={() => setAvatarModalOpen(false)}
+        onSavePreset={handleSavePresetAvatar}
+        onUploadFile={handleUploadAvatar}
+        onResetDefault={handleResetDefaultAvatar}
+      />
+
       {/* Success Modal Dialog */}
       <SuccessModal
         isOpen={modalState.isOpen}
@@ -370,10 +448,30 @@ const Profile = () => {
       {/* Bento Hero Summary Banner */}
       <section className="profile-summary-bento" aria-label="Tổng quan tài khoản">
         <div className="profile-summary-left">
-          <div className="profile-avatar-wrapper">
+          <div className="profile-avatar-wrapper" onClick={() => setAvatarModalOpen(true)} title="Bấm để thay đổi ảnh đại diện">
             <div className="profile-summary-avatar" aria-hidden="true">
-              {initial}
+              {user?.avatar_url && !avatarLoadFailed ? (
+                <img
+                  src={getAvatarSrc(user.avatar_url)}
+                  alt={user.username || 'Avatar'}
+                  className="profile-avatar-img-element"
+                  onError={() => setAvatarLoadFailed(true)}
+                />
+              ) : (
+                initial
+              )}
             </div>
+            <button
+              type="button"
+              className="profile-avatar-edit-badge"
+              aria-label="Thay đổi ảnh đại diện"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAvatarModalOpen(true);
+              }}
+            >
+              📷
+            </button>
             <span className="profile-avatar-badge" title="Tài khoản đang hoạt động"></span>
           </div>
 

@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import CategoryCard from '../components/CategoryCard';
 import CategoryFormModal from '../components/CategoryFormModal';
 import CustomSelect from '../components/CustomSelect';
@@ -33,6 +33,7 @@ const apiMessage = (error) => {
 const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
@@ -46,16 +47,18 @@ const Categories = () => {
   const [modalError, setModalError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [creatingDefaults, setCreatingDefaults] = useState(false);
+  const errorRef = useRef(null);
+  const loadErrorRef = useRef(null);
   const deferredSearch = useDeferredValue(search);
 
   const loadCategories = useCallback(async (signal) => {
     setLoading(true);
-    setError('');
+    setLoadError('');
     try {
       const data = await getCategories({ status: 'all' }, signal);
       setCategories(data.items || []);
     } catch (requestError) {
-      if (requestError.code !== 'ERR_CANCELED') setError(apiMessage(requestError));
+      if (requestError.code !== 'ERR_CANCELED') setLoadError(apiMessage(requestError));
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -88,6 +91,7 @@ const Categories = () => {
         ? {
           ...category,
           name: saved.name,
+          type: saved.type,
           icon: saved.icon,
           color: saved.color,
           is_active: saved.is_active,
@@ -122,6 +126,16 @@ const Categories = () => {
     const timeout = window.setTimeout(() => setSuccess(''), 3500);
     return () => window.clearTimeout(timeout);
   }, [success]);
+
+  useEffect(() => {
+    const target = loadError ? loadErrorRef.current : errorRef.current;
+    if (!target || (!error && !loadError)) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      target.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [error, loadError]);
 
   const openCreate = useCallback(() => {
     setModalError('');
@@ -286,11 +300,20 @@ const Categories = () => {
       </section>
 
       {success && <div className="message message-success page-message" role="status">{success}</div>}
-      {error && <div className="message message-error page-message" role="alert">{error}</div>}
+      {error && <div ref={errorRef} className="message message-error page-message" role="alert" tabIndex={-1}>{error}</div>}
+      {loadError && (
+        <div ref={loadErrorRef} className="message message-error page-message" role="alert" tabIndex={-1}>
+          <span>Không thể tải danh mục: {loadError}</span>{' '}
+          <button type="button" className="btn-secondary" onClick={() => loadCategories()} disabled={loading}>
+            {loading ? 'Đang thử lại...' : 'Thử lại'}
+          </button>
+        </div>
+      )}
 
       {loading && categories.length === 0 ? (
         <div className="category-state" aria-live="polite"><span className="loading-spinner" />Đang tải danh mục...</div>
-      ) : visibleCategories.length === 0 ? (
+      ) : loadError && categories.length === 0 ? null
+      : visibleCategories.length === 0 ? (
         <div className="category-state empty-state">
           <span className="empty-state-icon">◎</span>
           <h2>{filteredEmpty ? 'Không có kết quả phù hợp' : 'Chưa có danh mục nào'}</h2>

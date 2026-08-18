@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
-import { iconAssetPath, iconFallback, iconScale } from '../constants/categoryIcons';
+import { compactIconAssetPath, iconFallback, iconScale } from '../constants/categoryIcons';
 
-const CategoryIcon = ({ icon, color, className = '', loading = 'eager' }) => {
+const CategoryIcon = ({ icon, color, className = '', loading = 'eager', compact = false }) => {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ const CategoryIcon = ({ icon, color, className = '', loading = 'eager' }) => {
     >
       {!failed && (
         <img
-          src={iconAssetPath(icon)}
+          src={compactIconAssetPath(icon, compact)}
           alt=""
           decoding="async"
           loading={loading}

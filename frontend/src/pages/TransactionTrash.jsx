@@ -162,11 +162,10 @@ const TransactionTrash = () => {
         ) : (
           <>
             <section className="txn-list" aria-label="Danh sách thùng rác">
-              {transactions.map((txn, idx) => (
+              {transactions.map((txn) => (
                 <TransactionCard
                   key={txn.id}
                   transaction={txn}
-                  index={idx}
                   isTrashView
                   onRestore={handleRestore}
                   onDeletePermanently={handleDeletePermanently}

@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useModalLock } from '../hooks/useModalLock';
 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Xóa', cancelText = 'Hủy', isDanger = true }) => {
@@ -7,7 +8,7 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" ref={overlayRef} onMouseDown={(e) => { if (e.target === overlayRef.current) onCancel(); }}>
       <div className={`category-modal bounce-modal ${isDanger ? 'danger-modal' : ''}`} style={{ maxWidth: '460px', textAlign: 'center', padding: '32px 24px', margin: 'auto' }}>
         <div style={{ fontSize: '3rem', marginBottom: '16px' }}>{isDanger ? '⚠️' : '❓'}</div>
@@ -18,7 +19,8 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText
           <button type="button" className={isDanger ? 'btn-primary' : 'btn-primary'} style={isDanger ? { background: '#ef4444', color: '#fff', border: 'none', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', whiteSpace: 'nowrap' } : { whiteSpace: 'nowrap' }} onClick={onConfirm}>{confirmText}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

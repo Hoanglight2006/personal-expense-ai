@@ -1,8 +1,9 @@
 import { memo, useMemo, useState, useRef } from 'react';
 import { centsToDecimal, decimalToCents, formatVndDecimal, percentageOf } from '../utils/money';
 
-const CategoryInsights = ({ categories }) => {
-  const [viewType, setViewType] = useState('overview'); // 'overview', 'expense', or 'income'
+const CategoryInsights = ({ categories, viewType: externalViewType, onViewTypeChange }) => {
+  const [internalViewType, setInternalViewType] = useState('overview'); // 'overview', 'expense', or 'income'
+  const viewType = externalViewType || internalViewType;
   const toggleRef = useRef(null);
 
   const customSmoothScroll = (element, duration = 350) => {
@@ -28,7 +29,11 @@ const CategoryInsights = ({ categories }) => {
   };
 
   const handleTabSwitch = (type) => {
-    setViewType(type);
+    if (onViewTypeChange) {
+      onViewTypeChange(type);
+    } else {
+      setInternalViewType(type);
+    }
     setTimeout(() => {
       if (toggleRef.current) {
         customSmoothScroll(toggleRef.current, 350);
@@ -104,26 +109,28 @@ const CategoryInsights = ({ categories }) => {
 
   return (
     <section className="category-insights fade-in" aria-labelledby="category-insights-title">
-      <div className="insight-view-toggle" ref={toggleRef}>
-        <button 
-          className={`toggle-btn ${viewType === 'overview' ? 'active' : ''}`}
-          onClick={() => handleTabSwitch('overview')}
-        >
-          <span className="toggle-icon">⚖️</span> Tổng quan
-        </button>
-        <button 
-          className={`toggle-btn ${viewType === 'expense' ? 'active' : ''}`}
-          onClick={() => handleTabSwitch('expense')}
-        >
-          <span className="toggle-icon">📉</span> Thống kê Chi tiêu
-        </button>
-        <button 
-          className={`toggle-btn ${viewType === 'income' ? 'active' : ''}`}
-          onClick={() => handleTabSwitch('income')}
-        >
-          <span className="toggle-icon">📈</span> Thống kê Thu nhập
-        </button>
-      </div>
+      {!externalViewType && (
+        <div className="insight-view-toggle" ref={toggleRef}>
+          <button
+            className={`toggle-btn ${viewType === 'overview' ? 'active' : ''}`}
+            onClick={() => handleTabSwitch('overview')}
+          >
+            <span className="toggle-icon">⚖️</span> Tổng quan
+          </button>
+          <button
+            className={`toggle-btn ${viewType === 'expense' ? 'active' : ''}`}
+            onClick={() => handleTabSwitch('expense')}
+          >
+            <span className="toggle-icon">📉</span> Thống kê Chi tiêu
+          </button>
+          <button
+            className={`toggle-btn ${viewType === 'income' ? 'active' : ''}`}
+            onClick={() => handleTabSwitch('income')}
+          >
+            <span className="toggle-icon">📈</span> Thống kê Thu nhập
+          </button>
+        </div>
+      )}
 
       {viewType === 'overview' && (
         <div className="insight-charts">

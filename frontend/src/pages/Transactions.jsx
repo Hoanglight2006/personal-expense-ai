@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TransactionCard from '../components/TransactionCard';
 import TransactionFormModal from '../components/TransactionFormModal';
@@ -24,6 +24,25 @@ const todayValue = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+const formatMoney = (amount) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+};
+
+const TYPE_OPTIONS = [
+  { value: '', label: 'Tất cả' },
+  { value: 'expense', label: 'Chi' },
+  { value: 'income', label: 'Thu' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'date_desc', label: 'Mới nhất' },
+  { value: 'date_asc', label: 'Cũ nhất' },
+  { value: 'amount_desc', label: 'Số tiền cao' },
+  { value: 'amount_asc', label: 'Số tiền thấp' },
+];
+
+const SEARCH_DEBOUNCE_MS = 250;
+
 const apiMessage = (error) => {
   const detail = error?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
@@ -43,7 +62,10 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -57,7 +79,7 @@ const Transactions = () => {
   const [sort, setSort] = useState('date_desc');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
-  const deferredSearch = useDeferredValue(search);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,51 +92,96 @@ const Transactions = () => {
 
   // Excel
   const [excelPreviewData, setExcelPreviewData] = useState(null);
+  const [excelIdempotencyKey, setExcelIdempotencyKey] = useState('');
+  const [excelImportError, setExcelImportError] = useState('');
   const [excelLoading, setExcelLoading] = useState(false);
+  const errorRef = useRef(null);
+  const loadErrorRef = useRef(null);
+  const categoriesErrorRef = useRef(null);
+  const transactionsAbortRef = useRef(null);
+  const transactionsRequestSequenceRef = useRef(0);
+
+  const loadCategories = useCallback(async (signal) => {
+    setCategoriesLoading(true);
+    setCategoriesError('');
+    try {
+      const data = await getCategories({ status: 'all' }, signal);
+      setCategories(data.items || []);
+    } catch (requestError) {
+      if (requestError.code !== 'ERR_CANCELED') {
+        setCategoriesError(apiMessage(requestError));
+      }
+    } finally {
+      if (!signal?.aborted) setCategoriesLoading(false);
+    }
+  }, []);
 
   // Load categories once
   useEffect(() => {
-    let cancelled = false;
-    getCategories({ status: 'all' })
-      .then((data) => { if (!cancelled) setCategories(data.items); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+    const controller = new AbortController();
+    loadCategories(controller.signal);
+    return () => controller.abort();
+  }, [loadCategories]);
+
+  useEffect(() => {
+    const normalizedSearch = search.trim();
+    if (normalizedSearch === debouncedSearch) return undefined;
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(normalizedSearch);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [search, debouncedSearch]);
 
   // Build params
   const queryParams = useMemo(() => {
     const params = { sort, page, page_size: pageSize };
-    if (deferredSearch.trim()) params.search = deferredSearch.trim();
+    if (debouncedSearch) params.search = debouncedSearch;
     if (dateStart) params.date_start = dateStart;
     if (dateEnd) params.date_end = dateEnd;
     if (filterType) params.type = filterType;
     if (filterCategory) params.category_id = filterCategory;
     if (filterPayment) params.payment_method = filterPayment;
     return params;
-  }, [deferredSearch, dateStart, dateEnd, filterType, filterCategory, filterPayment, sort, page, pageSize]);
+  }, [debouncedSearch, dateStart, dateEnd, filterType, filterCategory, filterPayment, sort, page, pageSize]);
 
-  const loadTransactions = useCallback(async (signal) => {
+  const loadTransactions = useCallback(async () => {
+    transactionsAbortRef.current?.abort();
+    const controller = new AbortController();
+    transactionsAbortRef.current = controller;
+    const requestSequence = ++transactionsRequestSequenceRef.current;
+
     setLoading(true);
-    setError('');
+    setLoadError('');
     try {
-      const data = await getTransactions(queryParams, signal);
+      const data = await getTransactions(queryParams, controller.signal);
+      if (requestSequence !== transactionsRequestSequenceRef.current) return;
       setTransactions(data.items);
       setTotalCount(data.total_count);
     } catch (err) {
-      if (err.code !== 'ERR_CANCELED') setError(apiMessage(err));
+      if (
+        requestSequence === transactionsRequestSequenceRef.current
+        && err.code !== 'ERR_CANCELED'
+      ) {
+        setLoadError(apiMessage(err));
+      }
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (requestSequence === transactionsRequestSequenceRef.current) {
+        if (transactionsAbortRef.current === controller) {
+          transactionsAbortRef.current = null;
+        }
+        setLoading(false);
+      }
     }
   }, [queryParams]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => loadTransactions(controller.signal), 80);
-    return () => { window.clearTimeout(timeout); controller.abort(); };
+    loadTransactions();
+    return () => {
+      transactionsAbortRef.current?.abort();
+      transactionsRequestSequenceRef.current += 1;
+    };
   }, [loadTransactions]);
-
-  // Reset page when filters change
-  useEffect(() => { setPage(1); }, [deferredSearch, dateStart, dateEnd, filterType, filterCategory, filterPayment, sort]);
 
   // Success toast auto-clear
   useEffect(() => {
@@ -122,6 +189,20 @@ const Transactions = () => {
     const t = window.setTimeout(() => setSuccess(''), 3500);
     return () => window.clearTimeout(t);
   }, [success]);
+
+  useEffect(() => {
+    const target = categoriesError
+      ? categoriesErrorRef.current
+      : loadError
+        ? loadErrorRef.current
+        : errorRef.current;
+    if (!target || (!error && !loadError && !categoriesError)) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      target.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [error, loadError, categoriesError]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -144,14 +225,14 @@ const Transactions = () => {
     }
   }, [location, navigate, openCreate]);
 
-  const openEdit = (txn) => {
+  const openEdit = useCallback((txn) => {
     setEditingTxn(txn);
     setPrefillData(null);
     setModalError('');
     setModalOpen(true);
-  };
+  }, []);
 
-  const openDuplicate = async (txn) => {
+  const openDuplicate = useCallback(async (txn) => {
     try {
       const data = await apiDuplicate(txn.id);
       setEditingTxn(null);
@@ -168,7 +249,7 @@ const Transactions = () => {
     } catch (err) {
       setError(apiMessage(err));
     }
-  };
+  }, []);
 
   const closeModal = () => {
     if (!submitting) {
@@ -188,7 +269,11 @@ const Transactions = () => {
         setSuccess('Đã cập nhật giao dịch.');
       } else {
         await apiCreate(payload);
-        setSuccess('Đã thêm giao dịch mới.');
+        if (payload.saving_goal_id && payload.saving_goal_amount) {
+          setSuccess(`Đã thêm giao dịch thu nhập và trích ${formatMoney(payload.saving_goal_amount)} vào mục tiêu tiết kiệm!`);
+        } else {
+          setSuccess('Đã thêm giao dịch mới.');
+        }
       }
       setModalOpen(false);
       setEditingTxn(null);
@@ -224,33 +309,48 @@ const Transactions = () => {
     }
   };
 
-  const activeCategories = useMemo(
-    () => categories.filter((c) => c.is_active),
-    [categories],
-  );
-
   const categoryOptions = useMemo(() => [
     { value: '', label: 'Tất cả' },
-    ...activeCategories.map((c) => ({ value: c.id, label: c.name }))
-  ], [activeCategories]);
+    ...categories.map((c) => ({
+      value: c.id,
+      label: `${c.name}${c.is_active ? '' : ' (đã ẩn)'}`,
+    }))
+  ], [categories]);
 
   const paymentOptions = useMemo(() => [
     { value: '', label: 'Tất cả' },
     ...PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))
   ], []);
 
-  const typeOptions = [
-    { value: '', label: 'Tất cả' },
-    { value: 'expense', label: 'Chi' },
-    { value: 'income', label: 'Thu' }
-  ];
+  const changeDateStart = useCallback((event) => {
+    setDateStart(event.target.value);
+    setPage(1);
+  }, []);
 
-  const sortOptions = [
-    { value: 'date_desc', label: 'Mới nhất' },
-    { value: 'date_asc', label: 'Cũ nhất' },
-    { value: 'amount_desc', label: 'Số tiền cao' },
-    { value: 'amount_asc', label: 'Số tiền thấp' }
-  ];
+  const changeDateEnd = useCallback((event) => {
+    setDateEnd(event.target.value);
+    setPage(1);
+  }, []);
+
+  const changeType = useCallback((event) => {
+    setFilterType(event.target.value);
+    setPage(1);
+  }, []);
+
+  const changeCategory = useCallback((event) => {
+    setFilterCategory(event.target.value);
+    setPage(1);
+  }, []);
+
+  const changePayment = useCallback((event) => {
+    setFilterPayment(event.target.value);
+    setPage(1);
+  }, []);
+
+  const changeSort = useCallback((event) => {
+    setSort(event.target.value);
+    setPage(1);
+  }, []);
 
   const handleExcelUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -264,9 +364,10 @@ const Transactions = () => {
       const data = await apiParseExcel(file);
       setModalOpen(false);
       setExcelPreviewData(data.items);
+      setExcelIdempotencyKey(crypto.randomUUID());
+      setExcelImportError('');
     } catch (err) {
       setModalError(apiMessage(err));
-      setError(apiMessage(err));
     } finally {
       setExcelLoading(false);
     }
@@ -274,10 +375,10 @@ const Transactions = () => {
 
   const handleConfirmExcel = async (validRows) => {
     setSubmitting(true);
-    setError('');
+    setExcelImportError('');
     try {
       const payload = {
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: excelIdempotencyKey,
         rows: validRows.map((r) => ({
           amount: r.amount,
           type: r.type,
@@ -290,9 +391,10 @@ const Transactions = () => {
       const res = await apiImportTransactions(payload);
       setSuccess(`Nhập thành công ${res.success_count} giao dịch (thất bại: ${res.error_count}).`);
       setExcelPreviewData(null);
+      setExcelIdempotencyKey('');
       loadTransactions();
     } catch (err) {
-      setError(apiMessage(err));
+      setExcelImportError(apiMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -308,7 +410,7 @@ const Transactions = () => {
             <p>Ghi nhận, tìm kiếm và quản lý mọi khoản thu chi.</p>
           </div>
           <div className="txn-hero-actions">
-            <button type="button" className="btn-primary add-txn-button" onClick={openCreate}>+ Thêm giao dịch</button>
+            <button type="button" className="btn-primary add-txn-button" onClick={openCreate} disabled={categoriesLoading || Boolean(categoriesError)}>+ Thêm giao dịch</button>
             <Link to="/transactions/trash" className="btn-secondary txn-trash-link">🗑️ Thùng rác</Link>
           </div>
         </section>
@@ -321,29 +423,29 @@ const Transactions = () => {
             </label>
             <label>
               <span>Loại</span>
-              <CustomSelect value={filterType} onChange={(e) => setFilterType(e.target.value)} options={typeOptions} />
+              <CustomSelect value={filterType} onChange={changeType} options={TYPE_OPTIONS} />
             </label>
             <label>
               <span>Danh mục</span>
-              <CustomSelect value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} options={categoryOptions} />
+              <CustomSelect value={filterCategory} onChange={changeCategory} options={categoryOptions} />
             </label>
             <label>
               <span>Thanh toán</span>
-              <CustomSelect value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} options={paymentOptions} />
+              <CustomSelect value={filterPayment} onChange={changePayment} options={paymentOptions} />
             </label>
           </div>
           <div className="toolbar-row txn-toolbar-row-2">
             <label>
               <span>Từ ngày</span>
-              <CustomDatePicker value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+              <CustomDatePicker value={dateStart} onChange={changeDateStart} />
             </label>
             <label>
               <span>Đến ngày</span>
-              <CustomDatePicker value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
+              <CustomDatePicker value={dateEnd} onChange={changeDateEnd} />
             </label>
             <label>
               <span>Sắp xếp</span>
-              <CustomSelect value={sort} onChange={(e) => setSort(e.target.value)} options={sortOptions} />
+              <CustomSelect value={sort} onChange={changeSort} options={SORT_OPTIONS} />
             </label>
             <div className="txn-count-display">
               <span className="txn-count-label">Kết quả</span>
@@ -353,7 +455,23 @@ const Transactions = () => {
         </section>
 
         {success && <div className="message message-success page-message" role="status">{success}</div>}
-        {error && <div className="message message-error page-message" role="alert">{error}</div>}
+        {error && <div ref={errorRef} className="message message-error page-message" role="alert" tabIndex={-1}>{error}</div>}
+        {loadError && (
+          <div ref={loadErrorRef} className="message message-error page-message" role="alert" tabIndex={-1}>
+            <span>Không thể tải giao dịch: {loadError}</span>{' '}
+            <button type="button" className="btn-secondary" onClick={() => loadTransactions()} disabled={loading}>
+              {loading ? 'Đang thử lại...' : 'Thử lại'}
+            </button>
+          </div>
+        )}
+        {categoriesError && (
+          <div ref={categoriesErrorRef} className="message message-error page-message" role="alert" tabIndex={-1}>
+            <span>Không thể tải danh mục: {categoriesError}</span>{' '}
+            <button type="button" className="btn-secondary" onClick={() => loadCategories()} disabled={categoriesLoading}>
+              {categoriesLoading ? 'Đang thử lại...' : 'Thử lại'}
+            </button>
+          </div>
+        )}
 
         {loading && transactions.length > 0 && (
           <div className="txn-refreshing" role="status">
@@ -363,23 +481,23 @@ const Transactions = () => {
 
         {loading && transactions.length === 0 ? (
           <div className="txn-state" aria-live="polite"><span className="loading-spinner" />Đang tải giao dịch...</div>
-        ) : transactions.length === 0 ? (
+        ) : loadError && transactions.length === 0 ? null
+        : transactions.length === 0 ? (
           <div className="txn-state empty-state">
             <span className="empty-state-icon">◎</span>
-            <h2>{deferredSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment ? 'Không có kết quả phù hợp' : 'Chưa có giao dịch nào'}</h2>
-            <p>{deferredSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment ? 'Hãy thử điều chỉnh bộ lọc.' : 'Thêm giao dịch đầu tiên để bắt đầu quản lý.'}</p>
-            {!(deferredSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment) && (
-              <button type="button" className="btn-primary" onClick={openCreate}>+ Thêm giao dịch</button>
+            <h2>{debouncedSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment ? 'Không có kết quả phù hợp' : 'Chưa có giao dịch nào'}</h2>
+            <p>{debouncedSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment ? 'Hãy thử điều chỉnh bộ lọc.' : 'Thêm giao dịch đầu tiên để bắt đầu quản lý.'}</p>
+            {!(debouncedSearch || dateStart || dateEnd || filterType || filterCategory || filterPayment) && (
+              <button type="button" className="btn-primary" onClick={openCreate} disabled={categoriesLoading || Boolean(categoriesError)}>+ Thêm giao dịch</button>
             )}
           </div>
         ) : (
           <>
             <section className="txn-list" aria-label="Danh sách giao dịch">
-              {transactions.map((txn, idx) => (
+              {transactions.map((txn) => (
                 <TransactionCard
                   key={txn.id}
                   transaction={txn}
-                  index={idx}
                   onEdit={openEdit}
                   onTrash={handleTrash}
                   onDuplicate={openDuplicate}
@@ -408,6 +526,7 @@ const Transactions = () => {
             prefillData={prefillData}
             onExcelUpload={handleExcelUpload}
             isExcelLoading={excelLoading}
+            categoriesReady={!categoriesLoading && !categoriesError}
           />
         )}
 
@@ -416,7 +535,12 @@ const Transactions = () => {
             data={excelPreviewData}
             categories={categories}
             submitting={submitting}
-            onCancel={() => setExcelPreviewData(null)}
+            apiError={excelImportError}
+            onCancel={() => {
+              setExcelPreviewData(null);
+              setExcelIdempotencyKey('');
+              setExcelImportError('');
+            }}
             onConfirm={handleConfirmExcel}
           />
         )}

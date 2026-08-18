@@ -7,7 +7,9 @@ import CategoryIcon from '../components/CategoryIcon';
 
 const Dashboard = () => {
   const [summary, setSummary] = useState({
+    total_balance: 0,
     available_balance: 0,
+    saving_balance: 0,
     all_time_income: 0,
     all_time_expense: 0,
     month_income: 0,
@@ -37,7 +39,9 @@ const Dashboard = () => {
 
       if (sumData) {
         setSummary({
-          available_balance: Number(sumData.available_balance || 0),
+          total_balance: Number(sumData.total_balance ?? sumData.available_balance ?? 0),
+          available_balance: Number(sumData.available_balance ?? 0),
+          saving_balance: Number(sumData.saving_balance ?? 0),
           all_time_income: Number(sumData.all_time_income || 0),
           all_time_expense: Number(sumData.all_time_expense || 0),
           month_income: Number(sumData.month_income || 0),
@@ -79,7 +83,6 @@ const Dashboard = () => {
     return 'Chào buổi tối 🌙';
   };
 
-  const totalBalance = summary.available_balance;
   const totalActivity = summary.month_income + summary.month_expense;
   const incomePercent = totalActivity > 0 ? (summary.month_income / totalActivity) * 100 : 50;
   const expensePercent = totalActivity > 0 ? (summary.month_expense / totalActivity) * 100 : 50;
@@ -158,11 +161,14 @@ const Dashboard = () => {
             <div className="metric-card balance-card">
               <div className="metric-content">
                 <span className="metric-title">Số dư khả dụng</span>
-                <h2 className={`metric-value ${totalBalance < 0 ? 'text-error' : ''}`}>
-                  {formatMoney(totalBalance)}
+                <h2 className={`metric-value ${summary.available_balance < 0 ? 'text-error' : ''}`}>
+                  {formatMoney(summary.available_balance)}
                 </h2>
                 <div className="metric-subtext">
-                  <span>Chênh lệch tháng này: <strong className={summary.month_net >= 0 ? 'text-success' : 'text-error'}>{summary.month_net >= 0 ? '+' : ''}{formatMoney(summary.month_net)}</strong></span>
+                  <span>Tổng tài sản: <strong>{formatMoney(summary.total_balance)}</strong></span>
+                  {summary.saving_balance > 0 && (
+                    <span> | Tích lũy: <strong className="text-emerald">{formatMoney(summary.saving_balance)}</strong></span>
+                  )}
                 </div>
               </div>
             </div>

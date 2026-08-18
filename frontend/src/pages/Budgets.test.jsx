@@ -23,6 +23,11 @@ vi.mock('../api/transactionApi', () => ({
   getTransactionSummary: vi.fn(),
 }));
 
+vi.mock('../api/aiApi', () => ({
+  getBudgetRecommendations: vi.fn(),
+  applyBudgetRecommendations: vi.fn(),
+}));
+
 const mockCategories = [
   { id: 1, name: 'Ăn uống', type: 'expense', icon: 'food', color: '#C87941', is_active: true },
   { id: 2, name: 'Di chuyển', type: 'expense', icon: 'transport', color: '#38bdf8', is_active: true },
@@ -196,6 +201,80 @@ describe('Budgets Page', () => {
 
     await waitFor(() => {
       expect(deleteBudget).toHaveBeenCalledWith(102);
+    });
+  });
+
+  it('switches to AI Budget tab, shows options, and generates suggestions on confirmation', async () => {
+    const user = userEvent.setup();
+    const { getBudgetRecommendations, applyBudgetRecommendations } = await import('../api/aiApi');
+    getBudgetRecommendations.mockResolvedValue({
+      target_month: 8,
+      target_year: 2026,
+      total_recommended: 3000000,
+      recommendations: [
+        {
+          category_id: 1,
+          category_name: 'Ăn uống',
+          category_icon: 'food',
+          category_color: '#C87941',
+          avg_spent: 2000000,
+          last_month_spent: 2200000,
+          recommended_amount: 2500000,
+          reason: 'Dựa trên mức chi trung bình gần đây.',
+        },
+      ],
+    });
+    applyBudgetRecommendations.mockResolvedValue({
+      success: true,
+      applied_count: 1,
+      message: 'Đã áp dụng thành công.',
+    });
+
+    renderPage();
+
+    const aiTab = screen.getByRole('tab', { name: /AI Gợi Ý Ngân Sách/i });
+    await user.click(aiTab);
+
+    // Shows options config card first
+    expect(screen.getByText('Tùy Chọn Sinh Gợi Ý Ngân Sách AI')).toBeInTheDocument();
+    expect(screen.getByText('Cân đối thông minh (50/30/20)')).toBeInTheDocument();
+    expect(screen.getByText('Thắt chặt tiết kiệm')).toBeInTheDocument();
+
+    // Confirm generation
+    const confirmBtn = screen.getByRole('button', { name: /Xác Nhận & Sinh Gợi Ý Ngân Sách/i });
+    await user.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('✨ Hạn Mức Đề Xuất Từ AI')).toBeInTheDocument();
+      expect(screen.getByText('Dựa trên mức chi trung bình gần đây.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Xác Nhận Áp Dụng Ngân Sách Này/i })).toBeInTheDocument();
+    });
+
+    const amountInput = screen.getByRole('textbox', {
+      name: 'Hạn mức đề xuất cho Ăn uống',
+    });
+    expect(amountInput).toHaveValue('2.500.000');
+    await user.clear(amountInput);
+    await user.type(amountInput, '1750000');
+    expect(amountInput).toHaveValue('1.750.000');
+    expect(screen.queryByText('VNĐ')).not.toBeInTheDocument();
+
+    const editAmountButton = screen.getByRole('button', {
+      name: 'Sửa hạn mức cho Ăn uống',
+    });
+    await user.click(editAmountButton);
+    expect(amountInput).toHaveFocus();
+
+    const categoryIcon = document.querySelector('.ai-card-category-info .category-icon img');
+    expect(categoryIcon).toHaveAttribute('src', expect.stringContaining('food'));
+
+    await user.click(screen.getByRole('button', { name: /Xác Nhận Áp Dụng Ngân Sách Này/i }));
+    await waitFor(() => {
+      expect(applyBudgetRecommendations).toHaveBeenCalledWith({
+        target_month: 8,
+        target_year: 2026,
+        recommendations: [{ category_id: 1, amount: 1750000 }],
+      });
     });
   });
 });

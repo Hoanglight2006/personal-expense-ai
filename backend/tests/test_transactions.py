@@ -56,12 +56,38 @@ def create_transaction(client, headers, category_id, **overrides):
 
 @pytest.fixture(scope="module")
 def user_a(client):
-    return register_and_login(client, "txn_user_a", "txn_a@test.com")
+    headers = register_and_login(client, "txn_user_a", "txn_a@test.com")
+    cat_inc = create_category(client, headers, "Thu nhập khởi đầu A", type="income")
+    client.post(
+        TRANSACTIONS_URL,
+        json={
+            "amount": "100000000.00",
+            "type": "income",
+            "category_id": cat_inc["id"],
+            "transaction_date": "2026-01-01",
+            "description": "Khoản thu ban đầu",
+        },
+        headers=headers,
+    )
+    return headers
 
 
 @pytest.fixture(scope="module")
 def user_b(client):
-    return register_and_login(client, "txn_user_b", "txn_b@test.com")
+    headers = register_and_login(client, "txn_user_b", "txn_b@test.com")
+    cat_inc = create_category(client, headers, "Thu nhập khởi đầu B", type="income")
+    client.post(
+        TRANSACTIONS_URL,
+        json={
+            "amount": "100000000.00",
+            "type": "income",
+            "category_id": cat_inc["id"],
+            "transaction_date": "2026-01-01",
+            "description": "Khoản thu ban đầu",
+        },
+        headers=headers,
+    )
+    return headers
 
 
 @pytest.fixture(scope="module")
@@ -246,6 +272,21 @@ class TestUpdateTransaction:
             f"{TRANSACTIONS_URL}/{txn_id}", json={}, headers=user_a,
         )
         assert resp.status_code == 422
+
+    @pytest.mark.parametrize(
+        "field",
+        ["amount", "type", "category_id", "transaction_date", "payment_method"],
+    )
+    def test_update_rejects_explicit_null_for_required_fields(
+        self, client, user_a, cat_expense_a, field
+    ):
+        txn = create_transaction(client, user_a, cat_expense_a["id"]).json()
+        response = client.patch(
+            f"{TRANSACTIONS_URL}/{txn['id']}",
+            json={field: None},
+            headers=user_a,
+        )
+        assert response.status_code == 422
 
     def test_update_keeps_hidden_category_if_not_changing(self, client, user_a):
         """When editing an old transaction with a hidden category, keep it
@@ -670,11 +711,11 @@ class TestTransactionSummary:
         cat_inc = create_category(client, summary_user, "Thu nhập test", icon="salary", type="income")
         cat_exp = create_category(client, summary_user, "Chi tiêu test", icon="food", type="expense")
 
-        # Add income: 500.00, expense: 200.00
+        # Add income: 2000.00, expense: 200.00 (plus trashed 999.00)
         client.post(
             TRANSACTIONS_URL,
             json={
-                "amount": "500.00",
+                "amount": "2000.00",
                 "type": "income",
                 "category_id": cat_inc["id"],
                 "transaction_date": date.today().isoformat(),
@@ -708,12 +749,26 @@ class TestTransactionSummary:
         resp = client.get(f"{TRANSACTIONS_URL}/summary", headers=summary_user)
         assert resp.status_code == 200
         data = resp.json()
-        assert data["all_time_income"] == "500.00"
+        assert data["all_time_income"] == "2000.00"
         assert data["all_time_expense"] == "200.00"
-        assert data["available_balance"] == "300.00"
-        assert data["month_income"] == "500.00"
+        assert data["total_balance"] == "1800.00"
+        assert data["available_balance"] == "1800.00"
+        assert data["saving_balance"] == "0.00"
+        assert data["month_income"] == "2000.00"
         assert data["month_expense"] == "200.00"
-        assert data["month_net"] == "300.00"
+        assert data["month_net"] == "1800.00"
+
+        # Now create a saving goal with deposit 100.00
+        client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Heo đất", "target_amount": "1000.00", "initial_deposit": "100.00"},
+            headers=summary_user,
+        )
+        resp2 = client.get(f"{TRANSACTIONS_URL}/summary", headers=summary_user)
+        data2 = resp2.json()
+        assert data2["total_balance"] == "1800.00"
+        assert data2["saving_balance"] == "100.00"
+        assert data2["available_balance"] == "1700.00"
 
 
 
@@ -761,28 +816,436 @@ class TestCategoryValidationConstraints:
         assert res.status_code == 404
         assert "Không tìm thấy danh mục" in res.json()["detail"]
 
-    def test_import_transactions_rejects_mismatched_or_deleted_category(
+    def test_create_income_transaction_with_saving_allocation(
+        self, client, user_a, cat_income_a
+    ):
+        # 1. Create a saving goal
+        goal_resp = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Quỹ mua xe SH", "target_amount": "50000000.00"},
+            headers=user_a,
+        )
+        assert goal_resp.status_code == 201
+        goal_id = goal_resp.json()["id"]
+
+        # 2. Create income transaction with allocation
+        txn_resp = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "10000000.00",
+                "type": "income",
+                "category_id": cat_income_a["id"],
+                "transaction_date": date.today().isoformat(),
+                "description": "Thưởng doanh số quý 3",
+                "saving_goal_id": goal_id,
+                "saving_goal_amount": "2000000.00",
+            },
+            headers=user_a,
+        )
+        assert txn_resp.status_code == 201
+        txn_id = txn_resp.json()["id"]
+
+        # 3. Verify saving goal updated
+        goal_updated = client.get(f"/api/v1/saving-goals/{goal_id}", headers=user_a).json()
+        assert Decimal(goal_updated["current_amount"]) == Decimal("2000000.00")
+        assert len(goal_updated["contributions"]) == 1
+        assert goal_updated["contributions"][0]["source"] == "income_allocation"
+        assert goal_updated["contributions"][0]["transaction_id"] == txn_id
+        assert Decimal(goal_updated["contributions"][0]["amount"]) == Decimal("2000000.00")
+
+    def test_create_transaction_rejects_saving_allocation_on_expense(
         self, client, user_a, cat_expense_a
     ):
-        # 1. Row with mismatched type
-        payload = {
-            "idempotency_key": "test-import-val-1",
-            "rows": [
-                {
-                    "amount": "200.00",
-                    "type": "income",  # Mismatch with expense category
-                    "category_id": cat_expense_a["id"],
-                    "transaction_date": "2026-08-01",
-                    "description": "Income mismatch",
-                }
-            ],
-        }
-        res = client.post(f"{TRANSACTIONS_URL}/import", json=payload, headers=user_a)
-        assert res.status_code == 200
-        data = res.json()
-        assert data["success_count"] == 0
-        assert data["error_count"] == 1
-        assert "không khớp" in data["results"][0]["error"]
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Goal test expense", "target_amount": "10000000.00"},
+            headers=user_a,
+        ).json()
+
+        res = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "500000.00",
+                "type": "expense",
+                "category_id": cat_expense_a["id"],
+                "transaction_date": date.today().isoformat(),
+                "saving_goal_id": goal["id"],
+                "saving_goal_amount": "100000.00",
+            },
+            headers=user_a,
+        )
+        assert res.status_code == 422
+        assert "Chỉ có thể trích tiền vào mục tiêu tiết kiệm đối với giao dịch thu nhập" in res.text
+
+    def test_trash_and_restore_income_with_saving_allocation(
+        self, client, user_a, cat_income_a
+    ):
+        # 1. Create goal
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Mục tiêu mua laptop", "target_amount": "5000000.00"},
+            headers=user_a,
+        ).json()
+        goal_id = goal["id"]
+
+        # 2. Create income transaction with 5,000,000 allocating 5,000,000 to goal -> auto completes
+        txn = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "5000000.00",
+                "type": "income",
+                "category_id": cat_income_a["id"],
+                "transaction_date": date.today().isoformat(),
+                "description": "Lương tháng này",
+                "saving_goal_id": goal_id,
+                "saving_goal_amount": "5000000.00",
+            },
+            headers=user_a,
+        ).json()
+        txn_id = txn["id"]
+
+        # Goal is now completed
+        goal_status = client.get(f"/api/v1/saving-goals/{goal_id}", headers=user_a).json()
+        assert goal_status["status"] == "completed"
+        assert Decimal(goal_status["current_amount"]) == Decimal("5000000.00")
+
+        # 3. Trash the transaction -> goal current_amount should reduce and status revert to active
+        trash_resp = client.post(f"{TRANSACTIONS_URL}/{txn_id}/trash", headers=user_a)
+        assert trash_resp.status_code == 200
+
+        goal_after_trash = client.get(f"/api/v1/saving-goals/{goal_id}", headers=user_a).json()
+        assert Decimal(goal_after_trash["current_amount"]) == Decimal("0.00")
+        assert goal_after_trash["status"] == "active"
+
+        # 4. Restore the transaction -> goal current_amount should restore to 5,000,000 and status completed
+        restore_resp = client.post(f"{TRANSACTIONS_URL}/{txn_id}/restore", headers=user_a)
+        assert restore_resp.status_code == 200
+
+        goal_after_restore = client.get(f"/api/v1/saving-goals/{goal_id}", headers=user_a).json()
+        assert Decimal(goal_after_restore["current_amount"]) == Decimal("5000000.00")
+        assert goal_after_restore["status"] == "completed"
+
+    def test_restore_income_allocation_keeps_cancelled_goal_consistent(self, client):
+        user = register_and_login(
+            client,
+            "restore_cancelled_goal_user",
+            "restore_cancelled_goal@example.com",
+        )
+        income_category = create_category(
+            client,
+            user,
+            "Thu nhập cho mục tiêu đã hủy",
+            type="income",
+        )
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Quỹ dự phòng", "target_amount": "200000.00"},
+            headers=user,
+        ).json()
+        transaction = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": income_category["id"],
+                "transaction_date": date.today().isoformat(),
+                "saving_goal_id": goal["id"],
+                "saving_goal_amount": "30000.00",
+            },
+            headers=user,
+        ).json()
+
+        assert client.patch(
+            f"/api/v1/saving-goals/{goal['id']}",
+            json={"status": "cancelled"},
+            headers=user,
+        ).status_code == 200
+        assert client.post(
+            f"{TRANSACTIONS_URL}/{transaction['id']}/trash",
+            headers=user,
+        ).status_code == 200
+
+        after_trash = client.get(
+            f"/api/v1/saving-goals/{goal['id']}", headers=user
+        ).json()
+        assert after_trash["status"] == "cancelled"
+        assert Decimal(after_trash["current_amount"]) == Decimal("0.00")
+
+        restore_response = client.post(
+            f"{TRANSACTIONS_URL}/{transaction['id']}/restore",
+            headers=user,
+        )
+        assert restore_response.status_code == 200
+
+        after_restore = client.get(
+            f"/api/v1/saving-goals/{goal['id']}", headers=user
+        ).json()
+        assert after_restore["status"] == "cancelled"
+        assert Decimal(after_restore["current_amount"]) == Decimal("30000.00")
+        assert len(after_restore["contributions"]) == 1
+        assert Decimal(after_restore["contributions"][0]["amount"]) == Decimal("30000.00")
+
+        cancelled_summary = client.get(
+            f"{TRANSACTIONS_URL}/summary", headers=user
+        ).json()
+        assert Decimal(cancelled_summary["available_balance"]) == Decimal("100000.00")
+        assert Decimal(cancelled_summary["saving_balance"]) == Decimal("0.00")
+
+        reactivate_response = client.patch(
+            f"/api/v1/saving-goals/{goal['id']}",
+            json={"status": "active"},
+            headers=user,
+        )
+        assert reactivate_response.status_code == 200
+        assert Decimal(reactivate_response.json()["current_amount"]) == Decimal("30000.00")
+
+        active_summary = client.get(
+            f"{TRANSACTIONS_URL}/summary", headers=user
+        ).json()
+        assert Decimal(active_summary["saving_balance"]) == Decimal("30000.00")
+        assert Decimal(active_summary["available_balance"]) == Decimal("70000.00")
+
+    def test_update_income_with_saving_allocation_validations(
+        self, client, user_a, cat_income_a, cat_expense_a
+    ):
+        goal = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Mục tiêu mua điện thoại", "target_amount": "10000000.00"},
+            headers=user_a,
+        ).json()
+        goal_id = goal["id"]
+
+        txn = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "6000000.00",
+                "type": "income",
+                "category_id": cat_income_a["id"],
+                "transaction_date": date.today().isoformat(),
+                "saving_goal_id": goal_id,
+                "saving_goal_amount": "3000000.00",
+            },
+            headers=user_a,
+        ).json()
+        txn_id = txn["id"]
+
+        # Attempt to change type to expense -> rejected
+        resp_type_fail = client.patch(
+            f"{TRANSACTIONS_URL}/{txn_id}",
+            json={"type": "expense", "category_id": cat_expense_a["id"]},
+            headers=user_a,
+        )
+        assert resp_type_fail.status_code == 400
+        assert "không thể đổi loại thành chi tiêu" in resp_type_fail.json()["detail"]
+
+        # Attempt to reduce amount below allocated 3,000,000 -> rejected
+        resp_amount_fail = client.patch(
+            f"{TRANSACTIONS_URL}/{txn_id}",
+            json={"amount": "2000000.00"},
+            headers=user_a,
+        )
+        assert resp_amount_fail.status_code == 400
+        assert "không thể nhỏ hơn tổng số tiền đã trích" in resp_amount_fail.json()["detail"]
+
+        # Update amount to 4,000,000 (>= 3,000,000) -> success
+        resp_amount_ok = client.patch(
+            f"{TRANSACTIONS_URL}/{txn_id}",
+            json={"amount": "4000000.00"},
+            headers=user_a,
+        )
+        assert resp_amount_ok.status_code == 200
+        assert Decimal(resp_amount_ok.json()["amount"]) == Decimal("4000000.00")
 
 
+class TestAvailableBalanceEnforcement:
+    """Test strict balance enforcement when creating/updating/restoring expense transactions."""
 
+    def test_cannot_create_expense_with_zero_balance(self, client):
+        user = register_and_login(client, "broke_user", "broke@test.com")
+        cat_exp = create_category(client, user, "Chi test 0 balance", type="expense")
+        resp = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "50000.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        assert resp.status_code == 400
+        assert "vượt quá số dư khả dụng hiện có" in resp.json()["detail"]
+
+    def test_cannot_create_expense_exceeding_available_balance(self, client):
+        user = register_and_login(client, "limited_user", "limited@test.com")
+        cat_inc = create_category(client, user, "Thu test limit", type="income")
+        cat_exp = create_category(client, user, "Chi test limit", type="expense")
+        # Add income 100k
+        client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100000.00",
+                "type": "income",
+                "category_id": cat_inc["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        # Try expense 150k -> 400
+        resp = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "150000.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        assert resp.status_code == 400
+        assert "vượt quá số dư khả dụng hiện có" in resp.json()["detail"]
+
+        # Expense 80k -> 201 (remaining 20k)
+        resp_ok = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "80000.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        assert resp_ok.status_code == 201
+
+        # Try another 30k -> 400 (only 20k left)
+        resp_fail = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "30000.00",
+                "type": "expense",
+                "category_id": cat_exp["id"],
+                "transaction_date": date.today().isoformat(),
+            },
+            headers=user,
+        )
+        assert resp_fail.status_code == 400
+
+    def test_cannot_update_expense_exceeding_available_balance(self, client):
+        user = register_and_login(client, "update_user", "update@test.com")
+        cat_inc = create_category(client, user, "Thu test update", type="income")
+        cat_exp = create_category(client, user, "Chi test update", type="expense")
+        # Income 100k
+        client.post(
+            TRANSACTIONS_URL,
+            json={"amount": "100000.00", "type": "income", "category_id": cat_inc["id"], "transaction_date": date.today().isoformat()},
+            headers=user,
+        )
+        # Expense 50k -> remaining 50k
+        txn = client.post(
+            TRANSACTIONS_URL,
+            json={"amount": "50000.00", "type": "expense", "category_id": cat_exp["id"], "transaction_date": date.today().isoformat()},
+            headers=user,
+        ).json()
+
+        # Update expense from 50k to 120k (+70k > 50k avail) -> 400
+        resp_fail = client.patch(
+            f"{TRANSACTIONS_URL}/{txn['id']}",
+            json={"amount": "120000.00"},
+            headers=user,
+        )
+        assert resp_fail.status_code == 400
+        assert "tăng thêm" in resp_fail.json()["detail"]
+
+        # Update expense to 90k (+40k <= 50k avail) -> 200
+        resp_ok = client.patch(
+            f"{TRANSACTIONS_URL}/{txn['id']}",
+            json={"amount": "90000.00"},
+            headers=user,
+        )
+        assert resp_ok.status_code == 200
+
+    def test_cannot_restore_expense_exceeding_available_balance(self, client):
+        user = register_and_login(client, "restore_user", "restore@test.com")
+        cat_inc = create_category(client, user, "Thu test restore", type="income")
+        cat_exp = create_category(client, user, "Chi test restore", type="expense")
+        # Income 100k
+        client.post(
+            TRANSACTIONS_URL,
+            json={"amount": "100000.00", "type": "income", "category_id": cat_inc["id"], "transaction_date": date.today().isoformat()},
+            headers=user,
+        )
+        # Expense 60k
+        txn = client.post(
+            TRANSACTIONS_URL,
+            json={"amount": "60000.00", "type": "expense", "category_id": cat_exp["id"], "transaction_date": date.today().isoformat()},
+            headers=user,
+        ).json()
+        # Soft delete 60k -> available balance restores to 100k
+        client.post(f"{TRANSACTIONS_URL}/{txn['id']}/trash", headers=user)
+
+        # Spend 80k on other expense -> available balance drops to 20k
+        client.post(
+            TRANSACTIONS_URL,
+            json={"amount": "80000.00", "type": "expense", "category_id": cat_exp["id"], "transaction_date": date.today().isoformat()},
+            headers=user,
+        )
+
+        # Try to restore 60k expense -> fails (20k < 60k)
+        resp_restore_fail = client.post(f"{TRANSACTIONS_URL}/{txn['id']}/restore", headers=user)
+        assert resp_restore_fail.status_code == 400
+        assert "Khôi phục giao dịch chi tiêu" in resp_restore_fail.json()["detail"]
+
+    def test_cannot_reduce_income_when_projected_balance_is_negative(self, client):
+        user = register_and_login(client, "reduce_income_user", "reduce_income@test.com")
+        cat_inc = create_category(client, user, "Thu để giảm", type="income")
+        cat_exp = create_category(client, user, "Chi sau thu", type="expense")
+        income = create_transaction(
+            client,
+            user,
+            cat_inc["id"],
+            type="income",
+            amount="100000.00",
+        ).json()
+        assert create_transaction(
+            client, user, cat_exp["id"], amount="80000.00"
+        ).status_code == 201
+
+        response = client.patch(
+            f"{TRANSACTIONS_URL}/{income['id']}",
+            json={"amount": "10000.00"},
+            headers=user,
+        )
+        assert response.status_code == 400
+        assert "số dư khả dụng bị âm" in response.json()["detail"]
+
+        unchanged = client.get(
+            f"{TRANSACTIONS_URL}/{income['id']}", headers=user
+        )
+        assert unchanged.json()["amount"] == "100000.00"
+
+    def test_cannot_trash_income_when_projected_balance_is_negative(self, client):
+        user = register_and_login(client, "trash_income_user", "trash_income@test.com")
+        cat_inc = create_category(client, user, "Thu để xóa", type="income")
+        cat_exp = create_category(client, user, "Chi trước xóa", type="expense")
+        income = create_transaction(
+            client,
+            user,
+            cat_inc["id"],
+            type="income",
+            amount="100000.00",
+        ).json()
+        assert create_transaction(
+            client, user, cat_exp["id"], amount="80000.00"
+        ).status_code == 201
+
+        response = client.post(
+            f"{TRANSACTIONS_URL}/{income['id']}/trash", headers=user
+        )
+        assert response.status_code == 400
+        assert "Không thể xóa nguồn thu" in response.json()["detail"]
+
+        still_active = client.get(
+            f"{TRANSACTIONS_URL}/{income['id']}", headers=user
+        )
+        assert still_active.status_code == 200

@@ -32,4 +32,22 @@ describe('popup coordination', () => {
     expect(document.querySelector('.react-datepicker')).toBeInTheDocument();
     expect(document.querySelector('.custom-select__menu')).not.toBeInTheDocument();
   });
+
+  it('prevents wheel events over the date input and calendar from scrolling the page', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <CustomDatePicker value="2026-08-16" onChange={vi.fn()} />,
+    );
+
+    const input = container.querySelector('.custom-datepicker-input');
+    const inputWheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 });
+    input.dispatchEvent(inputWheel);
+    expect(inputWheel.defaultPrevented).toBe(true);
+
+    await user.click(input);
+    const calendar = document.querySelector('.react-datepicker');
+    const calendarWheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 });
+    calendar.dispatchEvent(calendarWheel);
+    expect(calendarWheel.defaultPrevented).toBe(true);
+  });
 });

@@ -5,7 +5,6 @@ and paginated listing.  All endpoints enforce ownership via the current JWT user
 """
 
 import calendar
-from collections import OrderedDict
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated
@@ -17,7 +16,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.category import Category
-from app.models.enums import CategoryType, PaymentMethod
+from app.models.enums import CategoryType, ContributionSource, GoalStatus, PaymentMethod
+from app.models.idempotency import ImportIdempotencyKey
+from app.models.saving_contribution import SavingContribution
+from app.models.saving_goal import SavingGoal
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.transaction import (
@@ -88,6 +90,7 @@ def _validate_category(
             Category.user_id == user_id,
             Category.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
     if category is None:
@@ -134,6 +137,57 @@ def _transaction_response(txn: Transaction) -> TransactionResponse:
     )
 
 
+def _get_user_available_balance(db: Session, user_id: int) -> Decimal:
+    """Compute available unallocated balance = Total Income - Total Expense - Total in Active/Completed Saving Goals."""
+    income_sum = (
+        db.query(sa_func.coalesce(sa_func.sum(Transaction.amount), 0))
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type == CategoryType.INCOME,
+            Transaction.is_deleted.is_(False),
+        )
+        .scalar()
+    )
+    expense_sum = (
+        db.query(sa_func.coalesce(sa_func.sum(Transaction.amount), 0))
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type == CategoryType.EXPENSE,
+            Transaction.is_deleted.is_(False),
+        )
+        .scalar()
+    )
+    saving_sum = (
+        db.query(sa_func.coalesce(sa_func.sum(SavingGoal.current_amount), 0))
+        .filter(
+            SavingGoal.user_id == user_id,
+            SavingGoal.status != GoalStatus.CANCELLED,
+        )
+        .scalar()
+    )
+    return Decimal(str(income_sum)) - Decimal(str(expense_sum)) - Decimal(str(saving_sum))
+
+
+def _lock_user_balance(db: Session, user_id: int) -> None:
+    """Serialize balance-changing operations for one user until commit/rollback."""
+    db.query(User.id).filter(User.id == user_id).with_for_update().one()
+
+
+def _balance_effect(transaction_type: CategoryType, amount: Decimal) -> Decimal:
+    normalized_amount = Decimal(str(amount))
+    return normalized_amount if transaction_type == CategoryType.INCOME else -normalized_amount
+
+
+def _ensure_projected_balance(
+    db: Session,
+    user_id: int,
+    delta: Decimal,
+    detail: str,
+) -> None:
+    if _get_user_available_balance(db, user_id) + delta < Decimal("0"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
 def _commit_or_raise(db: Session) -> None:
     try:
         db.commit()
@@ -162,9 +216,61 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TransactionResponse:
+    _lock_user_balance(db, current_user.id)
     _validate_category(
         db, payload.category_id, current_user.id, payload.type, require_active=True
     )
+
+    allocation = (
+        payload.saving_goal_amount
+        if payload.saving_goal_id is not None and payload.saving_goal_amount is not None
+        else Decimal("0")
+    )
+    delta = _balance_effect(payload.type, payload.amount) - allocation
+    _ensure_projected_balance(
+        db,
+        current_user.id,
+        delta,
+        (
+            f"Số tiền chi tiêu ({payload.amount:,.0f} đ) vượt quá số dư khả dụng "
+            "hiện có. Vui lòng thêm thu nhập trước khi chi tiêu."
+        ),
+    )
+
+    goal = None
+    if payload.type == CategoryType.INCOME and payload.saving_goal_id is not None:
+        goal = (
+            db.query(SavingGoal)
+            .filter(
+                SavingGoal.id == payload.saving_goal_id,
+                SavingGoal.user_id == current_user.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if goal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy mục tiêu tiết kiệm.",
+            )
+        if goal.status == GoalStatus.COMPLETED or goal.current_amount >= goal.target_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mục tiêu tiết kiệm đã hoàn thành, không thể trích thêm tiền.",
+            )
+        if goal.status == GoalStatus.CANCELLED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mục tiêu tiết kiệm đã bị hủy hoặc tạm dừng.",
+            )
+
+        remaining_needed = Decimal(str(goal.target_amount)) - Decimal(str(goal.current_amount))
+        if payload.saving_goal_amount is not None and payload.saving_goal_amount > remaining_needed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Số tiền trích ({payload.saving_goal_amount:,.0f} đ) vượt quá số tiền còn thiếu của mục tiêu ({remaining_needed:,.0f} đ).",
+            )
+
     txn = Transaction(
         user_id=current_user.id,
         category_id=payload.category_id,
@@ -175,6 +281,21 @@ def create_transaction(
         payment_method=payload.payment_method,
     )
     db.add(txn)
+    db.flush()
+
+    if goal is not None and payload.saving_goal_amount is not None:
+        contrib = SavingContribution(
+            saving_goal_id=goal.id,
+            transaction_id=txn.id,
+            amount=payload.saving_goal_amount,
+            source=ContributionSource.INCOME_ALLOCATION,
+            note=f"Trích từ nguồn thu: {txn.description or 'Thu nhập'}",
+        )
+        db.add(contrib)
+        goal.current_amount = Decimal(str(goal.current_amount)) + payload.saving_goal_amount
+        if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
+            goal.status = GoalStatus.COMPLETED
+
     _commit_or_raise(db)
     db.refresh(txn)
     return _transaction_response(txn)
@@ -363,11 +484,25 @@ def get_transaction_summary(
         elif txn_type == CategoryType.EXPENSE:
             month_expense = Decimal(total).quantize(Decimal("0.01"))
 
-    available_balance = all_time_income - all_time_expense
+    # 3. Total in active/completed Saving Goals
+    saving_balance_raw = (
+        db.query(sa_func.coalesce(sa_func.sum(SavingGoal.current_amount), 0))
+        .filter(
+            SavingGoal.user_id == current_user.id,
+            SavingGoal.status != GoalStatus.CANCELLED,
+        )
+        .scalar()
+    )
+    saving_balance = Decimal(str(saving_balance_raw)).quantize(Decimal("0.01"))
+
+    total_balance = all_time_income - all_time_expense
+    available_balance = total_balance - saving_balance
     month_net = month_income - month_expense
 
     return TransactionSummaryResponse(
+        total_balance=total_balance,
         available_balance=available_balance,
+        saving_balance=saving_balance,
         all_time_income=all_time_income,
         all_time_expense=all_time_expense,
         month_income=month_income,
@@ -393,6 +528,7 @@ def update_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TransactionResponse:
+    _lock_user_balance(db, current_user.id)
     txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
 
     changes = payload.model_dump(exclude_unset=True)
@@ -400,6 +536,42 @@ def update_transaction(
     # Resolve effective type and category_id after potential changes
     effective_type = changes.get("type", txn.type)
     effective_category_id = changes.get("category_id", txn.category_id)
+    effective_amount = Decimal(str(changes.get("amount", txn.amount)))
+
+    # If transaction has linked saving contributions, protect data integrity
+    contributions = (
+        db.query(SavingContribution)
+        .filter(SavingContribution.transaction_id == txn.id)
+        .all()
+    )
+    if contributions:
+        total_allocated = sum(Decimal(str(c.amount)) for c in contributions)
+        if effective_type == CategoryType.EXPENSE and txn.type == CategoryType.INCOME:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Giao dịch thu nhập này đang trích {total_allocated:,.0f} đ vào mục tiêu tiết kiệm, không thể đổi loại thành chi tiêu.",
+            )
+        if "amount" in changes and Decimal(str(changes["amount"])) < total_allocated:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Số tiền thu nhập mới ({changes['amount']:,.0f} đ) không thể nhỏ hơn tổng số tiền đã trích vào mục tiêu tiết kiệm ({total_allocated:,.0f} đ).",
+            )
+
+    old_effect = _balance_effect(txn.type, Decimal(str(txn.amount)))
+    new_effect = _balance_effect(effective_type, effective_amount)
+    balance_error = "Thay đổi này sẽ làm số dư khả dụng bị âm."
+    if (
+        txn.type == CategoryType.EXPENSE
+        and effective_type == CategoryType.EXPENSE
+        and effective_amount > Decimal(str(txn.amount))
+    ):
+        balance_error = "Số tiền chi tiêu tăng thêm vượt quá số dư khả dụng hiện có."
+    _ensure_projected_balance(
+        db,
+        current_user.id,
+        new_effect - old_effect,
+        balance_error,
+    )
 
     # If category or type is changing, validate the new combination
     if "category_id" in changes or "type" in changes:
@@ -429,7 +601,43 @@ def trash_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TransactionResponse:
+    _lock_user_balance(db, current_user.id)
     txn = _owned_transaction_or_404(db, transaction_id, current_user.id)
+
+    # Adjust linked saving goals when income transaction is trashed
+    contributions = (
+        db.query(SavingContribution)
+        .filter(SavingContribution.transaction_id == txn.id)
+        .all()
+    )
+    released_savings = sum(
+        (
+            Decimal(str(c.amount))
+            for c in contributions
+            if c.saving_goal and c.saving_goal.status != GoalStatus.CANCELLED
+        ),
+        Decimal("0"),
+    )
+    _ensure_projected_balance(
+        db,
+        current_user.id,
+        -_balance_effect(txn.type, Decimal(str(txn.amount))) + released_savings,
+        "Không thể xóa nguồn thu vì thao tác này sẽ làm số dư khả dụng bị âm.",
+    )
+    for c in contributions:
+        goal = (
+            db.query(SavingGoal)
+            .filter(SavingGoal.id == c.saving_goal_id)
+            .with_for_update()
+            .first()
+        )
+        if goal:
+            goal.current_amount = max(
+                Decimal("0.00"), Decimal(str(goal.current_amount)) - Decimal(str(c.amount))
+            )
+            if goal.status == GoalStatus.COMPLETED and goal.current_amount < goal.target_amount:
+                goal.status = GoalStatus.ACTIVE
+
     txn.is_deleted = True
     txn.deleted_at = datetime.now(timezone.utc)
     _commit_or_raise(db)
@@ -443,6 +651,7 @@ def restore_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TransactionRestoreResponse:
+    _lock_user_balance(db, current_user.id)
     txn = _owned_transaction_or_404(
         db, transaction_id, current_user.id, include_deleted=True
     )
@@ -451,6 +660,45 @@ def restore_transaction(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Giao dịch này không nằm trong thùng rác.",
         )
+
+    # Restore linked contribution amounts whenever the goal still exists.
+    # Cancelled goals remain excluded from available-balance calculations, but
+    # their current_amount must stay consistent with contribution history so a
+    # later reactivation reserves the restored allocation again.
+    contributions = (
+        db.query(SavingContribution)
+        .filter(SavingContribution.transaction_id == txn.id)
+        .all()
+    )
+    restored_savings = sum(
+        (
+            Decimal(str(c.amount))
+            for c in contributions
+            if c.saving_goal and c.saving_goal.status != GoalStatus.CANCELLED
+        ),
+        Decimal("0"),
+    )
+    _ensure_projected_balance(
+        db,
+        current_user.id,
+        _balance_effect(txn.type, Decimal(str(txn.amount))) - restored_savings,
+        (
+            "Khôi phục giao dịch chi tiêu sẽ làm số dư khả dụng bị âm."
+            if txn.type == CategoryType.EXPENSE
+            else "Không thể khôi phục giao dịch vì thao tác này sẽ làm số dư khả dụng bị âm."
+        ),
+    )
+    for c in contributions:
+        goal = (
+            db.query(SavingGoal)
+            .filter(SavingGoal.id == c.saving_goal_id)
+            .with_for_update()
+            .first()
+        )
+        if goal:
+            goal.current_amount = Decimal(str(goal.current_amount)) + Decimal(str(c.amount))
+            if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
+                goal.status = GoalStatus.COMPLETED
 
     warning = None
     category = (
@@ -488,6 +736,11 @@ def delete_transaction_permanently(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Giao dịch phải ở trong thùng rác trước khi xóa vĩnh viễn.",
         )
+    # Remove associated saving contributions
+    db.query(SavingContribution).filter(
+        SavingContribution.transaction_id == txn.id
+    ).delete(synchronize_session=False)
+
     db.delete(txn)
     _commit_or_raise(db)
 
@@ -511,11 +764,6 @@ def duplicate_transaction(
 # Bulk import (confirmed rows from Excel / OCR preview)
 # ---------------------------------------------------------------------------
 
-# In-memory idempotency store with bounded capacity (LRU-style FIFO eviction).
-# For production cluster, swap with Redis or a DB table.
-MAX_IDEMPOTENCY_KEYS = 2000
-_processed_import_keys: OrderedDict[str, bool] = OrderedDict()
-
 
 @router.post("/import", response_model=BulkImportResponse)
 def import_transactions(
@@ -525,10 +773,18 @@ def import_transactions(
 ) -> BulkImportResponse:
     """Import a batch of user-confirmed transactions.
 
-    Uses an idempotency key to prevent duplicate submissions.
+    Uses a database-backed idempotency key to prevent duplicate submissions across workers.
     """
-    user_scoped_key = f"{current_user.id}:{payload.idempotency_key}"
-    if user_scoped_key in _processed_import_keys:
+    _lock_user_balance(db, current_user.id)
+    existing_key = (
+        db.query(ImportIdempotencyKey)
+        .filter(
+            ImportIdempotencyKey.user_id == current_user.id,
+            ImportIdempotencyKey.idempotency_key == payload.idempotency_key,
+        )
+        .first()
+    )
+    if existing_key is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Phiên nhập này đã được xử lý. Vui lòng tải lại trang để nhập mới.",
@@ -537,6 +793,7 @@ def import_transactions(
     results: list[RowResult] = []
     success_count = 0
     error_count = 0
+    current_avail = _get_user_available_balance(db, current_user.id)
 
     for idx, row in enumerate(payload.rows):
         try:
@@ -549,6 +806,7 @@ def import_transactions(
                         Category.user_id == current_user.id,
                         Category.deleted_at.is_(None),
                     )
+                    .with_for_update()
                     .first()
                 )
                 if cat is None:
@@ -557,6 +815,13 @@ def import_transactions(
                     raise ValueError("Không thể sử dụng danh mục đã ẩn.")
                 if cat.type != row.type.value:
                     raise ValueError("Loại giao dịch không khớp với loại danh mục.")
+
+                next_avail = current_avail + _balance_effect(row.type, row.amount)
+                if next_avail < Decimal("0"):
+                    if row.type == CategoryType.EXPENSE:
+                        raise ValueError(
+                            f"Số tiền chi tiêu ({row.amount:,.0f} đ) vượt quá số dư khả dụng hiện có ({current_avail:,.0f} đ)."
+                        )
 
                 txn = Transaction(
                     user_id=current_user.id,
@@ -569,6 +834,7 @@ def import_transactions(
                 )
                 db.add(txn)
                 db.flush()
+            current_avail = next_avail
             results.append(
                 RowResult(index=idx, status="success", transaction_id=txn.id)
             )
@@ -579,10 +845,13 @@ def import_transactions(
             error_count += 1
 
     if success_count > 0:
+        db.add(
+            ImportIdempotencyKey(
+                user_id=current_user.id,
+                idempotency_key=payload.idempotency_key,
+            )
+        )
         _commit_or_raise(db)
-        if len(_processed_import_keys) >= MAX_IDEMPOTENCY_KEYS:
-            _processed_import_keys.popitem(last=False)
-        _processed_import_keys[user_scoped_key] = True
 
     return BulkImportResponse(
         total=len(payload.rows),

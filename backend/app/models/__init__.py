@@ -2,6 +2,7 @@ from app.models.ai_report import AIReport
 from app.models.budget import Budget
 from app.models.category import Category
 from app.models.enums import CategoryType, ContributionSource, GoalStatus, PaymentMethod, ReportType
+from app.models.idempotency import ImportIdempotencyKey
 from app.models.saving_contribution import SavingContribution
 from app.models.saving_goal import SavingGoal
 from app.models.transaction import Transaction
@@ -15,6 +16,7 @@ __all__ = [
     "SavingGoal",
     "SavingContribution",
     "AIReport",
+    "ImportIdempotencyKey",
     "CategoryType",
     "PaymentMethod",
     "GoalStatus",

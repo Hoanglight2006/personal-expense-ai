@@ -377,3 +377,56 @@ def test_get_current_user_deleted_user(client: TestClient):
         db.close()
     assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
 
+
+def test_update_avatar_preset_url(client: TestClient):
+    username = random_string()
+    client.post("/api/v1/auth/register", json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"})
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
+    token = login.json()["access_token"]
+
+    response = client.patch(
+        "/api/v1/auth/me",
+        json={"avatar_url": "/assets/mascot_coin.png"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["avatar_url"] == "/assets/mascot_coin.png"
+
+
+def test_upload_avatar_image_file(client: TestClient):
+    username = random_string()
+    client.post("/api/v1/auth/register", json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"})
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
+    token = login.json()["access_token"]
+
+    fake_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+    files = {"file": ("avatar.png", fake_png, "image/png")}
+
+    response = client.post(
+        "/api/v1/auth/avatar/upload",
+        files=files,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["avatar_url"] is not None
+    assert "/static/avatars/avatar_" in data["avatar_url"]
+
+
+def test_upload_avatar_invalid_type(client: TestClient):
+    username = random_string()
+    client.post("/api/v1/auth/register", json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"})
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
+    token = login.json()["access_token"]
+
+    files = {"file": ("document.pdf", b"%PDF-1.4...", "application/pdf")}
+
+    response = client.post(
+        "/api/v1/auth/avatar/upload",
+        files=files,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+    assert "Định dạng ảnh không hợp lệ" in response.json()["detail"]
+

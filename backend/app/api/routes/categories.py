@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.category_defaults import add_missing_default_categories
+from app.models.budget import Budget
 from app.models.category import Category
 from app.models.enums import CategoryType
 from app.models.transaction import Transaction
@@ -48,13 +49,20 @@ def validated_period(start_date: date | None, end_date: date | None) -> tuple[da
 
 
 def owned_category_or_404(
-    db: Session, category_id: int, user_id: int, *, include_deleted: bool = False
+    db: Session,
+    category_id: int,
+    user_id: int,
+    *,
+    include_deleted: bool = False,
+    lock: bool = False,
 ) -> Category:
     query = db.query(Category).filter(
         Category.id == category_id, Category.user_id == user_id
     )
     if not include_deleted:
         query = query.filter(Category.deleted_at.is_(None))
+    if lock:
+        query = query.with_for_update()
     category = query.first()
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CATEGORY_NOT_FOUND)
@@ -339,8 +347,35 @@ def update_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> CategoryResponse:
-    category = owned_category_or_404(db, category_id, current_user.id)
+    category = owned_category_or_404(db, category_id, current_user.id, lock=True)
     changes = category_in.model_dump(exclude_unset=True)
+    if "type" in changes and changes["type"] != category.type:
+        has_transactions = (
+            db.query(Transaction.id)
+            .filter(
+                Transaction.category_id == category.id,
+                Transaction.user_id == current_user.id,
+            )
+            .first()
+            is not None
+        )
+        has_budgets = (
+            db.query(Budget.id)
+            .filter(
+                Budget.category_id == category.id,
+                Budget.user_id == current_user.id,
+            )
+            .first()
+            is not None
+        )
+        if has_transactions or has_budgets:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Không thể đổi loại danh mục đã được sử dụng cho giao dịch "
+                    "hoặc ngân sách."
+                ),
+            )
     next_name = changes.get("name", category.name)
     normalized_name = category_name_key(next_name)
     ensure_unique_name(db, current_user.id, normalized_name, exclude_id=category.id)
@@ -410,4 +445,3 @@ def delete_category(
     category.deleted_at = func.now()
     category.is_active = False
     commit_category(db, category)
-

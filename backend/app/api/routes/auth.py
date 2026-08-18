@@ -1,8 +1,10 @@
 from datetime import timedelta
+from pathlib import Path
 from urllib.parse import quote
 from typing import Any
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -162,12 +164,58 @@ def update_users_me(
         current_user.username = user_in.username
     if user_in.email is not None:
         current_user.email = user_in.email
+    if user_in.avatar_url is not None:
+        current_user.avatar_url = user_in.avatar_url.strip() if user_in.avatar_url.strip() else None
 
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail=USER_ALREADY_EXISTS)
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/avatar/upload", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Upload a custom avatar image file (JPG, PNG, WEBP, GIF, max 2MB)."""
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"}
+    MAX_SIZE = 2 * 1024 * 1024  # 2MB
+
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Định dạng ảnh không hợp lệ. Chỉ chấp nhận JPG, PNG, WEBP hoặc GIF.",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="Dung lượng ảnh vượt quá giới hạn 2MB.",
+        )
+
+    ext = "png"
+    if file.filename and "." in file.filename:
+        parsed_ext = file.filename.rsplit(".", 1)[-1].lower()
+        if parsed_ext in {"jpg", "jpeg", "png", "webp", "gif"}:
+            ext = parsed_ext
+
+    filename = f"avatar_{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}"
+    upload_dir = Path("static/avatars")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / filename
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    avatar_url = f"/static/avatars/{filename}"
+    current_user.avatar_url = avatar_url
+    db.commit()
     db.refresh(current_user)
     return current_user
 
