@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 
 import openpyxl
@@ -138,7 +138,7 @@ class MBStatementAdapter(ExcelParser):
         except InvalidOperation:
             return Decimal(0)
 
-    def _parse_date(self, val) -> datetime.date | None:
+    def _parse_date(self, val) -> date | None:
         if isinstance(val, datetime):
             return val.date()
         if not val:
