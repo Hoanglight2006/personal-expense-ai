@@ -14,6 +14,9 @@
   withdrawal; Goal đã completed vẫn giữ mốc hoàn thành sau khi rút.
 - Excel parse/preview, category suggestion, duplicate hint và bulk import từng
   dòng với database-backed idempotency key.
+- Chuẩn hóa toàn diện 10 models sang cú pháp chuẩn SQLAlchemy 2.0 `Mapped[T] = mapped_column(...)`, hoàn thiện type hints và null-safety.
+- Tối ưu hóa FinAI Chatbot và Báo cáo tài chính sang model `gemini-3.5-flash-lite`, bổ sung cơ chế timeout 8s và fallback thế hệ mới, cải thiện tốc độ phản hồi từ 20-30s xuống ~1.1s.
+- Tái cấu trúc module `tests.test_db` quản lý in-memory SQLite database dùng chung cho test suite.
 - Retry/error/empty states frontend, popup validation có focus về trường lỗi và
   tối ưu render trang Transaction.
 - Composite ownership FK cho Transaction/Budget với Category.
