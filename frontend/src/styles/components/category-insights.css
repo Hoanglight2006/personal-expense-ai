@@ -1,0 +1,1413 @@
+/* CATEGORY PERFORMANCE + COMPACT ANALYTICS */
+.app-page .app-header {
+  background: #fff9ec;
+  backdrop-filter: none;
+}
+
+.category-toolbar,
+.category-card {
+  backdrop-filter: none;
+}
+
+.category-toolbar {
+  box-shadow: 0 6px 20px rgba(96, 69, 31, 0.05);
+}
+
+.category-insights {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: #fffdf8;
+  contain: layout paint;
+}
+
+.category-refreshing,
+.txn-refreshing {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 30px;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: toast-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.category-refreshing .loading-spinner,
+.txn-refreshing .loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+}
+
+.insight-heading,
+.insight-heading>div,
+.expense-donut-panel>div:first-child,
+.expense-ranking-panel>div:first-child {
+  min-width: 0;
+}
+
+.insight-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.insight-heading .eyebrow {
+  margin-bottom: 3px;
+  font-size: 0.68rem;
+}
+
+.insight-heading h2 {
+  color: var(--text-color);
+  font-size: 1.25rem;
+}
+
+.insight-heading>span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.insight-summary {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-tile {
+  min-width: 0;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 13px;
+  background: #fff;
+}
+
+.summary-tile span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.summary-tile strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1rem, 2vw, 1.28rem);
+}
+
+.summary-income strong {
+  color: #397c50;
+}
+
+.summary-expense strong {
+  color: #ad5146;
+}
+
+.summary-transactions strong {
+  color: #8c5a0b;
+}
+
+.insight-charts {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(340px, 1.1fr);
+  gap: 10px;
+}
+
+.expense-donut-panel,
+.expense-ranking-panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 15px;
+  background: #fff;
+}
+
+.expense-donut-panel h3,
+.expense-ranking-panel h3 {
+  color: var(--text-color);
+  font-size: 0.92rem;
+}
+
+.expense-donut-panel p,
+.expense-ranking-panel p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.expense-donut-content {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.expense-donut {
+  position: relative;
+  width: 132px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--donut-gradient);
+}
+
+.expense-donut::after {
+  position: absolute;
+  width: 76%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;
+  content: '';
+}
+
+.expense-donut>span {
+  z-index: 1;
+  max-width: 94px;
+  color: var(--text-color);
+  font-size: 0.69rem;
+  font-weight: 850;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.expense-donut small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 0.61rem;
+  font-weight: 650;
+}
+
+.expense-legend {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.expense-legend>div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.72rem;
+}
+
+.expense-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--legend-color);
+}
+
+.expense-legend span {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expense-legend strong {
+  color: var(--text-color);
+}
+
+.expense-ranking {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ranking-row>div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.ranking-row>div span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-row>div strong {
+  flex-shrink: 0;
+  color: var(--text-color);
+}
+
+.ranking-track {
+  height: 6px;
+  margin-top: 4px;
+  display: block;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #eee9df;
+}
+
+.ranking-track i {
+  width: var(--bar-width);
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: var(--bar-color);
+}
+
+.chart-empty {
+  padding: 26px 8px;
+  text-align: center;
+}
+
+.category-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.category-card {
+  min-height: 82px;
+  padding: 12px 13px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(135px, auto) auto;
+  align-items: center;
+  gap: 12px;
+  border-radius: 14px;
+  border-left: 4px solid var(--category-color);
+  background: #fff;
+  box-shadow: none;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 82px;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.category-card::before {
+  display: none;
+}
+
+.category-card:hover {
+  transform: none;
+  border-color: color-mix(in srgb, var(--category-color) 70%, var(--border-color));
+  border-left-color: var(--category-color);
+  background: #fffdf8;
+  box-shadow: none;
+}
+
+/* Visible sliding thumb for the period mode segmented control. */
+.period-panel .date-mode-tabs {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 238px;
+  overflow: hidden;
+  border: 1px solid rgba(214, 154, 35, 0.2);
+  border-radius: 12px;
+  background: #f5eee1;
+}
+
+.period-panel .date-mode-tabs::before {
+  position: absolute;
+  inset: 4px auto 4px 4px;
+  z-index: 0;
+  width: calc((100% - 11px) / 2);
+  border: 1px solid rgba(214, 154, 35, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fffdf7, #fff4d8);
+  box-shadow: 0 3px 10px rgba(96, 69, 31, 0.12);
+  content: '';
+  transform: translate3d(0, 0, 0);
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.period-panel .date-mode-tabs.mode-custom::before {
+  transform: translate3d(calc(100% + 3px), 0, 0);
+}
+
+.period-panel .date-mode-tabs button,
+.period-panel .date-mode-tabs button.active {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  transition: color 180ms ease, transform 120ms ease;
+}
+
+.period-panel .date-mode-tabs button.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .period-panel .date-mode-tabs::before,
+  .period-panel .date-mode-tabs button {
+    transition: none;
+  }
+}
+
+/* Final period transition override: keep both controls mounted for a true crossfade. */
+.period-panel .date-mode-tabs::before {
+  transform: translate3d(0, 0, 0);
+  transition-duration: 0.26s;
+  transition-timing-function: cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.period-panel .date-mode-tabs.mode-custom::before {
+  transform: translate3d(calc(100% + 3px), 0, 0);
+}
+
+.period-control-stack {
+  min-width: min(410px, 100%);
+  display: grid;
+  align-items: end;
+}
+
+.period-control-stack .period-control-content {
+  grid-area: 1 / 1;
+  animation: none;
+  transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.22, 0.8, 0.24, 1),
+    visibility 0s linear 0.24s;
+  will-change: opacity, transform;
+}
+
+.month-period-controls {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-12px, 0, 0);
+}
+
+.custom-period-controls {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(12px, 0, 0);
+}
+
+.period-control-stack.mode-month .month-period-controls,
+.period-control-stack.mode-custom .custom-period-controls {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition-delay: 0s;
+}
+
+@media (max-width: 900px) {
+  .period-control-stack {
+    width: 100%;
+  }
+}
+
+.category-card {
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.category-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(96, 69, 31, 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .period-panel .date-mode-tabs::before,
+  .period-control-stack .period-control-content {
+    transition: none;
+  }
+
+  .category-card {
+    transition: none;
+  }
+}
+
+/* Visible animated segmented toggle for month/day mode. */
+.period-panel .date-mode-tabs {
+  position: relative;
+  isolation: isolate;
+  min-width: 238px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(190, 139, 46, 0.2);
+  border-radius: 13px;
+  background: #eee5d4;
+  box-shadow: inset 0 1px 2px rgba(96, 69, 31, 0.06);
+}
+
+.period-panel .date-mode-tabs::before {
+  position: absolute;
+  inset: 4px auto 4px 4px;
+  z-index: 0;
+  width: calc((100% - 11px) / 2);
+  border: 1px solid rgba(214, 154, 35, 0.42);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #fffdf7, #fff1c8);
+  box-shadow: 0 3px 10px rgba(131, 88, 20, 0.16);
+  content: '';
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.24, 1),
+    box-shadow 0.2s ease;
+  will-change: transform;
+}
+
+.period-panel .date-mode-tabs.mode-custom::before {
+  transform: translate3d(calc(100% + 3px), 0, 0);
+}
+
+.period-panel .date-mode-tabs button,
+.period-panel .date-mode-tabs button.active {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #7f756a;
+  transition: color 0.2s ease, transform 0.12s ease;
+}
+
+.period-panel .date-mode-tabs button.active {
+  color: #835710;
+  font-weight: 850;
+}
+
+.period-panel .date-mode-tabs:active::before {
+  box-shadow: 0 2px 6px rgba(131, 88, 20, 0.13);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .period-panel .date-mode-tabs::before,
+  .period-panel .date-mode-tabs button {
+    transition: none;
+  }
+}
+
+/* Lightweight compositor-only motion. */
+@keyframes category-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@keyframes category-bar-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes category-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+}
+
+.category-modal.bounce-modal {
+  animation: modal-bounce-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.15) !important;
+}
+
+@keyframes modal-bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateY(60px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(-5px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes category-donut-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) rotate(-8deg);
+  }
+}
+
+.category-insights {
+  animation: category-surface-in 0.22s ease-out both;
+}
+
+.summary-tile {
+  animation: category-surface-in 0.2s ease-out both;
+}
+
+.summary-tile:nth-child(2) {
+  animation-delay: 35ms;
+}
+
+.summary-tile:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.expense-donut {
+  animation: category-donut-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.ranking-track i {
+  transform-origin: left center;
+  animation: category-bar-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.category-card {
+  animation: category-surface-in 0.18s ease-out var(--card-delay) both;
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.category-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(96, 69, 31, 0.07);
+}
+
+.category-card-actions button:active:not(:disabled),
+.quick-periods button:active,
+.date-mode-tabs button:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .category-insights,
+  .summary-tile,
+  .expense-donut,
+  .ranking-track i,
+  .category-card {
+    animation: none;
+  }
+
+  .category-card,
+  .category-card-actions button,
+  .quick-periods button,
+  .date-mode-tabs button {
+    transition: none;
+  }
+}
+
+/* Smooth period switching and lightweight page micro-interactions. */
+@keyframes period-control-in {
+  from {
+    opacity: 0;
+    transform: translateX(7px);
+  }
+}
+
+.category-toolbar {
+  animation: category-surface-in 0.2s ease-out both;
+}
+
+.period-panel {
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.period-panel:hover {
+  border-color: rgba(214, 154, 35, 0.34);
+  box-shadow: 0 5px 16px rgba(96, 69, 31, 0.045);
+}
+
+.period-panel .date-mode-tabs {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.period-panel .date-mode-tabs::before {
+  position: absolute;
+  inset: 4px auto 4px 4px;
+  z-index: -1;
+  width: calc((100% - 11px) / 2);
+  border: 1px solid rgba(214, 154, 35, 0.18);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 3px 9px rgba(96, 69, 31, 0.08);
+  content: '';
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.period-panel .date-mode-tabs.mode-custom::before {
+  transform: translateX(calc(100% + 3px));
+}
+
+.period-panel .date-mode-tabs button {
+  position: relative;
+  z-index: 1;
+  transition: color 0.16s ease, transform 0.12s ease;
+}
+
+.period-panel .date-mode-tabs button.active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.period-panel .date-mode-tabs button:active {
+  transform: scale(0.97);
+}
+
+.period-control-content {
+  animation: period-control-in 0.17s ease-out both;
+}
+
+.quick-periods-label {
+  padding: 5px 9px;
+  border: 1px solid rgba(214, 154, 35, 0.24);
+  border-radius: 99px;
+  background: #fff3cf;
+  color: #8c5a0b !important;
+  font-size: 0.67rem !important;
+  font-weight: 850 !important;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.quick-periods button,
+.month-selector-card>button,
+.summary-tile,
+.expense-donut-panel,
+.expense-ranking-panel,
+.category-card-icon {
+  transition: transform 0.14s ease, border-color 0.14s ease,
+    background-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.quick-periods button:hover {
+  transform: translateY(-1px);
+}
+
+.month-selector-card>button:hover {
+  z-index: 1;
+  transform: scale(1.04);
+  border-color: rgba(214, 154, 35, 0.46);
+  background: #fff7df;
+}
+
+.summary-tile:hover,
+.expense-donut-panel:hover,
+.expense-ranking-panel:hover {
+  transform: translateY(-1px);
+  border-color: rgba(214, 154, 35, 0.3);
+  box-shadow: 0 5px 14px rgba(96, 69, 31, 0.05);
+}
+
+.category-card:hover .category-card-icon {
+  transform: scale(1.04) rotate(-1deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .category-toolbar,
+  .period-control-content {
+    animation: none;
+  }
+
+  .period-panel,
+  .period-panel .date-mode-tabs::before,
+  .period-panel .date-mode-tabs button,
+  .quick-periods button,
+  .month-selector-card>button,
+  .summary-tile,
+  .expense-donut-panel,
+  .expense-ranking-panel,
+  .category-card-icon {
+    transition: none;
+  }
+}
+
+.category-card-hidden {
+  opacity: 0.68;
+  filter: none;
+}
+
+.category-card-top {
+  gap: 10px;
+}
+
+.category-card-icon {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+  border-radius: 11px;
+}
+
+.category-card-title h2 {
+  font-size: 0.96rem;
+}
+
+.category-badges {
+  margin-top: 3px;
+}
+
+.category-default-badge,
+.category-status-hidden {
+  padding: 2px 6px;
+  border-radius: 99px;
+  font-size: 0.61rem;
+  font-weight: 750;
+}
+
+.category-default-badge {
+  background: #f4efe4;
+  color: var(--text-muted);
+}
+
+.category-amount {
+  margin: 0;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.category-amount strong {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.category-amount span {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.category-card-actions {
+  margin: 0;
+  display: flex;
+  gap: 5px;
+}
+
+.category-card-actions button {
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+}
+
+
+
+@media (max-width: 620px) {
+  .category-insights {
+    padding: 14px;
+  }
+
+  .insight-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-donut-content {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .expense-legend {
+    width: 100%;
+  }
+
+  .category-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .category-amount {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .category-card-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+/* CATEGORY REFINEMENTS */
+.toolbar-row {
+  grid-template-columns: minmax(260px, 1.7fr) minmax(180px, 0.8fr) minmax(160px, 0.7fr);
+}
+
+.category-card {
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.category-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--category-color) 48%, var(--border-color));
+  box-shadow: 0 20px 46px rgba(96, 69, 31, 0.13);
+}
+
+.category-icon img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform: scale(var(--icon-scale, 1));
+  transform-origin: center;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .modal-backdrop,
+  .category-modal {
+    animation: none;
+  }
+}
+
+.category-owner-badge {
+  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: rgba(129, 115, 103, 0.09);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.category-owner-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--category-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--category-color) 14%, transparent);
+}
+
+.period-panel {
+  margin-top: 18px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) auto;
+  gap: 14px 24px;
+  border: 1px solid rgba(214, 154, 35, 0.2);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 250, 238, 0.92), rgba(255, 255, 255, 0.76));
+}
+
+.period-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calendar-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(214, 154, 35, 0.22);
+  border-radius: 12px;
+  background: #fff3cf;
+  color: #9c6815;
+  font-size: 1.25rem;
+}
+
+.period-panel-heading div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.period-panel-heading strong {
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.period-panel-heading div>span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.period-panel .date-mode-tabs {
+  justify-self: end;
+  align-self: center;
+}
+
+.period-editor {
+  grid-column: 1 / -1;
+  padding-top: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 24px;
+}
+
+.modal-header h2 {
+  font-size: 1.5rem;
+  color: var(--text-color);
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.month-selector-card {
+  display: grid;
+  grid-template-columns: 42px minmax(180px, 230px) 42px;
+  align-items: end;
+}
+
+.month-selector-card>button {
+  height: 44px;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  color: #9c6815;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.month-selector-card>button:first-child {
+  border-radius: 11px 0 0 11px;
+}
+
+.month-selector-card>button:last-child {
+  border-radius: 0 11px 11px 0;
+}
+
+.month-selector-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.month-selector-card label span {
+  padding-left: 12px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.month-selector-card input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-right: 0;
+  border-left: 0;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-color);
+  font-weight: 700;
+}
+
+.refined-date-controls {
+  align-items: flex-end;
+}
+
+.refined-date-controls label {
+  min-width: 175px;
+}
+
+.date-range-arrow {
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: #b98a3c;
+  font-size: 1.1rem;
+}
+
+.quick-periods {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.quick-periods>span {
+  margin-right: 3px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.quick-periods button {
+  min-height: 34px;
+  padding: 6px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.quick-periods button:hover,
+.quick-periods button.active {
+  border-color: rgba(214, 154, 35, 0.4);
+  background: #fff1c8;
+  color: #8c5a0b;
+}
+
+.category-modal-refined {
+  width: min(760px, 100%);
+}
+
+.category-modal-refined .modal-header p {
+  max-width: 520px;
+  margin-top: 7px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.preset-picker,
+.color-picker-panel {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.preset-picker legend,
+.color-picker-panel legend {
+  padding: 0 5px;
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.preset-picker>p,
+.color-picker-panel>p {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.preset-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preset-option {
+  min-width: 0;
+  padding: 9px 5px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-muted);
+  font-size: 0.69rem;
+  font-weight: 700;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.preset-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(214, 154, 35, 0.35);
+}
+
+.preset-option.selected {
+  border-color: #d69a23;
+  background: #fff3cf;
+  color: #76501a;
+  box-shadow: 0 0 0 2px var(--glow-primary);
+}
+
+.preset-option .category-icon {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+  border-radius: 12px;
+}
+
+.preset-option>span:last-child {
+  width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-name-field input {
+  min-height: 48px;
+  font-weight: 650;
+}
+
+.color-picker-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.color-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  outline: 1px solid rgba(64, 53, 43, 0.13);
+  background: var(--swatch-color);
+  box-shadow: 0 3px 9px rgba(64, 53, 43, 0.12);
+  transition: transform 0.18s ease, outline-color 0.18s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.08);
+}
+
+.color-swatch.selected {
+  outline: 2px solid var(--swatch-color);
+  outline-offset: 2px;
+}
+
+.color-swatch span {
+  opacity: 0;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 900;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.color-swatch.selected span {
+  opacity: 1;
+}
+
+.custom-color-field {
+  min-width: 145px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 0 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.custom-color-field>span {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  font-weight: 700;
+}
+
+.custom-color-field input[type='color'] {
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  grid-row: 1 / span 2;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.custom-color-field code {
+  grid-column: 2;
+  color: var(--text-color);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.refined-preview {
+  position: relative;
+  overflow: hidden;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--preview-color) 30%, var(--border-color));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--preview-color) 8%, white), rgba(255, 255, 255, 0.82));
+}
+
+.refined-preview::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  content: '';
+  background: var(--preview-color);
+}
+
+@media (max-width: 900px) {
+
+  .period-editor,
+  .color-picker-content {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quick-periods {
+    justify-content: flex-start;
+  }
+
+  .preset-options {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .period-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .period-panel .date-mode-tabs {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .period-panel .date-mode-tabs button {
+    flex: 1;
+  }
+
+  .month-selector-card {
+    width: 100%;
+    grid-template-columns: 42px 1fr 42px;
+  }
+}
+
+@media (max-width: 520px) {
+  .preset-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .refined-date-controls {
+    align-items: stretch;
+  }
+
+  .refined-date-controls label {
+    min-width: 0;
+  }
+
+  .date-range-arrow {
+    height: auto;
+    transform: rotate(90deg);
+  }
+}
+
+/* Keep compact cards cheaper than the legacy hover treatment above. */
+.category-card {
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.category-card:hover {
+  transform: none;
+  border-color: color-mix(in srgb, var(--category-color) 70%, var(--border-color));
+  border-left-color: var(--category-color);
+  background: #fffdf8;
+  box-shadow: none;
+}
+
+/* Final cascade rule: animated thumb for the month/day segmented control. */
+.period-panel .date-mode-tabs {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 238px;
+  overflow: hidden;
+  border: 1px solid rgba(214, 154, 35, 0.2);
+  border-radius: 12px;
+  background: #f5eee1;
+}
+
+.period-panel .date-mode-tabs::before {
+  position: absolute;
+  inset: 4px auto 4px 4px;
+  z-index: 0;
+  width: calc((100% - 11px) / 2);
+  border: 1px solid rgba(214, 154, 35, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fffdf7, #fff4d8);
+  box-shadow: 0 3px 10px rgba(96, 69, 31, 0.12);
+  content: '';
+  transform: translate3d(0, 0, 0);
+  transition: transform 500ms cubic-bezier(0.45, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.period-panel .date-mode-tabs.mode-custom::before {
+  transform: translate3d(calc(100% + 3px), 0, 0);
+}
+
+.period-panel .date-mode-tabs button,
+.period-panel .date-mode-tabs button.active {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  transition: color 350ms ease;
+}
+
+.period-panel .date-mode-tabs button.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .period-panel .date-mode-tabs::before,
+  .period-panel .date-mode-tabs button {
+    transition-duration: 350ms;
+  }
+}

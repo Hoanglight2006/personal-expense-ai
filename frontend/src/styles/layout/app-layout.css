@@ -1,0 +1,222 @@
+/* APP LAYOUT & SIDEBAR */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Desktop default: Mobile header, backdrop and close button are hidden */
+.app-mobile-header {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.btn-sidebar-close {
+  display: none;
+}
+
+.sidebar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.app-sidebar {
+  width: 260px;
+  background: rgba(255, 249, 236, 0.86);
+  backdrop-filter: blur(18px);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+  z-index: 10;
+  padding: 24px 16px;
+}
+
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #8c5a0b;
+  font-size: 1.6rem;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.sidebar-logo img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+  background: #fff3cf;
+  color: #8c5a0b;
+}
+
+.sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+}
+
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e9bd46;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.account-name {
+  color: var(--text-color);
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-email {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(185, 90, 77, 0.1);
+  border: 1px solid rgba(185, 90, 77, 0.3);
+  border-radius: 12px;
+  color: var(--error-color);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-sidebar-logout:hover {
+  background: rgba(185, 90, 77, 0.2);
+}
+
+.app-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  position: relative;
+  z-index: 20;
+}
+
+
+
+.btn-ghost-danger,
+.btn-secondary,
+.btn-soft-danger,
+.btn-soft-success,
+.current-month-button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-color);
+  font-weight: 700;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.btn-ghost-danger {
+  color: var(--error-color);
+}
+
+.btn-ghost-danger:hover,
+.btn-soft-danger:hover:not(:disabled) {
+  border-color: rgba(185, 90, 77, 0.35);
+  background: rgba(185, 90, 77, 0.1);
+}
+
+.btn-secondary:hover:not(:disabled),
+.current-month-button:hover:not(:disabled) {
+  border-color: rgba(214, 154, 35, 0.45);
+  background: #fff8e7;
+}
+
+.btn-soft-success {
+  color: var(--success-color);
+}
+
+.btn-soft-success:hover:not(:disabled) {
+  border-color: rgba(79, 138, 87, 0.35);
+  background: rgba(79, 138, 87, 0.1);
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #a16b12;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

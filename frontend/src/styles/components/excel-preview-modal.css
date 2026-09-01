@@ -1,0 +1,96 @@
+/* Excel Preview Modal */
+.excel-preview-modal {
+  width: min(800px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.excel-summary {
+  background: var(--surface-soft);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.excel-summary p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.excel-summary .text-warning {
+  margin-top: 8px;
+  color: #a16b12;
+  font-weight: 600;
+}
+
+.excel-preview-table-container {
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  flex: 1;
+  min-height: 200px;
+}
+
+.excel-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.excel-preview-table th {
+  background: var(--surface-soft);
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  position: sticky;
+  top: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.excel-preview-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.excel-preview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.excel-preview-table .nowrap {
+  white-space: nowrap;
+}
+
+.excel-preview-table .text-truncate {
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.excel-category-select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #ffffff);
+  color: var(--text-color, #1a202c);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 190px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.excel-category-select:focus {
+  border-color: var(--primary-color, #d69a23);
+  box-shadow: 0 0 0 2px rgba(214, 154, 35, 0.15);
+}
+
+.excel-category-select.unselected {
+  border-color: #e53e3e;
+  background-color: rgba(229, 62, 62, 0.05);
+}

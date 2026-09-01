@@ -1,0 +1,313 @@
+/* Form Modal */
+.txn-form-modal {
+  width: min(600px, 92vw);
+  max-height: calc(100vh - 40px);
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  animation: none;
+  box-shadow: 0 12px 30px rgba(45, 36, 26, 0.18);
+}
+
+.txn-form-modal .txn-form-field input,
+.txn-form-modal .txn-form-field select,
+.txn-form-modal .txn-form-field textarea,
+.txn-form-modal .custom-datepicker-input,
+.txn-form-modal .custom-select__control {
+  backdrop-filter: none !important;
+  transition-property: border-color, background-color, box-shadow !important;
+  transition-duration: 0.12s !important;
+}
+
+.txn-form-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.txn-form-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.txn-form-modal::-webkit-scrollbar-thumb {
+  background: rgba(214, 154, 35, 0.3);
+  border-radius: 6px;
+}
+
+/* AI OCR & Excel Processing Overlay (Clean, Zero-Lag Fintech Loader) */
+.txn-processing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(255, 253, 248, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.txn-processing-card {
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+  border: 1px solid rgba(226, 206, 181, 0.85);
+  border-radius: 18px;
+  padding: 32px 24px;
+  box-shadow: 0 12px 32px rgba(64, 53, 43, 0.08);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.txn-clean-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3.5px solid rgba(214, 154, 35, 0.18);
+  border-top-color: #d69a23;
+  animation: cleanSpin 0.75s linear infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes cleanSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.txn-processing-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-color, #40352b);
+}
+
+.txn-processing-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted, #7c7267);
+  max-width: 320px;
+}
+
+.txn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.txn-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.txn-form-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.txn-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txn-form-field span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.txn-form-field em {
+  color: var(--error-color);
+  font-style: normal;
+  margin-left: 4px;
+}
+
+.txn-form-field input,
+.txn-form-field select,
+.txn-form-field textarea {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1.05rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  color: var(--text-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.txn-form-field input:focus,
+.txn-form-field select:focus,
+.txn-form-field textarea:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: #d4a373;
+  box-shadow: 0 0 0 4px rgba(212, 163, 115, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.txn-form-field input.input-error,
+.txn-form-field select.input-error,
+.txn-form-field textarea.input-error {
+  border-color: var(--error-color);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.txn-form-field input.input-error:focus,
+.txn-form-field select.input-error:focus,
+.txn-form-field textarea.input-error:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.txn-form-field textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.txn-type-toggle {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 6px;
+  border-radius: 16px;
+  position: relative;
+}
+
+.txn-type-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.txn-type-btn.active {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.txn-type-btn.active.expense {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 8px 16px -4px rgba(239, 68, 68, 0.3), 0 4px 8px -2px rgba(239, 68, 68, 0.2);
+}
+
+.txn-type-btn.active.income {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 8px 16px -4px rgba(16, 185, 129, 0.3), 0 4px 8px -2px rgba(16, 185, 129, 0.2);
+}
+
+.txn-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+
+/* Transaction form header: title and tools share the row; close stays top-right. */
+.txn-form-modal .modal-header {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding-right: 52px;
+}
+
+.txn-form-modal .modal-header-title-row {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.txn-form-modal .modal-header-title-row h2 {
+  margin: 0;
+}
+
+.txn-form-modal .modal-header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.txn-form-modal .modal-header .modal-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  margin: 0;
+  z-index: 2;
+}
+
+
+/* Form modals: keep the close control in the top-right corner on small screens. */
+@media (max-width: 768px) {
+  .category-modal {
+    position: relative !important;
+  }
+
+  .category-modal .modal-header {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    min-height: 42px !important;
+    gap: 0 !important;
+  }
+
+  .category-modal .modal-header > :first-child {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 48px !important;
+    box-sizing: border-box !important;
+  }
+
+  .category-modal .modal-header .modal-close {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    margin: 0 !important;
+    z-index: 2 !important;
+  }
+
+  .txn-form-modal .modal-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding-right: 0 !important;
+  }
+
+  .txn-form-modal .modal-header-title-row {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-right: 48px !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
+  }
+
+  .txn-form-modal .modal-header-tools {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

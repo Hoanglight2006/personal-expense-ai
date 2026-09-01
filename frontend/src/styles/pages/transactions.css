@@ -1,0 +1,112 @@
+/* ==========================================================================
+   TRANSACTIONS
+   ========================================================================== */
+
+.txn-page {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: 46px clamp(20px, 5vw, 72px) 72px;
+}
+
+.txn-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.txn-hero h1 {
+  color: var(--text-color);
+  font-size: clamp(2.1rem, 5vw, 3.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.txn-hero p {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.txn-hero-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.txn-trash-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.add-txn-button {
+  width: auto;
+  min-width: 170px;
+  margin: 0;
+  padding: 0 22px;
+  flex-shrink: 0;
+}
+
+.txn-toolbar {
+  margin-top: 34px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--surface-color);
+  box-shadow: 0 8px 24px rgba(96, 69, 31, 0.06);
+}
+
+.txn-toolbar input,
+.txn-toolbar .custom-datepicker-input,
+.txn-toolbar .custom-select__control {
+  backdrop-filter: none !important;
+  transition-duration: 0.12s !important;
+}
+
+.txn-toolbar-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.txn-toolbar-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.search-field input[type="search"] {
+  width: 100%;
+}
+
+.txn-count-display {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  height: 44px;
+  padding: 0 16px;
+  background: rgba(243, 205, 98, 0.15);
+  border: 1px solid rgba(214, 154, 35, 0.3);
+  border-radius: 11px;
+}
+
+.txn-count-label {
+  font-size: 0.7rem;
+  color: #a16b12;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.txn-count-display strong {
+  color: #8c5a0b;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+}
