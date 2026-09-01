@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 from unittest.mock import patch
 import pytest
 
@@ -39,7 +40,7 @@ def test_scan_image_success(client, mock_ocr_factory):
     # Setup mock
     mock_provider = mock_ocr_factory.return_value
     mock_provider.extract_transaction.return_value = ExtractedTransaction(
-        amount="50000",
+        amount=Decimal("50000"),
         transaction_date="2026-08-12",
         description="Thanh toán ăn uống",
         type_suggestion=CategoryType.EXPENSE,
@@ -55,7 +56,7 @@ def test_scan_image_success(client, mock_ocr_factory):
     
     assert resp.status_code == 200
     data = resp.json()
-    assert data["amount"] == "50000"
+    assert str(data["amount"]) == "50000"
     assert data["transaction_date"] == "2026-08-12"
     assert data["description"] == "Thanh toán ăn uống"
     assert data["type"] == "expense"

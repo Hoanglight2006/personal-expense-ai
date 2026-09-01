@@ -92,24 +92,28 @@ class CategoryUpdate(BaseModel):
 
     @field_validator("name", mode="before")
     @classmethod
-    def validate_name(cls, value: str | None) -> str:
+    def validate_name(cls, value: str | None) -> str | None:
         if value is None:
-            raise ValueError("Tên danh mục không được để trống.")
+            return None
         normalized = normalize_category_name(value)
         category_name_key(normalized)
         return normalized
 
     @field_validator("icon")
     @classmethod
-    def validate_icon(cls, value: str | None) -> str:
+    def validate_icon(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if value not in SUPPORTED_CATEGORY_ICONS:
             raise ValueError("Biểu tượng danh mục không được hỗ trợ.")
         return value
 
     @field_validator("color")
     @classmethod
-    def validate_color(cls, value: str | None) -> str:
-        if value is None or not HEX_COLOR_PATTERN.fullmatch(value):
+    def validate_color(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not HEX_COLOR_PATTERN.fullmatch(value):
             raise ValueError("Màu phải là mã HEX dạng #RRGGBB.")
         return value.upper()
 

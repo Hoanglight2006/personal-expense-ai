@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 import openpyxl
@@ -38,6 +38,8 @@ class MBStatementAdapter(ExcelParser):
                 return True
             # Fallback: check first sheet for MB specific headers
             sheet = wb.active
+            if sheet is None:
+                return False
             for row in sheet.iter_rows(min_row=1, max_row=30, values_only=True):
                 if row and len(row) >= 7:
                     row_str = " ".join([str(c).lower() for c in row if c])
@@ -50,6 +52,8 @@ class MBStatementAdapter(ExcelParser):
     def parse(self, file_content: bytes) -> list[BulkTransactionRow]:
         wb = openpyxl.load_workbook(io.BytesIO(file_content), read_only=True, data_only=True)
         sheet = wb["Sao ke tai khoan"] if "Sao ke tai khoan" in wb.sheetnames else wb.active
+        if sheet is None:
+            return []
 
         rows = []
         data_started = False
@@ -138,9 +142,11 @@ class MBStatementAdapter(ExcelParser):
         except InvalidOperation:
             return Decimal(0)
 
-    def _parse_date(self, val) -> datetime.date | None:
+    def _parse_date(self, val) -> date | None:
         if isinstance(val, datetime):
             return val.date()
+        if isinstance(val, date):
+            return val
         if not val:
             return None
         # Try parse string like DD/MM/YYYY
