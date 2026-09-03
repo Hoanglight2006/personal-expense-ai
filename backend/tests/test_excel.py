@@ -16,6 +16,7 @@ def mb_parser():
 def create_mock_excel(rows_data, sheet_name="Sao ke tai khoan"):
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = sheet_name
     for row in rows_data:
         ws.append(row)
@@ -90,7 +91,7 @@ def test_is_duplicate_transaction_excludes_soft_deleted(client):
     from app.models.category import Category
     from app.models.transaction import Transaction
     from app.models.user import User
-    from tests.conftest import TestingSessionLocal, engine
+    from tests.test_db import TestingSessionLocal, test_engine as engine
 
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
@@ -141,7 +142,7 @@ def test_is_duplicate_transaction_handles_empty_or_none_description(client):
     from app.models.category import Category
     from app.models.transaction import Transaction
     from app.models.user import User
-    from tests.conftest import TestingSessionLocal, engine
+    from tests.test_db import TestingSessionLocal, test_engine as engine
 
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()

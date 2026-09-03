@@ -121,7 +121,10 @@ def reset_password(
         )
         if payload.get("type") != "password_reset":
             raise credentials_exception
-        user_id = int(payload.get("sub"))
+        sub = payload.get("sub")
+        if not sub:
+            raise credentials_exception
+        user_id = int(sub)
         token_version = payload.get("ver")
     except (InvalidTokenError, TypeError, ValueError):
         raise credentials_exception
@@ -150,15 +153,18 @@ def update_users_me(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update the current user's public profile fields."""
-    duplicate = db.query(User).filter(
-        User.id != current_user.id,
-        or_(
-            User.username == user_in.username if user_in.username is not None else False,
-            User.email == user_in.email if user_in.email is not None else False,
-        ),
-    ).first()
-    if duplicate:
-        raise HTTPException(status_code=400, detail=USER_ALREADY_EXISTS)
+    conditions = []
+    if user_in.username is not None:
+        conditions.append(User.username == user_in.username)
+    if user_in.email is not None:
+        conditions.append(User.email == user_in.email)
+    if conditions:
+        duplicate = db.query(User).filter(
+            User.id != current_user.id,
+            or_(*conditions),
+        ).first()
+        if duplicate:
+            raise HTTPException(status_code=400, detail=USER_ALREADY_EXISTS)
 
     if user_in.username is not None:
         current_user.username = user_in.username

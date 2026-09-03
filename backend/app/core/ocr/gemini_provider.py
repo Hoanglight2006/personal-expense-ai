@@ -55,6 +55,7 @@ class GeminiOcrProvider(OcrProvider):
             }
         ]
         
+        text = ""
         try:
             response = self.model.generate_content([prompt, image_parts[0]])
             text = response.text

@@ -30,7 +30,8 @@ class LocalOcrProvider(OcrProvider):
             img = Image.open(io.BytesIO(image_bytes))
             # Convert to grayscale for better OCR
             img = img.convert("L")
-            text = pytesseract.image_to_string(img, lang="vie+eng")
+            raw_text = pytesseract.image_to_string(img, lang="vie+eng")
+            text: str = raw_text if isinstance(raw_text, str) else str(raw_text)
         except Exception as e:
             raise RuntimeError(f"Lỗi đọc ảnh: {e}")
 

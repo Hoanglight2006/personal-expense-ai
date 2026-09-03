@@ -22,7 +22,7 @@ from app.models.category import Category
 from app.models.enums import CategoryType
 from app.models.transaction import Transaction
 from app.models.user import User
-from conftest import TestingSessionLocal
+from tests.test_db import TestingSessionLocal
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +52,7 @@ def create_user_and_auth(client: TestClient, db: Session, email: str = "ai_user@
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     user = db.query(User).filter(User.id == user_id).first()
+    assert user is not None
     return user, token
 
 

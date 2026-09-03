@@ -1,7 +1,13 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, Numeric, UniqueConstraint
-from sqlalchemy.orm import relationship
+from decimal import Decimal
+from typing import TYPE_CHECKING
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.saving_contribution import SavingContribution
+    from app.models.saving_withdrawal import SavingWithdrawal
 
 
 class SavingWithdrawalAllocation(Base):
@@ -9,20 +15,20 @@ class SavingWithdrawalAllocation(Base):
 
     __tablename__ = "saving_withdrawal_allocations"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    withdrawal_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    withdrawal_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("saving_withdrawals.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    contribution_id = Column(
+    contribution_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("saving_contributions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    amount = Column(Numeric(15, 2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -36,5 +42,5 @@ class SavingWithdrawalAllocation(Base):
         ),
     )
 
-    withdrawal = relationship("SavingWithdrawal", back_populates="allocations")
-    contribution = relationship("SavingContribution", back_populates="withdrawal_allocations")
+    withdrawal: Mapped["SavingWithdrawal"] = relationship("SavingWithdrawal", back_populates="allocations")
+    contribution: Mapped["SavingContribution"] = relationship("SavingContribution", back_populates="withdrawal_allocations")
