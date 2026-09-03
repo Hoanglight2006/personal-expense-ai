@@ -14,7 +14,7 @@ from app.core.category_defaults import DEFAULT_CATEGORIES
 from app.core.security import get_password_hash
 from app.models.category import Category
 from app.models.user import User
-from conftest import TestingSessionLocal
+from tests.test_db import TestingSessionLocal
 import app.api.routes.auth as auth_routes
 
 
@@ -368,7 +368,7 @@ def test_get_current_user_deleted_user(client: TestClient):
     client.post("/api/v1/auth/register", json={"username": username, "email": f"{username}@example.com", "password": "strongpassword123"})
     login = client.post("/api/v1/auth/login", data={"username": username, "password": "strongpassword123"})
     token = login.json()["access_token"]
-    from conftest import TestingSessionLocal
+    from tests.test_db import TestingSessionLocal
     db = TestingSessionLocal()
     try:
         db.query(User).filter(User.username == username).delete()

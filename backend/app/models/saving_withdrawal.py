@@ -1,6 +1,8 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import (
     CheckConstraint,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
@@ -8,10 +10,14 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.saving_goal import SavingGoal
+    from app.models.saving_withdrawal_allocation import SavingWithdrawalAllocation
 
 
 class SavingWithdrawal(Base):
@@ -23,17 +29,17 @@ class SavingWithdrawal(Base):
 
     __tablename__ = "saving_withdrawals"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    saving_goal_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    saving_goal_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("saving_goals.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    amount = Column(Numeric(15, 2), nullable=False)
-    idempotency_key = Column(String(64), nullable=False)
-    note = Column(String(255), nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_saving_withdrawal_amount_positive"),
@@ -44,8 +50,8 @@ class SavingWithdrawal(Base):
         ),
     )
 
-    saving_goal = relationship("SavingGoal", back_populates="withdrawals")
-    allocations = relationship(
+    saving_goal: Mapped["SavingGoal"] = relationship("SavingGoal", back_populates="withdrawals")
+    allocations: Mapped[List["SavingWithdrawalAllocation"]] = relationship(
         "SavingWithdrawalAllocation",
         back_populates="withdrawal",
         cascade="all, delete-orphan",

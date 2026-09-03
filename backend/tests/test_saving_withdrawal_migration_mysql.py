@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(
     reason="Set RUN_MYSQL_MIGRATION_TEST=1 to run against a disposable MySQL database.",
 )
 
-MIGRATION_FILE = Path(__file__).parents[1] / "migrations" / "004_saving_withdrawals.sql"
+MIGRATION_FILE = Path(__file__).parents[2] / "database" / "migrations" / "004_saving_withdrawals.sql"
 
 
 def migration_statements(script: str):

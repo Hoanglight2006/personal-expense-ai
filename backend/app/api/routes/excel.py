@@ -28,7 +28,7 @@ async def parse_excel(
     current_user: User = Depends(get_current_user),
 ):
     """Parse an Excel statement and return preview data with duplicate checks."""
-    if file.content_type not in ALLOWED_MIME_TYPES and not file.filename.endswith(('.xlsx', '.xls')):
+    if file.content_type not in ALLOWED_MIME_TYPES and not (file.filename and file.filename.endswith(('.xlsx', '.xls'))):
          raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Định dạng file không được hỗ trợ. Vui lòng tải lên file Excel (.xlsx, .xls).",

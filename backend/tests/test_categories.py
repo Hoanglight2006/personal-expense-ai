@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.category import Category
 from app.models.enums import CategoryType
 from app.models.transaction import Transaction
-from conftest import TestingSessionLocal
+from tests.test_db import TestingSessionLocal
 
 
 def auth_headers(client: TestClient) -> tuple[dict[str, str], int]:

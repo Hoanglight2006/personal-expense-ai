@@ -1,0 +1,14 @@
+:root {
+  --primary-color: #f3cd62;
+  --primary-hover: #e9bd46;
+  --bg-color: #fff9ec;
+  --surface-color: rgba(255, 255, 255, 0.7);
+  --surface-soft: rgba(255, 255, 255, 0.9);
+  --text-color: #40352b;
+  --text-muted: #817367;
+  --border-color: rgba(232, 222, 201, 0.6);
+  --error-color: #dc2626;
+  --success-color: #4f8a57;
+  --shadow-soft: 0 25px 50px -12px rgba(96, 69, 31, 0.15);
+  --glow-primary: rgba(243, 205, 98, 0.3);
+}

@@ -122,41 +122,28 @@ CREATE DATABASE personal_expense
 tồn tại. Với production database hiện hữu, luôn backup và chạy migration đã kiểm
 chứng trước khi deploy code.
 
-## SQL migration legacy
+## SQL migration & DDL Schema
 
-Các script MySQL 8 nằm tại `backend/migrations`:
+Các script MySQL 8 nằm tập trung tại thư mục `database/`:
 
-1. `001_category_management.sql`: merge tên Category legacy trùng, repoint
-   Transaction/Budget và thêm composite ownership constraints.
-2. `002_transaction_management.sql`: thêm payment method, soft-delete fields và
-   index Transaction.
-3. `003_category_soft_delete.sql`: thêm `categories.deleted_at` và index.
-4. `004_saving_withdrawals.sql`: thêm sổ lịch sử rút tiền cho Saving Goal. Script
-   cũng nâng cấp bản draft đã có bảng withdrawal nhưng thiếu `idempotency_key`,
-   backfill dữ liệu cũ bằng `legacy-<id>` rồi thêm unique constraint. Allocation
-   suy luận được dựng và kiểm tra trong temporary table; chỉ publish vào bảng
-   thật trong transaction sau khi toàn bộ preflight đạt. Exception handler sẽ
-   rollback nên preflight lỗi không để lại allocation trung gian. Một bảng marker
-   tạm thời ở cấp migration ghi lại đúng các row từng thiếu key; nội dung key API
-   không được dùng để nhận diện legacy. Marker được giữ nếu migration lỗi để hỗ
-   trợ retry và được drop sau khi migration thành công.
-
-Script dùng stored procedure và `information_schema` guards để có thể retry sau
-DDL bị gián đoạn. Việc merge Category trong `001` không rollback được; phải phục
-hồi backup nếu cần quay lại.
-
-`001` nhắm tới một schema legacy cụ thể và không phải script tạo schema mới. Code
-hiện tại yêu cầu `categories.type`; hãy đối chiếu schema đích và kiểm chứng toàn bộ
-chain trước khi dùng trên dữ liệu thật. Trong môi trường làm việc hiện tại, full
-MySQL migration chain chưa được chạy; đây là giới hạn xác minh đã biết.
+1. `database/schema.sql`: Toàn bộ cấu trúc DDL hoàn chỉnh của cơ sở dữ liệu (Users, Categories, Transactions, Budgets, Saving Goals, Saving Contributions, Saving Withdrawals, Saving Withdrawal Allocations, AI Reports).
+2. `database/migrations/001_category_management.sql`: merge tên Category legacy trùng, repoint Transaction/Budget và thêm composite ownership constraints.
+3. `database/migrations/002_transaction_management.sql`: thêm payment method, soft-delete fields và index Transaction.
+4. `database/migrations/003_category_soft_delete.sql`: thêm `categories.deleted_at` và index.
+5. `database/migrations/004_saving_withdrawals.sql`: thêm sổ lịch sử rút tiền cho Saving Goal.
+6. `database/seed_demo.py`: Script khởi tạo sẵn 74 giao dịch demo 6 tháng.
 
 Ví dụ chạy thủ công bằng MySQL client sau khi backup:
 
 ```powershell
-Get-Content -Raw backend/migrations/001_category_management.sql | mysql --host=localhost --user=root --password personal_expense
-Get-Content -Raw backend/migrations/002_transaction_management.sql | mysql --host=localhost --user=root --password personal_expense
-Get-Content -Raw backend/migrations/003_category_soft_delete.sql | mysql --host=localhost --user=root --password personal_expense
-Get-Content -Raw backend/migrations/004_saving_withdrawals.sql | mysql --host=localhost --user=root --password personal_expense
+# Khởi tạo toàn bộ database mới
+Get-Content -Raw database/schema.sql | mysql --host=localhost --user=root --password personal_expense
+
+# Hoặc áp dụng từng migration theo phiên bản
+Get-Content -Raw database/migrations/001_category_management.sql | mysql --host=localhost --user=root --password personal_expense
+Get-Content -Raw database/migrations/002_transaction_management.sql | mysql --host=localhost --user=root --password personal_expense
+Get-Content -Raw database/migrations/003_category_soft_delete.sql | mysql --host=localhost --user=root --password personal_expense
+Get-Content -Raw database/migrations/004_saving_withdrawals.sql | mysql --host=localhost --user=root --password personal_expense
 ```
 
 Không chạy các SQL này trên SQLite.

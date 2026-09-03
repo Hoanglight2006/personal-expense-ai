@@ -4,6 +4,7 @@ Provides the GeminiChatService class that builds financial context
 from user transaction data and generates AI-powered responses.
 """
 
+import asyncio
 import calendar
 import re
 from datetime import date, timedelta
@@ -256,9 +257,11 @@ class GeminiChatService:
 
         candidate_models = [
             self._model_name,
-            "gemini-1.5-flash",
-            "gemini-2.0-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash",
             "gemini-flash-latest",
+            "gemini-3.7-flash",
         ]
         # Remove duplicates while preserving order
         candidate_models = list(dict.fromkeys(candidate_models))
@@ -274,7 +277,10 @@ class GeminiChatService:
                         temperature=0.7,
                     ),
                 )
-                response = await model.generate_content_async(contents)
+                response = await asyncio.wait_for(
+                    model.generate_content_async(contents),
+                    timeout=8.0,
+                )
                 if response and response.text:
                     return response.text.strip()
             except Exception as e:

@@ -2,39 +2,28 @@ from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import Session
 
-from app.database import Base, get_db
+from app.database import get_db
 from app.main import app
-
-# Use SQLite in-memory database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-
-@event.listens_for(engine, "connect")
-def enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
-
-
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from tests.test_db import TestingSessionLocal, drop_test_db, init_test_db, test_engine as engine
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_db() -> Generator:
-    from app.models import User, Category, Transaction, Budget, SavingGoal, SavingContribution, AIReport
-    Base.metadata.create_all(bind=engine)
+    init_test_db()
     yield
-    Base.metadata.drop_all(bind=engine)
+    drop_test_db()
+
+
+@pytest.fixture()
+def db() -> Generator[Session, None, None]:
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
 
 @pytest.fixture(scope="module")
 def client() -> Generator:
