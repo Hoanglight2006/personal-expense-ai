@@ -1,11 +1,11 @@
-# Nhật Ký Phát Triển & Minh Chứng Sử Dụng AI (Development Changelog)
+# Nhật Ký Phát Triển & Minh Chứng Sử Dụng AI
 
 Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Expense AI**, các công việc thực tế theo ngày tháng commit, nội dung prompt khi dùng AI hỗ trợ, những lỗi phát hiện từ phản hồi của AI và cách nhóm đã tự kiểm tra, sửa lại code.
 
 ---
 
 ### 📅 03/08/2026: Khởi tạo dự án và dựng khung hệ thống
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Khởi tạo Git repository, tạo cấu trúc thư mục cho Backend (FastAPI, SQLAlchemy) và Frontend (React, Vite).
   - Cấu hình file `.gitignore`, môi trường ảo Python `.venv` và cài đặt các thư viện cơ bản.
 * **Minh chứng sử dụng AI:**
@@ -15,7 +15,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 07/08/2026: Thiết kế cơ sở dữ liệu (ERD) và viết đặc tả yêu cầu
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Viết tài liệu yêu cầu hệ thống [REQUIREMENTS.md](file:///d:/clone/personal-expense-ai/REQUIREMENTS.md).
   - Thiết kế sơ đồ quan hệ thực thể (ERD) gồm các bảng: `users`, `categories`, `transactions`, `budgets`, `saving_goals`, `saving_contributions`, `saving_withdrawals`.
   - Viết model SQLAlchemy ban đầu trong thư mục `backend/app/models/`.
@@ -29,7 +29,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 11/08/2026: Module Xác thực tài khoản (Auth) & Phân quyền JWT
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Viết các API đăng ký (`/register`), đăng nhập (`/login`) và đổi mật khẩu trong [auth.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/auth.py).
   - Sử dụng `passlib` với thuật toán `bcrypt` để băm mật khẩu. Sinh mã JWT token khi đăng nhập thành công.
   - Viết middleware `get_current_user` để bảo vệ các router nội bộ.
@@ -45,7 +45,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 14/08/2026: Phân hệ Danh mục, Giao dịch thu/chi & Thùng rác (Recycle Bin)
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Xây dựng CRUD Danh mục ([categories.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/categories.py)): Nạp sẵn 12 danh mục mặc định, hỗ trợ ẩn/hiện danh mục.
   - Xây dựng CRUD Giao dịch ([transactions.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/transactions.py)): Phân trang, tìm kiếm, lọc theo ngày tháng, danh mục, loại thu/chi.
   - Thêm tính năng Nhân bản giao dịch (`Duplicate`) để tạo nhanh các khoản chi định kỳ.
@@ -61,7 +61,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 17/08/2026: Phân hệ Ngân sách (Budgets) & Cảnh báo bội chi
-* **Làm gì & Sửa gì:**
+* ***Việc cần làm:**
   - Xây dựng API và giao diện Quản lý Ngân sách ([budgets.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/budgets.py)): Người dùng đặt hạn mức chi tiêu theo từng danh mục trong tháng (ví dụ: Ăn uống tháng 8 là 3 triệu).
   - Tính toán tiến độ chi tiêu thực tế, đổi màu thanh cảnh báo (xanh $\rightarrow$ vàng $\rightarrow$ đỏ khi vượt quá 100%).
   - Cập nhật trang thông tin cá nhân Profile ([profile.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/profile.py)).
@@ -76,7 +76,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 18/08/2026: Mục tiêu tiết kiệm, Rút tiền & Khóa dòng chống âm ví (Pessimistic Lock)
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Xây dựng phân hệ Quỹ tiết kiệm ([saving_goals.py](file:///d:/clone/personal-expense-ai/backend/app/api/routes/saving_goals.py)): Cho phép tạo mục tiêu tiết kiệm, nạp tiền thủ công (`MANUAL`) hoặc trích tự động khi ghi nhận thu nhập (`INCOME_ALLOCATION`).
   - Hỗ trợ rút tiền tiết kiệm một phần hoặc toàn bộ, hoàn tiền lại vào số dư khả dụng và ghi log lịch sử rút.
   - Viết cơ chế khóa dòng người dùng `SELECT ... FOR UPDATE` trong SQLAlchemy để xử lý xung đột đồng thời (Race-condition).
@@ -114,7 +114,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 ---
 
 ### 📅 19/08/2026: Trích xuất sao kê ngân hàng Excel & Sửa lỗi Parser MB Bank
-* **Làm gì & Sửa gì:**
+* **Việc cần làm:**
   - Viết module đọc file sao kê Excel ngân hàng ([excel_service.py](file:///d:/clone/personal-expense-ai/backend/app/services/excel_service.py)) và parser riêng cho sao kê MB Bank ([mb_parser.py](file:///d:/clone/personal-expense-ai/backend/app/services/mb_parser.py)).
   - Cho phép người dùng tải file `.xlsx` lên, xem trước bảng dữ liệu (Preview) và chọn danh mục trước khi nạp vào hệ thống.
 * **Minh chứng sử dụng AI:**
@@ -122,7 +122,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
   - *AI phản hồi:* AI đưa regex: `r"([+-]?\d+)\s*(?:VND|d)?"`
 * **Phát hiện lỗi & Tự sửa lại:**
   - **Lỗi Regex:** Dữ liệu thực tế từ file Excel ngân hàng Việt Nam luôn có dấu phẩy `,` phân cách hàng nghìn (ví dụ `1,500,000`). Regex của AI gặp dấu phẩy thì dừng lại ngay, chỉ bắt được mỗi số `1` (thay vì 1.5 triệu thì thành 1 đồng!).
-  - **Nhóm tự sửa:** Viết lại pattern: `r"([+-]?[\d,]+)\s*(?:VND|đ|d)?"`, sau đó dùng `.replace(",", "")` rồi mới ép sang kiểu `Decimal`. Kiểm tra và bổ sung xử lý trường hợp file bị trống dòng hoặc sai định dạng ngày tháng để không làm crash cả tiến trình import.
+  - **Nhóm sửa:** Viết lại pattern: `r"([+-]?[\d,]+)\s*(?:VND|đ|d)?"`, sau đó dùng `.replace(",", "")` rồi mới ép sang kiểu `Decimal`. Kiểm tra và bổ sung xử lý trường hợp file bị trống dòng hoặc sai định dạng ngày tháng để không làm crash cả tiến trình import.
 
 ---
 
