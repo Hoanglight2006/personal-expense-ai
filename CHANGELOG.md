@@ -150,7 +150,7 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
   - *AI phản hồi:* AI đưa regex: `r"([+-]?\d+)\s*(?:VND|d)?"`
 * **Phát hiện lỗi và sửa:**
   - **Lỗi Regex:** Dữ liệu thực tế từ file Excel ngân hàng Việt Nam luôn có dấu phẩy `,` phân cách hàng nghìn (ví dụ `1,500,000`). Regex của AI gặp dấu phẩy thì dừng lại ngay, chỉ bắt được mỗi số `1` (thay vì 1.5 triệu thì thành 1 đồng!).
-  - **Nhóm tự sửa:** Viết lại pattern: `r"([+-]?[\d,]+)\s*(?:VND|đ|d)?"`, sau đó dùng `.replace(",", "")` rồi mới ép sang kiểu `Decimal`. Bổ sung xử lý dòng trống và định dạng ngày sai lệch để không làm crash cả tiến trình import.
+  - **Nhóm sửa:** Viết lại pattern: `r"([+-]?[\d,]+)\s*(?:VND|đ|d)?"`, sau đó dùng `.replace(",", "")` rồi mới ép sang kiểu `Decimal`. Bổ sung xử lý dòng trống và định dạng ngày sai lệch để không làm crash cả tiến trình import.
 
 ---
 
