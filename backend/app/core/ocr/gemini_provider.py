@@ -9,6 +9,8 @@ from app.config import settings
 from app.core.ocr.base import ExtractedTransaction, OcrProvider
 from app.models.enums import CategoryType, PaymentMethod
 
+from app.core.prompts import format_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,29 +26,15 @@ class GeminiOcrProvider(OcrProvider):
     def extract_transaction(self, image_bytes: bytes, categories: list | None = None) -> ExtractedTransaction:
         categories_context = ""
         if categories:
-            categories_list = "\n".join([f"- ID: {c.id}, Tên: {c.name}, Loại: {c.type}" for c in categories])
+            categories_list = "\n".join([f"- ID {c.id}: {c.name} ({c.type.value if hasattr(c.type, 'value') else c.type})" for c in categories])
             categories_context = f"""
-        Here is the list of available categories for this user:
+        Available Categories in system:
         {categories_list}
         
         Based on the items/products in the receipt and the store name, choose the MOST LOGICAL category_id from the list above. If you cannot determine it confidently, return null.
         """
         
-        prompt = f"""
-        You are an expert at extracting financial transaction details from receipts and invoices.
-        Extract the following information from the provided image and return ONLY a valid JSON object.
-        JSON Schema:
-        {{
-            "amount": "The total amount of the transaction as a number without currency symbols (e.g. 150000.50). Ensure you extract the FINAL Total amount. Return null if not found.",
-            "transaction_date": "The date of the transaction in YYYY-MM-DD format, or null if not found",
-            "description": "A short, concise description of the transaction (max 100 characters), e.g., 'Ăn trưa tại nhà hàng X', or null",
-            "type_suggestion": "Must be either 'expense' or 'income'. For typical receipts (supermarkets, dining), it's 'expense'. For salary/transfer in, it's 'income'.",
-            "payment_method_suggestion": "Must be one of 'cash', 'bank_transfer', 'credit_card', 'e_wallet', or null",
-            "category_id": "The integer ID of the best matching category from the provided list, or null"
-        }}
-        {categories_context}
-        Return ONLY the raw JSON without any markdown formatting or code blocks. Do not add any text before or after.
-        """
+        prompt = format_prompt("receipt_ocr", "prompt_template", categories_context=categories_context)
         
         image_parts = [
             {
