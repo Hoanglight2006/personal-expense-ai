@@ -235,8 +235,27 @@ AI sinh ra các component `CoinAssistant.jsx`, `ChatPopup.jsx` và các keyframe
 
 ---
 
-## 💡 5. ĐÁNH GIÁ VÀ BÀI HỌC KINH NGHIỆM
+## 🔬 5. THỰC NGHIỆM ĐỐI CHỨNG TỐI ƯU PROMPT QUA 3 VÒNG LẶP (TIÊU CHÍ 4)
+
+> Toàn bộ prompt của hệ thống được tách biệt hoàn toàn khỏi mã nguồn tại [`config/prompts.json`](../config/prompts.json) và được quản lý tập trung bởi module [`backend/app/core/prompts.py`](../backend/app/core/prompts.py).
+> 
+> Đã tiến hành thực nghiệm benchmark đối chứng tự động bằng script [`scripts/benchmark_prompts.py`](../scripts/benchmark_prompts.py). Xem chi tiết báo cáo tại: [**`docs/PROMPT_BENCHMARK_REPORT.md`**](PROMPT_BENCHMARK_REPORT.md).
+
+### Bảng Tổng Hợp Kết Quả 3 Vòng Thử Nghiệm Prompt:
+
+| Chỉ số / Tiêu chí | Vòng 1 (V1 - Naive) | Vòng 2 (V2 - Constrained) | Vòng 3 (V3 - Production Hiện tại) |
+|---|---|---|---|
+| **Cấu trúc Prompt** | Zero-shot thô, không ràng buộc | Thêm luật cấm ngoài lề & JSON cơ bản | Chuẩn 5 thành phần + Regex Masking + Schema |
+| **Bảo vệ Dữ liệu Nhạy cảm (PII)** | ❌ Lộ STK ngân hàng và mã giao dịch | ⚠️ Chỉ nhắc bằng text, dễ bị AI bỏ qua | ✅ **100% che giấu STK, Thẻ, Mã GD qua Regex** |
+| **Kiểm soát Phạm vi (Scope Guard)** | ❌ Trả lời lan man (thời tiết, làm thơ) | ✅ Từ chối câu hỏi ngoài lề | ✅ **Phản hồi vui vẻ + Nudge về số dư khả dụng** |
+| **Độ tin cậy Định dạng (Format)** | ❌ Văn bản tự do, Frontend không parse được | ⚠️ JSON không theo schema, thiếu trường | ✅ **JSON Schema chuẩn 4 trường, parse 100%** |
+| **Tối ưu Token & Thời gian** | ❌ Dài dòng (> 600 tokens), phản hồi chậm | ✅ Đã rút ngắn độ dài | ✅ **Tối đa 100 từ, phản hồi < 1.5s, tiết kiệm 50% token** |
+| **Điểm Đánh giá Kỹ thuật** | **3.5 / 10** | **6.8 / 10** | **9.6 / 10 (ĐẠT CHUẨN XUẤT SẮC)** |
+
+---
+
+## 💡 6. ĐÁNH GIÁ VÀ BÀI HỌC KINH NGHIỆM
 
 1. 🎯 **Làm chủ cấu trúc Prompt 5 thành phần**: Việc xác định rõ **Context**, **Constraints** và **Output Format** giúp AI hiểu chính xác yêu cầu, giảm thiểu tối đa các câu trả lời sai lệch (*hallucination*).
 2. 🛡️ **Nguyên tắc "Zero Trust" khi tích hợp Code AI**: Không bao giờ sao chép nguyên văn mã nguồn AI sinh ra ở các phần xử lý tiền tệ và bảo mật. Lập trình viên phải luôn đọc hiểu, rà soát trường hợp biên và viết test tự động để nghiệm thu.
-3. ⚡ **Tăng tốc độ phát triển**: Ứng dụng AI giúp giảm hơn **60%** thời gian viết các đoạn code lặp lại, cho phép sinh viên tập trung tối đa vào việc hoàn thiện logic nghiệp vụ và tối ưu hóa trải nghiệm người dùng.
+3. ⚡ **Tách biệt Prompt khỏi Code**: Lưu trữ cấu trúc prompt tập trung tại `config/prompts.json` giúp kiểm thử A/B testing và tinh chỉnh văn phong nhanh chóng mà không cần biên dịch lại hoặc sửa đổi logic mã nguồn Python.

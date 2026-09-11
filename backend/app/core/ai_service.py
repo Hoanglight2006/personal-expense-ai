@@ -35,9 +35,9 @@ from app.schemas.ai import (
     SpendingVelocityItem,
 )
 
-SYSTEM_REPORT_PROMPT = (
-    "Bạn là trợ lý chi tiêu cá nhân. Chỉ đưa gợi ý tham khảo, không tư vấn tài chính chuyên nghiệp."
-)
+from app.core.prompts import format_prompt, get_prompt
+
+SYSTEM_REPORT_PROMPT = get_prompt("monthly_report", "system_instruction")
 
 
 def _get_gemini_model(system_instruction: str = SYSTEM_REPORT_PROMPT):
@@ -679,23 +679,8 @@ async def generate_monthly_ai_report(
         f"Top danh mục chi tiêu:\n" + ("\n".join(top_exp_lines) if top_exp_lines else "Chưa có giao dịch chi tiêu.")
     )
 
-    # Prompt specified in REQUIREMENTS.md:
-    # User: Dữ liệu chi tiêu tháng: {{monthly_expense_summary}}. Hãy tóm tắt xu hướng và gợi ý 3 điểm cần điều chỉnh.
-    user_prompt = (
-        f"Dữ liệu chi tiêu tháng:\n{summary_text}\n\n"
-        f"Hãy tóm tắt xu hướng và gợi ý 3 điểm cần điều chỉnh.\n\n"
-        f"Trả lời dưới định dạng JSON với cấu trúc sau:\n"
-        f"{{\n"
-        f'  "overview": "Tóm tắt tổng quan tình hình tài chính tháng này trong 1-2 câu",\n'
-        f'  "trend_analysis": "Phân tích cụ thể xu hướng thu/chi, so sánh với tháng trước và danh mục chi tiêu lớn nhất",\n'
-        f'  "adjustments": [\n'
-        f'    "Gợi ý điều chỉnh hành động 1 (cụ thể, thiết thực)",\n'
-        f'    "Gợi ý điều chỉnh hành động 2 (cụ thể, thiết thực)",\n'
-        f'    "Gợi ý điều chỉnh hành động 3 (cụ thể, thiết thực)"\n'
-        f"  ],\n"
-        f'  "conclusion": "Lời khuyên đúc kết tài chính ngắn gọn và động lực tiết kiệm cho tháng tới"\n'
-        f"}}"
-    )
+    # Prompt specified in REQUIREMENTS.md loaded from config/prompts.json
+    user_prompt = format_prompt("monthly_report", "user_prompt_template", summary_text=summary_text)
 
     overview = (
         f"Trong tháng {month}/{year}, tổng thu nhập đạt {summary['total_income']:,.0f} đ và chi tiêu {summary['total_expense']:,.0f} đ, "
@@ -931,14 +916,15 @@ async def generate_budget_recommendations(
 
     # Prompt Gemini for AI-refined reasons and amounts
     model = _get_gemini_model(
-        system_instruction="Bạn là trợ lý tài chính cá nhân thông minh. Đưa ra gợi ý hạn mức ngân sách hàng tháng hợp lý, thực tế và tiết kiệm."
+        system_instruction=get_prompt("budget_recommendations", "system_instruction")
     )
     if model and prompt_items:
-        prompt = (
-            f"Dưới đây là danh sách các danh mục chi tiêu của người dùng cho tháng {target_month:02d}/{target_year} kèm mức chi trung bình (avg_spent) và tháng trước (last_spent):\n"
-            f"{json.dumps(prompt_items, ensure_ascii=False, indent=2)}\n\n"
-            f"Hãy đưa ra mức ngân sách đề xuất (recommended_amount dạng số làm tròn đến 10,000 hoặc 50,000 VNĐ) và lý do ngắn gọn (reason trong 1 câu tiếng Việt).\n"
-            f"Trả về kết quả dưới dạng JSON array: [{{ 'id': <category_id>, 'recommended_amount': <number>, 'reason': '<lý do ngắn gọn>' }}]"
+        prompt = format_prompt(
+            "budget_recommendations",
+            "user_prompt_template",
+            target_month=target_month,
+            target_year=target_year,
+            items_json=json.dumps(prompt_items, ensure_ascii=False, indent=2),
         )
         try:
             res = await asyncio.wait_for(model.generate_content_async(prompt), timeout=8.0)
