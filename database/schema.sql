@@ -31,9 +31,13 @@ CREATE TABLE IF NOT EXISTS categories (
     color VARCHAR(20) NOT NULL DEFAULT '#6366F1',
     type ENUM('income', 'expense') NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
     CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_category_id_user UNIQUE (id, user_id),
+    CONSTRAINT uq_category_user_normalized_name UNIQUE (user_id, name_normalized),
     INDEX idx_categories_user (user_id),
     INDEX idx_categories_user_type (user_id, type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -136,12 +140,12 @@ CREATE TABLE IF NOT EXISTS saving_withdrawal_allocations (
 CREATE TABLE IF NOT EXISTS ai_reports (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    month SMALLINT NOT NULL,
-    year SMALLINT NOT NULL,
-    report_type ENUM('monthly_summary', 'budget_suggestion', 'chat_answer') NOT NULL,
-    content TEXT NOT NULL,
-    meta_data JSON NULL,
+    report_type ENUM('MONTHLY_SUMMARY', 'BUDGET_SUGGESTION', 'CHAT_ANSWER') NOT NULL,
+    prompt_sent TEXT NOT NULL,
+    ai_response TEXT NOT NULL,
+    period_month SMALLINT NULL,
+    period_year SMALLINT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_ai_reports_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_ai_reports_user_period (user_id, year, month)
+    INDEX idx_ai_reports_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

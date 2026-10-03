@@ -1,0 +1,87 @@
+services:
+  # =========================================================================
+  # 1. Cơ sở dữ liệu quan hệ MySQL 8.0
+  # =========================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: expense_mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: personal_expense
+      MYSQL_USER: expense_user
+      MYSQL_PASSWORD: expense_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - expense_net
+
+  # =========================================================================
+  # 2. Máy chủ Backend FastAPI (Python 3.11)
+  # =========================================================================
+  backend:
+    container_name: expense_backend
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://expense_user:expense_password@mysql:3306/personal_expense
+      SECRET_KEY: ${SECRET_KEY:-personal-expense-ai-super-secret-key-32chars-min}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      PASSWORD_RESET_EXPIRE_MINUTES: 30
+      FRONTEND_BASE_URL: http://localhost:5173
+      CORS_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost", "http://127.0.0.1", "http://localhost:80"]'
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      OCR_PROVIDER: ${OCR_PROVIDER:-gemini}
+    ports:
+      - "8000:8000"
+    volumes:
+      - static_data:/app/backend/static
+      - ./backups:/app/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - expense_net
+
+  # =========================================================================
+  # 3. Giao diện Web Frontend React 19 + Nginx
+  # =========================================================================
+  frontend:
+    container_name: expense_frontend
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - expense_net
+
+volumes:
+  mysql_data:
+    name: expense_mysql_data
+  static_data:
+    name: expense_static_data
+
+networks:
+  expense_net:
+    name: expense_network
+    driver: bridge
