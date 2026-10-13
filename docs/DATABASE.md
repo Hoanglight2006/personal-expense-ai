@@ -192,9 +192,33 @@ RUN_MYSQL_MIGRATION_TEST=1 pytest -q backend/tests/test_category_migration_mysql
 Nếu `RUN_MYSQL_MIGRATION_TEST` khác `1`, test được skip. Nếu `DATABASE_URL` không
 phải MySQL, test cũng skip.
 
+## Sao lưu và khôi phục cơ sở dữ liệu
+
+Dự án có sẵn script sao lưu và khôi phục cho SQLite và MySQL:
+
+- Script chính: [`scripts/backup_db.py`](../scripts/backup_db.py) và [`scripts/restore_db.py`](../scripts/restore_db.py).
+- Shortcut Windows: [`scripts/backup.bat`](../scripts/backup.bat) và [`scripts/restore.bat`](../scripts/restore.bat).
+- Thư mục lưu file: `backups/`.
+
+### 1. Sao lưu
+```powershell
+python scripts/backup_db.py
+```
+- **SQLite**: Dùng `sqlite3.backup()` để tạo snapshot mà không cần tắt ứng dụng.
+- **MySQL**: Tự gọi `mysqldump` (nếu có trong PATH) hoặc PyMySQL để xuất cấu trúc bảng và dữ liệu thành file `.sql`.
+
+### 2. Khôi phục
+```powershell
+# Khôi phục từ bản sao lưu mới nhất
+python scripts/restore_db.py
+
+# Hoặc chỉ định file cụ thể
+python scripts/restore_db.py --file backups/backup_mysql_personal_expense_20261003_175051.sql
+```
+
 ## Checklist migration production
 
-1. Backup và thử restore backup.
+1. Backup và thử restore backup (sử dụng `scripts/backup_db.py` và `scripts/restore_db.py`).
 2. Chạy ownership preflight trên bản sao dữ liệu.
 3. Chạy migration trên disposable/staging MySQL cùng version production.
 4. Kiểm tra composite FK, indexes, `NUMERIC(15,2)` và row counts.

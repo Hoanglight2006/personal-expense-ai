@@ -120,7 +120,25 @@ personal-expense-ai/
 
 ---
 
-## 🚀 HƯỚNG DẪN CÀI ĐẶT & CHẠY DỰ ÁN (QUICK START)
+## Triển khai bằng Docker Compose
+
+Yêu cầu: Máy đã cài Docker Desktop.
+
+```powershell
+# Khởi động các dịch vụ (MySQL, Backend FastAPI, Frontend React)
+docker compose up -d --build
+
+# (Tùy chọn) Nạp 74 giao dịch demo vào container
+docker compose exec backend python /app/database/seed_demo.py
+```
+
+- Frontend: `http://localhost:5173` hoặc `http://localhost`
+- API Docs (Swagger): `http://localhost:8000/docs`
+- Dừng dịch vụ: `docker compose down`
+
+---
+
+## Cài đặt và chạy trực tiếp (Không dùng Docker)
 
 ### Yêu cầu môi trường:
 * **Python**: Phiên bản 3.11 trở lên.
@@ -173,7 +191,7 @@ python -m venv .venv
 python -m pip install -r backend/requirements.txt
 
 # 3. Nạp sẵn dữ liệu mẫu 6 tháng sống động để trải nghiệm
-python backend/seed_demo.py
+python database/seed_demo.py
 
 # 4. Khởi chạy server FastAPI
 python -m uvicorn app.main:app --reload --reload-dir backend --app-dir backend --host 127.0.0.1 --port 8000
@@ -207,6 +225,19 @@ Sau khi chạy lệnh `python backend/seed_demo.py`, bạn hãy dùng tài kho�
 * 🔒 **Mật khẩu**: `Password123@`
 
 *(Tài khoản này chứa sẵn **74 giao dịch** trải dài 6 tháng, 12 danh mục chuẩn, 2 mục tiêu tiết kiệm và 4 ngân sách tháng có đầy đủ biểu đồ sống động).*
+
+---
+
+## Sao lưu và khôi phục cơ sở dữ liệu
+
+Dự án có sẵn script sao lưu và phục hồi cho cả SQLite và MySQL, dữ liệu lưu trong thư mục `backups/`:
+
+* **Sao lưu**:
+  * Windows: Chạy file [`scripts/backup.bat`](scripts/backup.bat)
+  * Dòng lệnh: `python scripts/backup_db.py`
+* **Khôi phục**:
+  * Windows: Chạy file [`scripts/restore.bat`](scripts/restore.bat)
+  * Dòng lệnh: `python scripts/restore_db.py` (hoặc `python scripts/restore_db.py --file <đường_dẫn_file>`)
 
 ---
 

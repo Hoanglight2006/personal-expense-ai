@@ -16,3 +16,6 @@ dist/
 .idea/
 /static/
 /backend/static/
+backups/*.sql
+backups/*.db
+!backups/README.md
