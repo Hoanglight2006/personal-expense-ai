@@ -26,14 +26,15 @@ const AppSidebar = ({ user, onLogout, isOpen = false, onClose }) => {
   };
 
   const avatarSrc = getAvatarSrc(user?.avatar_url);
+  const isAdmin = user?.role === 'admin';
 
   return (
     <aside className={`app-sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Thanh điều hướng">
       <div className="sidebar-top">
         <div className="sidebar-header-row">
-          <NavLink to="/" className="sidebar-logo" aria-label="FinAI - Trang chủ" onClick={handleNavClick}>
+          <NavLink to={isAdmin ? "/admin/dashboard" : "/dashboard"} className="sidebar-logo" aria-label="FinAI - Trang chủ" onClick={handleNavClick}>
             <img src="/finai-winged-coin-favicon.png" alt="" />
-            <span>FinAI</span>
+            <span>FinAI{isAdmin && <span className="logo-admin-badge" style={{ fontSize: '11px', background: '#d97706', color: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}</span>
           </NavLink>
           {onClose && (
             <button
@@ -47,34 +48,78 @@ const AppSidebar = ({ user, onLogout, isOpen = false, onClose }) => {
           )}
         </div>
         <nav className="sidebar-nav" aria-label="Điều hướng chính">
-          <NavLink to="/dashboard" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">📊</span>
-            <span className="nav-text">Tổng quan</span>
-          </NavLink>
-          <NavLink to="/transactions" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">💸</span>
-            <span className="nav-text">Giao dịch</span>
-          </NavLink>
-          <NavLink to="/statistics" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">📈</span>
-            <span className="nav-text">Thống kê</span>
-          </NavLink>
-          <NavLink to="/budgets" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">💳</span>
-            <span className="nav-text">Ngân sách</span>
-          </NavLink>
-          <NavLink to="/saving-goals" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">🎯</span>
-            <span className="nav-text">Tiết kiệm</span>
-          </NavLink>
-          <NavLink to="/categories" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
-            <span className="nav-icon">📁</span>
-            <span className="nav-text">Danh mục</span>
-          </NavLink>
-          <NavLink to="/profile" onClick={handleNavClick} className={({ isActive }) => `sidebar-profile-link ${isActive ? 'active' : ''}`}>
-            <span className="nav-icon">👤</span>
-            <span className="nav-text">Hồ sơ</span>
-          </NavLink>
+          {isAdmin ? (
+            <>
+              <div
+                className="sidebar-section-label"
+                style={{
+                  padding: '8px 16px 4px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#92400e',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Khu vực Quản trị
+              </div>
+              <NavLink
+                to="/admin/dashboard"
+                onClick={handleNavClick}
+                className={({ isActive }) => (isActive ? 'active' : '')}
+              >
+                <span className="nav-icon">📊</span>
+                <span className="nav-text">Tổng quan hệ thống</span>
+              </NavLink>
+              <NavLink
+                to="/admin/users"
+                onClick={handleNavClick}
+                className={({ isActive }) => (isActive ? 'active' : '')}
+              >
+                <span className="nav-icon">👥</span>
+                <span className="nav-text">Quản lý người dùng</span>
+              </NavLink>
+              <NavLink
+                to="/profile"
+                onClick={handleNavClick}
+                className={({ isActive }) => `sidebar-profile-link ${isActive ? 'active' : ''}`}
+              >
+                <span className="nav-icon">👤</span>
+                <span className="nav-text">Hồ sơ Admin</span>
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/dashboard" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">📊</span>
+                <span className="nav-text">Tổng quan</span>
+              </NavLink>
+              <NavLink to="/transactions" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">💸</span>
+                <span className="nav-text">Giao dịch</span>
+              </NavLink>
+              <NavLink to="/statistics" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">📈</span>
+                <span className="nav-text">Thống kê</span>
+              </NavLink>
+              <NavLink to="/budgets" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">💳</span>
+                <span className="nav-text">Ngân sách</span>
+              </NavLink>
+              <NavLink to="/saving-goals" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">🎯</span>
+                <span className="nav-text">Tiết kiệm</span>
+              </NavLink>
+              <NavLink to="/categories" onClick={handleNavClick} className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="nav-icon">📁</span>
+                <span className="nav-text">Danh mục</span>
+              </NavLink>
+              <NavLink to="/profile" onClick={handleNavClick} className={({ isActive }) => `sidebar-profile-link ${isActive ? 'active' : ''}`}>
+                <span className="nav-icon">👤</span>
+                <span className="nav-text">Hồ sơ</span>
+              </NavLink>
+            </>
+          )}
         </nav>
       </div>
       <div className="sidebar-bottom">
@@ -92,7 +137,10 @@ const AppSidebar = ({ user, onLogout, isOpen = false, onClose }) => {
             )}
           </div>
           <div className="account-info">
-            <span className="account-name" title={user?.username}>{user?.username}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="account-name" title={user?.username}>{user?.username}</span>
+              {isAdmin && <span className="badge-admin-tag">Admin</span>}
+            </div>
             <span className="account-email" title={user?.email}>{user?.email}</span>
           </div>
         </NavLink>

@@ -13,7 +13,7 @@ const STRATEGY_OPTIONS = [
     id: 'smart',
     icon: '🎯',
     title: 'Cân đối thông minh (50/30/20)',
-    desc: 'Phân bổ hạn mức tối ưu dựa trên mức chi trung bình 3 tháng và mục tiêu tiết kiệm 20%.',
+    desc: 'Phân bổ hạn mức tối ưu dựa trên mức chi trung bình quá khứ và mục tiêu tiết kiệm 20%.',
     factor: 1.0,
   },
   {
@@ -27,9 +27,15 @@ const STRATEGY_OPTIONS = [
     id: 'flexible',
     icon: '🌊',
     title: 'Linh hoạt theo thực tế',
-    desc: 'Giữ hạn mức sát với thực tế chi tiêu tháng gần nhất với biên độ an toàn +10%.',
+    desc: 'Giữ hạn mức sát với thực tế chi tiêu quá khứ với biên độ an toàn +10%.',
     factor: 1.1,
   },
+];
+
+const LOOKBACK_OPTIONS = [
+  { value: 1, label: '1 tháng gần nhất (Xu hướng mới)' },
+  { value: 3, label: '3 tháng gần nhất (Khuyên dùng)' },
+  { value: 6, label: '6 tháng gần nhất (Dài hạn ổn định)' },
 ];
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
@@ -37,10 +43,35 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
   label: `Tháng ${String(i + 1).padStart(2, '0')}`,
 }));
 
+const customSmoothScroll = (element, duration = 350, offset = 32) => {
+  if (!element) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  const targetPosition = element.getBoundingClientRect().top + window.scrollY - offset;
+  const startPosition = window.scrollY;
+  const distance = targetPosition - startPosition;
+  let startTime = null;
+
+  const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+
+  const animation = (currentTime) => {
+    if (startTime === null) startTime = currentTime;
+    const timeElapsed = currentTime - startTime;
+    const progress = Math.min(timeElapsed / duration, 1);
+    window.scrollTo(0, startPosition + distance * easeOutQuart(progress));
+    if (timeElapsed < duration) {
+      requestAnimationFrame(animation);
+    }
+  };
+  requestAnimationFrame(animation);
+};
+
 const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
   const [targetMonth, setTargetMonth] = useState(currentMonth || new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState(currentYear || new Date().getFullYear());
   const [strategy, setStrategy] = useState('smart');
+  const [lookbackMonths, setLookbackMonths] = useState(3);
 
   const yearOptions = useMemo(() => {
     const baseYear = targetYear || new Date().getFullYear();
@@ -60,6 +91,17 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
   const [hasGenerated, setHasGenerated] = useState(false);
   const [showConfig, setShowConfig] = useState(true);
   const amountInputRefs = useRef(new Map());
+  const configRef = useRef(null);
+  const resultsRef = useRef(null);
+
+  const handleToggleConfig = () => {
+    setShowConfig(true);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        customSmoothScroll(configRef.current, 350, 32);
+      }, 50);
+    });
+  };
 
   const selectedMonthStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
 
@@ -68,7 +110,7 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await getBudgetRecommendations(selectedMonthStr);
+      const res = await getBudgetRecommendations(selectedMonthStr, lookbackMonths);
       setData(res);
 
       const stratObj = STRATEGY_OPTIONS.find((s) => s.id === strategy) || STRATEGY_OPTIONS[0];
@@ -80,6 +122,11 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
       setEditedAmounts(initialMap);
       setHasGenerated(true);
       setShowConfig(false);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          customSmoothScroll(resultsRef.current, 350, 32);
+        }, 50);
+      });
     } catch (err) {
       setError(err.response?.data?.detail || 'Không thể tải gợi ý ngân sách AI lúc này.');
     } finally {
@@ -146,11 +193,11 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
     <div className="ai-budget-tab-container fade-in">
       {/* Options Configuration Card */}
       {showConfig && (
-        <div className="ai-config-card">
+        <div className="ai-config-card" ref={configRef}>
           <div className="ai-config-header">
             <div className="ai-config-badge">✨ FinAI Smart Budgeting</div>
             <h2>Tùy Chọn Sinh Gợi Ý Ngân Sách AI</h2>
-            <p>Chọn tháng áp dụng và chiến lược tài chính phù hợp để AI tính toán ngân sách tối ưu.</p>
+            <p>Chọn tháng áp dụng, khoảng thời gian đối chiếu và chiến lược tài chính phù hợp.</p>
           </div>
 
           <div className="ai-config-body">
@@ -181,9 +228,21 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
               </div>
             </div>
 
-            {/* 2. Chọn chiến lược */}
+            {/* 2. Chọn khoảng thời gian lịch sử đối chiếu */}
             <div className="ai-config-section">
-              <label className="ai-config-label">2. Chọn chiến lược phân bổ ngân sách:</label>
+              <label className="ai-config-label">2. Dữ liệu lịch sử đối chiếu:</label>
+              <div className="ai-lookback-select-wrap">
+                <CustomSelect
+                  value={lookbackMonths}
+                  onChange={(e) => setLookbackMonths(Number(e.target.value))}
+                  options={LOOKBACK_OPTIONS}
+                />
+              </div>
+            </div>
+
+            {/* 3. Chọn chiến lược */}
+            <div className="ai-config-section">
+              <label className="ai-config-label">3. Chọn chiến lược phân bổ ngân sách:</label>
               <div className="ai-focus-options-grid">
                 {STRATEGY_OPTIONS.map((opt) => (
                   <button
@@ -237,27 +296,27 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
         <div className="ai-tab-loading-state">
           <div className="ai-spinner" />
           <h3>FinAI đang phân tích lịch sử chi tiêu và tính toán hạn mức...</h3>
-          <p>Dựa trên xu hướng 3 tháng gần nhất và chiến lược đã chọn, hệ thống đang xây dựng kế hoạch ngân sách tối ưu cho từng danh mục.</p>
+          <p>Dựa trên xu hướng {lookbackMonths} tháng gần nhất và chiến lược đã chọn, hệ thống đang xây dựng kế hoạch ngân sách tối ưu cho từng danh mục.</p>
         </div>
       )}
 
       {/* Display Generated Recommendations */}
       {hasGenerated && data && !loading && (
-        <div className="ai-budget-results-card fade-in">
+        <div className="ai-budget-results-card fade-in" ref={resultsRef}>
           <div className="ai-budget-results-header">
             <div className="ai-budget-results-title">
               <span className="ai-badge-sub">✨ Hạn Mức Đề Xuất Từ AI</span>
               <h2>Gợi Ý Ngân Sách Tháng {data.target_month}/{data.target_year}</h2>
-              <p>Chiến lược: {STRATEGY_OPTIONS.find((s) => s.id === strategy)?.title || 'Cân đối thông minh'}</p>
+              <p>Chiến lược: {STRATEGY_OPTIONS.find((s) => s.id === strategy)?.title || 'Cân đối thông minh'} • Đối chiếu: {lookbackMonths} tháng lịch sử</p>
             </div>
 
             <div className="ai-budget-results-actions">
               <button
                 type="button"
                 className="btn-reconfigure-ai"
-                onClick={() => setShowConfig(!showConfig)}
+                onClick={handleToggleConfig}
               >
-                {showConfig ? 'Ẩn tùy chọn' : '⚙️ Đổi Tùy Chọn'}
+                ⚙️ Đổi Tùy Chọn
               </button>
             </div>
           </div>
@@ -337,6 +396,13 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
 
           {/* Bottom Apply Action */}
           <div className="ai-budget-tab-footer">
+            <button
+              type="button"
+              className="btn-reconfigure-bottom"
+              onClick={handleToggleConfig}
+            >
+              ⚙️ Đổi Tùy Chọn Khác
+            </button>
             <div className="footer-summary">
               <span>Tổng ngân sách áp dụng:</span>
               <strong className="font-mono text-amber">{formatCurrency(totalCalculated)}</strong>

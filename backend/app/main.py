@@ -1,33 +1,22 @@
+import logging
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect, text
 
-from app.api.routes import auth, categories, transactions, budgets, saving_goals, ocr, excel, chat, ai
-from app.database import Base, engine
+from app.api.routes import admin, ai, auth, budgets, categories, chat, ocr, saving_goals, transactions
 from app.config import settings
+from app.database import init_db
 
-
-def init_db_and_static():
-    """Ensure static directories exist and database schema has all columns."""
-    static_dir = Path("static/avatars")
-    static_dir.mkdir(parents=True, exist_ok=True)
-
-    Base.metadata.create_all(bind=engine)
-    try:
-        with engine.begin() as conn:
-            inspector = inspect(conn)
-            if "users" in inspector.get_table_names():
-                columns = [c["name"] for c in inspector.get_columns("users")]
-                if "avatar_url" not in columns:
-                    conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) NULL"))
-    except Exception:
-        pass
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 
 def create_app() -> FastAPI:
-    init_db_and_static()
+    """Application factory for FastAPI app."""
+    init_db()
 
     app = FastAPI(
         title="Personal Expense AI API",
@@ -48,13 +37,14 @@ def create_app() -> FastAPI:
     static_path.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
+    # API Routers
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(admin.router, prefix="/api/v1")
     app.include_router(categories.router, prefix="/api/v1")
     app.include_router(transactions.router, prefix="/api/v1")
     app.include_router(budgets.router, prefix="/api/v1")
     app.include_router(saving_goals.router, prefix="/api/v1")
     app.include_router(ocr.router, prefix="/api/v1")
-    app.include_router(excel.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
     app.include_router(ai.router, prefix="/api/v1")
 

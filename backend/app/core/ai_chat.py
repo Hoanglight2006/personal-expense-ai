@@ -7,10 +7,13 @@ from user transaction data and generates AI-powered responses.
 import asyncio
 import calendar
 import re
-from datetime import date, timedelta
+from app.core.timezone import local_today
 from decimal import Decimal
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
@@ -20,7 +23,6 @@ from app.models.category import Category
 from app.models.enums import CategoryType, GoalStatus
 from app.models.saving_goal import SavingGoal
 from app.models.transaction import Transaction
-from app.models.user import User
 
 from app.core.prompts import get_prompt
 
@@ -50,7 +52,7 @@ def build_financial_context(db: Session, user_id: int) -> str:
 
     Only sends aggregated/summarized data to protect user privacy.
     """
-    today = date.today()
+    today = local_today()
     first_of_month = today.replace(day=1)
     last_day = calendar.monthrange(today.year, today.month)[1]
     last_of_month = today.replace(day=last_day)
@@ -224,6 +226,8 @@ class GeminiChatService:
     """Handles AI chat interactions via the Gemini API."""
 
     def __init__(self):
+        if not genai:
+            raise RuntimeError("Thư viện google-generativeai chưa được cài đặt.")
         if not settings.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not configured.")
         genai.configure(api_key=settings.GEMINI_API_KEY)

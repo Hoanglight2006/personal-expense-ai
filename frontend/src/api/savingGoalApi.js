@@ -6,7 +6,11 @@ import api from './axios';
  * @param {AbortSignal} [signal]
  */
 export const getSavingGoals = async (params = {}, signal) => {
-  const response = await api.get('/saving-goals', { params, signal });
+  const cleanParams = { ...params };
+  if (cleanParams.status === 'all') {
+    delete cleanParams.status;
+  }
+  const response = await api.get('/saving-goals', { params: cleanParams, signal });
   return response.data;
 };
 

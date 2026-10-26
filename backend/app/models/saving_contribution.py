@@ -39,7 +39,7 @@ class SavingContribution(Base):
         nullable=True,
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
-    source: Mapped[ContributionSource] = mapped_column(Enum(ContributionSource), nullable=False)
+    source: Mapped[ContributionSource] = mapped_column(Enum(ContributionSource, values_callable=lambda x: [e.value for e in x]), nullable=False)
     note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 

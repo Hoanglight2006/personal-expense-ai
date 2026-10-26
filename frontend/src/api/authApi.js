@@ -46,6 +46,26 @@ export const resetPassword = async (token, password) => {
   return response.data;
 };
 
+export const resetPasswordWithOtp = async (email, code, password) => {
+  const response = await api.post('/auth/reset-password', { email, code, password });
+  return response.data;
+};
+
+export const sendVerificationEmail = async () => {
+  const response = await api.post('/auth/send-verification-email');
+  return response.data;
+};
+
+export const verifyEmail = async (code) => {
+  const response = await api.post('/auth/verify-email', { code });
+  return response.data;
+};
+
+export const dismissBalanceGuide = async () => {
+  const response = await api.post('/auth/dismiss-balance-guide');
+  return response.data;
+};
+
 export const uploadAvatar = async (file) => {
   const formData = new FormData();
   formData.append('file', file);

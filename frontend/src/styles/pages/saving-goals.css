@@ -1559,3 +1559,103 @@
   background: #fef3c7;
   transform: translateY(-1px);
 }
+
+/* Urgent In-App Alert Banner & Badges */
+.saving-urgent-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fde68a;
+  border-left: 5px solid #f59e0b;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.08);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.saving-urgent-alert-banner .urgent-banner-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.saving-urgent-alert-banner .urgent-banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.saving-urgent-alert-banner .urgent-banner-title strong {
+  font-size: 0.98rem;
+  color: #92400e;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.saving-urgent-alert-banner .urgent-banner-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saving-urgent-alert-banner .urgent-mini-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #fef3c7;
+}
+
+.saving-urgent-alert-banner .urgent-mini-tag.tag-overdue {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.saving-urgent-alert-banner .urgent-mini-tag.tag-today {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.saving-urgent-alert-banner .urgent-mini-tag.tag-soon {
+  border-color: #fef08a;
+  background: #fefce8;
+  color: #854d0e;
+}
+
+.saving-urgent-alert-banner .urgent-tag-name {
+  font-weight: 700;
+}
+
+.saving-urgent-alert-banner .urgent-tag-time {
+  font-weight: 600;
+}
+
+.saving-urgent-alert-banner .urgent-tag-remain {
+  opacity: 0.85;
+  font-size: 0.78rem;
+}
+
+.deadline-today {
+  background: rgba(220, 38, 38, 0.16) !important;
+  color: #b91c1c !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(220, 38, 38, 0.3) !important;
+  animation: pulse 2s infinite;
+}
+
+.goal-card.card-overdue {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.08) !important;
+}
+
+.goal-card.card-urgent {
+  border-color: rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.08) !important;
+}

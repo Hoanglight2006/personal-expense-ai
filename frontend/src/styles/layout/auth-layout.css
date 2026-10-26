@@ -191,8 +191,8 @@
 
 .form-mascot {
   position: absolute;
-  top: 0px;
-  right: 28px;
+  top: -18px;
+  right: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -200,8 +200,8 @@
 }
 
 .form-mascot-image {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   object-fit: contain;
   filter: drop-shadow(0 8px 12px rgba(189, 124, 22, 0.25));
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -251,14 +251,16 @@
 
 .auth-heading {
   margin-bottom: 24px;
+  padding-right: 85px;
 }
 
 .auth-heading h1 {
-  font-size: 2rem;
+  font-size: 1.85rem;
   font-weight: 800;
   color: var(--text-color);
   margin-bottom: 8px;
   letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .auth-heading p {

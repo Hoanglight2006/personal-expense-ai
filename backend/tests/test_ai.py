@@ -232,7 +232,7 @@ def test_generate_monthly_report(client: TestClient):
 
     assert data["month"] == month_str
     assert 0 <= data["financial_health_score"] <= 100
-    assert data["health_status"] in ["Xuất sắc", "Tốt", "Cần chú ý", "Báo động"]
+    assert data["health_status"] in ["Xuất sắc", "Tốt", "Cần chú ý", "Báo động", "Đang theo dõi"]
     assert Decimal(str(data["total_income"])) == Decimal("20000000.00")
     assert Decimal(str(data["total_expense"])) == Decimal("10000000.00")
     assert Decimal(str(data["net_savings"])) == Decimal("10000000.00")
@@ -240,6 +240,47 @@ def test_generate_monthly_report(client: TestClient):
     assert len(data["adjustments"]) >= 1
     assert "Báo Cáo Phân Tích Chi Tiêu" in data["raw_markdown"]
     db.close()
+
+def test_generate_monthly_report_preliminary_and_focus(client: TestClient):
+    """Test preliminary status when spending < 500k and different focus options."""
+    db = TestingSessionLocal()
+    user, token = create_user_and_auth(client, db, "prelim_user@example.com")
+
+    cat_sal = create_cat(db, user.id, "Thu nhập", CategoryType.INCOME)
+    cat_coffee = create_cat(db, user.id, "Cà phê", CategoryType.EXPENSE)
+
+    today = date.today()
+    month_str = f"{today.year:04d}-{today.month:02d}"
+
+    # Only 80k expense (below 500k threshold)
+    create_txn(db, user.id, cat_sal.id, Decimal("5000000"), CategoryType.INCOME, today)
+    create_txn(db, user.id, cat_coffee.id, Decimal("80000"), CategoryType.EXPENSE, today)
+
+    # Test saving focus without mock (fallback flow)
+    res_saving = client.post(
+        "/api/v1/ai/monthly-report",
+        json={"month": month_str, "focus": "saving"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_saving.status_code == 200
+    data_saving = res_saving.json()
+    assert data_saving["health_status"] == "Đang theo dõi"
+    assert data_saving["financial_health_score"] == 70
+    assert "Tối Ưu Tiết Kiệm" in data_saving["raw_markdown"]
+
+    # Test risk focus
+    res_risk = client.post(
+        "/api/v1/ai/monthly-report",
+        json={"month": month_str, "focus": "risk"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_risk.status_code == 200
+    data_risk = res_risk.json()
+    assert data_risk["health_status"] == "Đang theo dõi"
+    assert "Cảnh Báo Rủi Ro" in data_risk["raw_markdown"]
+
+    db.close()
+
 
 
 # ---------------------------------------------------------------------------

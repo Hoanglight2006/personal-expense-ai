@@ -2,6 +2,9 @@ import React, { useContext, useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import CoinAssistant from './CoinAssistant';
+import EmailVerificationBanner from './EmailVerificationBanner';
+import MustChangePasswordModal from './MustChangePasswordModal';
+import InitialBalanceGuideModal from './InitialBalanceGuideModal';
 import { AuthContext } from '../context/auth-context';
 import { getAvatarSrc } from '../utils/avatar';
 
@@ -27,7 +30,7 @@ const AppLayout = () => {
         >
           <span className="hamburger-icon">{mobileMenuOpen ? '✕' : '☰'}</span>
         </button>
-        <NavLink to="/dashboard" className="mobile-header-logo" onClick={closeMobileMenu}>
+        <NavLink to={user?.role === 'admin' ? "/admin/dashboard" : "/dashboard"} className="mobile-header-logo" onClick={closeMobileMenu}>
           <img src="/finai-winged-coin-favicon.png" alt="" />
           <span>FinAI</span>
         </NavLink>
@@ -55,10 +58,22 @@ const AppLayout = () => {
         isOpen={mobileMenuOpen}
         onClose={closeMobileMenu}
       />
+
       <main className="app-main-content">
+        {/* Banner reminding user to verify email (only for regular users, if not verified) */}
+        {user?.role !== 'admin' && <EmailVerificationBanner user={user} />}
         <Outlet />
       </main>
-      <CoinAssistant />
+
+      {user?.role !== 'admin' && <CoinAssistant />}
+
+      {/* Enforce password change when flagged by system or admin */}
+      <MustChangePasswordModal isOpen={Boolean(user?.must_change_password)} />
+
+      {/* Show initial balance guide once upon first access for non-admin users */}
+      <InitialBalanceGuideModal
+        isOpen={Boolean(user && !user.has_seen_initial_balance_guide && user.role !== 'admin' && !user.must_change_password)}
+      />
     </div>
   );
 };

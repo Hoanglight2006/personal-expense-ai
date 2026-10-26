@@ -10,7 +10,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.api.routes.transactions import _recomputed_goal_current_amount
+from app.services.transaction_service import _recomputed_goal_current_amount
 from app.config import settings
 
 

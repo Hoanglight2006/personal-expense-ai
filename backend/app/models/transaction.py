@@ -35,12 +35,12 @@ class Transaction(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     category_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    type: Mapped[CategoryType] = mapped_column(Enum(CategoryType), nullable=False)
+    type: Mapped[CategoryType] = mapped_column(Enum(CategoryType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(
-        Enum(PaymentMethod),
+        Enum(PaymentMethod, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=PaymentMethod.CASH,
         server_default=PaymentMethod.CASH.value,

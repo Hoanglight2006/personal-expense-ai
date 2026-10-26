@@ -1,9 +1,7 @@
 """Seed demo dataset for Personal Expense AI system.
 
 Usage:
-    python backend/seed_demo.py
-    # or inside backend folder:
-    python seed_demo.py
+    python database/seed_demo.py
 
 This script creates or resets a comprehensive demo account:
     - Email: demo@example.com
@@ -15,7 +13,7 @@ This script creates or resets a comprehensive demo account:
 """
 
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -41,9 +39,11 @@ from app.models.transaction import Transaction
 from app.models.budget import Budget
 from app.models.saving_goal import SavingGoal
 from app.models.saving_contribution import SavingContribution
-from app.models.enums import CategoryType, PaymentMethod, GoalStatus, ContributionSource
+from app.models.enums import CategoryType, PaymentMethod, GoalStatus, ContributionSource, UserRole
 from app.core.security import get_password_hash
 from app.core.category_defaults import add_missing_default_categories
+from app.core.timezone import local_today
+import app.models  # noqa: F401
 
 
 def seed_demo_data():
@@ -73,6 +73,27 @@ def seed_demo_data():
         db.add(demo_user)
         db.commit()
         db.refresh(demo_user)
+
+        # 2.1 Create Admin User
+        admin_email = "admin@example.com"
+        admin_username = "system_admin"
+        admin_password = "AdminPass123@"
+        existing_admin = db.query(User).filter(User.email == admin_email).first()
+        if existing_admin:
+            db.delete(existing_admin)
+            db.commit()
+        admin_user = User(
+            username=admin_username,
+            email=admin_email,
+            password_hash=get_password_hash(admin_password),
+            role=UserRole.ADMIN,
+            is_locked=False,
+            avatar_url="/static/avatars/default_avatar.png"
+        )
+        db.add(admin_user)
+        db.commit()
+        db.refresh(admin_user)
+        print(f"✓ Tạo thành công Admin Demo: {admin_email} (Mật khẩu: {admin_password})")
         print(f"✓ Tạo thành công User Demo: {demo_email} (Mật khẩu: {demo_password})")
 
         # 3. Create Default Categories
@@ -83,7 +104,7 @@ def seed_demo_data():
         print(f"✓ Khởi tạo {len(categories)} danh mục thu chi chuẩn.")
 
         # 4. Create Saving Goals
-        today = date.today()
+        today = local_today()
         current_year = today.year
         current_month = today.month
 
@@ -109,8 +130,6 @@ def seed_demo_data():
         db.refresh(goal_emergency)
 
         # 5. Generate Multi-Month Realistic Transactions
-        transactions = []
-        contributions = []
 
         # Helper to get date in past months
         def get_date_in_month(months_ago, day):
@@ -126,7 +145,7 @@ def seed_demo_data():
         # Monthly income and expense template
         # 6 months of data: from (current - 5) to current month
         for months_ago in range(5, -1, -1):
-            m_date = lambda d: get_date_in_month(months_ago, d)
+            def m_date(d, m=months_ago): return get_date_in_month(m, d)
             
             # --- Incomes ---
             # 1. Salary (Lương mùng 5 hàng tháng)
@@ -354,8 +373,8 @@ def seed_demo_data():
         print("\n🎉 HOÀN TẤT NẠP DỮ LIỆU MẪU THÀNH CÔNG!")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("🔑 THÔNG TIN ĐĂNG NHẬP DEMO:")
-        print(f"   📧 Email:    {demo_email}")
-        print(f"   🔒 Mật khẩu: {demo_password}")
+        print(f"   📧 User Demo:  {demo_email} (Mật khẩu: {demo_password})")
+        print(f"   🛡️ Admin Demo: {admin_email} (Mật khẩu: {admin_password})")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("💡 Giờ bạn có thể mở http://localhost:5173 và đăng nhập ngay để trải nghiệm đồ án với đầy đủ biểu đồ sống động!\n")
 

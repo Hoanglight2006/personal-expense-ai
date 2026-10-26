@@ -388,7 +388,7 @@ describe('SavingGoals Page', () => {
     });
   });
 
-  it('does not display edit button and disables deposit button for completed goals', async () => {
+  it('allows deposit and edit on completed goals (Piggy Bank model)', async () => {
     renderPage();
 
     await waitFor(() => {
@@ -396,12 +396,12 @@ describe('SavingGoals Page', () => {
     });
 
     const completedCard = screen.getByText('Khóa học thiết kế').closest('article');
-    // Edit button should not be present on completed cards
-    expect(within(completedCard).queryByLabelText(/Sửa Khóa học thiết kế/i)).not.toBeInTheDocument();
+    // Edit button should be present on completed cards in Piggy Bank model
+    expect(within(completedCard).getByLabelText(/Sửa Khóa học thiết kế/i)).toBeInTheDocument();
 
-    // Deposit button should show '✓ Đã hoàn thành' and be disabled
-    const depositBtn = within(completedCard).getByRole('button', { name: /✓ Đã hoàn thành/i });
-    expect(depositBtn).toBeDisabled();
+    // Deposit button should show '+ Nạp thêm' and be enabled
+    const depositBtn = within(completedCard).getByRole('button', { name: /\+ Nạp thêm/i });
+    expect(depositBtn).toBeEnabled();
     expect(within(completedCard).getByRole('button', { name: /Rút tiền/i })).toBeEnabled();
   });
 

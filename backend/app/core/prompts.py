@@ -46,11 +46,24 @@ _FALLBACK_PROMPTS: dict[str, dict[str, str]] = {
         ),
     },
     "budget_recommendations": {
-        "system_instruction": "Bạn là trợ lý tài chính cá nhân thông minh. Đưa ra gợi ý hạn mức ngân sách hàng tháng hợp lý, thực tế và tiết kiệm.",
+        "system_instruction": (
+            "Bạn là trợ lý tài chính cá nhân FinAI dành cho người trẻ và người lao động tại Việt Nam.\n"
+            "QUY TẮC BẮT BUỘC KHI ĐỊNH MỨC NGÂN SÁCH:\n"
+            "1. Với các danh mục CHƯA CÓ lịch sử chi tiêu (avg_spent = 0 và last_spent = 0): BẮT BUỘC đề xuất mức tiết kiệm, hợp lý cho người trẻ/người lao động với mức thu nhập vừa phải. Tổng ngân sách toàn bộ các danh mục phải nằm trong khoảng 5,000,000 - 6,500,000 VNĐ.\n"
+            "   - Ăn uống: 2,000,000 - 2,500,000 VNĐ.\n"
+            "   - Nhà ở / Tiền phòng: 1,500,000 - 2,000,000 VNĐ.\n"
+            "   - Đi lại / Xăng xe: 300,000 - 500,000 VNĐ.\n"
+            "   - Mua sắm: 300,000 - 500,000 VNĐ.\n"
+            "   - Giải trí / Cà phê: 200,000 - 300,000 VNĐ.\n"
+            "   - Giáo dục / Sách vở: 200,000 - 300,000 VNĐ.\n"
+            "   - Sức khỏe / Y tế: 200,000 - 300,000 VNĐ.\n"
+            "   - Khác / Dự phòng: 200,000 VNĐ.\n"
+            "2. Với danh mục ĐÃ CÓ dữ liệu lịch sử (avg_spent > 0 hoặc last_spent > 0): Đề xuất bám sát thực tế của người dùng kèm biên độ dự phòng an toàn 5-10%."
+        ),
         "user_prompt_template": (
             "Dưới đây là danh sách các danh mục chi tiêu của người dùng cho tháng {target_month:02d}/{target_year} kèm mức chi trung bình (avg_spent) và tháng trước (last_spent):\n"
             "{items_json}\n\n"
-            "Hãy đưa ra mức ngân sách đề xuất (recommended_amount dạng số làm tròn đến 10,000 hoặc 50,000 VNĐ) và lý do ngắn gọn (reason trong 1 câu tiếng Việt).\n"
+            "Hãy phân tích và đưa ra recommended_amount (làm tròn đến 50,000 VNĐ) và reason (1 câu tiếng Việt ngắn gọn, khích lệ, thực tế).\n"
             "Trả về kết quả dưới dạng JSON array: [{{ 'id': <category_id>, 'recommended_amount': <number>, 'reason': '<lý do ngắn gọn>' }}]"
         ),
     },

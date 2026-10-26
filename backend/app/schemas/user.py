@@ -89,8 +89,10 @@ class PasswordResetRequest(BaseModel):
 
 
 class PasswordResetConfirm(BaseModel):
-    token: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=8)
+    token: Optional[str] = None
+    code: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: str = Field(..., min_length=6)
 
     @field_validator("password")
     @classmethod
@@ -98,6 +100,10 @@ class PasswordResetConfirm(BaseModel):
         if len(value.encode("utf-8")) > 72:
             raise ValueError("Password must be at most 72 bytes")
         return value
+
+
+class EmailVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=10, description="Mã OTP xác minh 6 số")
 
 
 class MessageResponse(BaseModel):
@@ -108,6 +114,11 @@ class UserResponse(UserBase):
     """Model for returning user data."""
 
     id: int
+    role: str = "user"
+    is_locked: bool = False
+    is_verified: bool = False
+    must_change_password: bool = False
+    has_seen_initial_balance_guide: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -119,9 +130,13 @@ class Token(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    role: str = "user"
+    must_change_password: bool = False
+    is_verified: bool = False
 
 
 class TokenData(BaseModel):
     """Model for JWT token data."""
 
     user_id: int
+    role: Optional[str] = "user"

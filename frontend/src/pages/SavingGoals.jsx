@@ -86,6 +86,16 @@ const SavingGoals = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('created_desc');
 
+  const urgentGoals = useMemo(() => {
+    return (data.items || []).filter(
+      (g) =>
+        g.status === 'active' &&
+        g.deadline &&
+        g.days_remaining !== null &&
+        g.days_remaining <= 3
+    );
+  }, [data.items]);
+
   // Modals state
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
@@ -191,11 +201,6 @@ const SavingGoals = () => {
   };
 
   const openEditModal = (goal) => {
-    if (goal.status === 'completed' || goal.progress_percentage >= 100) {
-      setToastMessage('Mục tiêu đã hoàn thành không thể chỉnh sửa.');
-      setTimeout(() => setToastMessage(''), 3000);
-      return;
-    }
     setEditingGoal(goal);
     setFormName(goal.name || '');
     setFormTargetAmount(String(goal.target_amount || ''));
@@ -381,13 +386,6 @@ const SavingGoals = () => {
       return;
     }
 
-    const remainingNeeded = Number(activeDepositGoal?.remaining_amount || 0);
-    if (amountVal > remainingNeeded) {
-      const message = `Số tiền nạp (${formatMoney(amountVal)}) vượt quá số tiền còn thiếu của mục tiêu (${formatMoney(remainingNeeded)}).`;
-      setDepositError(message);
-      showWarning(message, 'deposit-amount');
-      return;
-    }
 
     setSubmitting(true);
     setDepositError('');
@@ -621,6 +619,38 @@ const SavingGoals = () => {
         </div>
       </section>
 
+      {/* Urgent In-App Alert Banner */}
+      {urgentGoals.length > 0 && (
+        <section className="saving-urgent-alert-banner" role="alert" aria-label="Cảnh báo hạn chót mục tiêu tiết kiệm">
+          <span className="urgent-banner-icon" aria-hidden="true">⏰</span>
+          <div className="urgent-banner-content">
+            <div className="urgent-banner-title">
+              <strong>Mục tiêu cần chú ý ({urgentGoals.length}):</strong>
+            </div>
+            <div className="urgent-banner-tags">
+              {urgentGoals.map((g) => {
+                const isOverdue = g.days_remaining !== null && g.days_remaining < 0;
+                const isToday = g.days_remaining !== null && g.days_remaining === 0;
+                const tagClass = isOverdue ? 'tag-overdue' : isToday ? 'tag-today' : 'tag-soon';
+                const timeText = isOverdue
+                  ? `Quá hạn ${Math.abs(g.days_remaining)} ngày`
+                  : isToday
+                  ? 'Hạn chót hôm nay'
+                  : `Còn ${g.days_remaining} ngày`;
+                const remainAmount = Math.max(0, Number(g.target_amount) - Number(g.current_amount));
+                return (
+                  <span key={g.id} className={`urgent-mini-tag ${tagClass}`}>
+                    <span className="urgent-tag-name">{g.name}</span>
+                    <span className="urgent-tag-time">({timeText})</span>
+                    <span className="urgent-tag-remain">· Còn thiếu {formatCurrency(remainAmount)}</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Toolbar & Filters */}
       <section className="saving-toolbar" aria-label="Bộ lọc và tìm kiếm">
         <div className="saving-status-tabs" role="tablist">
@@ -780,7 +810,7 @@ const SavingGoals = () => {
                     <h3 className="goal-name" title={goal.name}>{goal.name}</h3>
                   </div>
                   <div className="goal-actions-dropdown">
-                    {!isCompleted && (
+                    {!isCancelled && (
                       <button
                         type="button"
                         className="btn-icon-action"
@@ -811,17 +841,23 @@ const SavingGoals = () => {
                   {goal.deadline ? (
                     <span
                       className={`goal-deadline-badge ${
-                        goal.days_remaining !== null && goal.days_remaining < 0
+                        !isCompleted && goal.days_remaining !== null && goal.days_remaining < 0
                           ? 'deadline-overdue'
-                          : goal.days_remaining !== null && goal.days_remaining <= 7
+                          : !isCompleted && goal.days_remaining !== null && goal.days_remaining === 0
+                          ? 'deadline-today'
+                          : !isCompleted && goal.days_remaining !== null && goal.days_remaining <= 3
                           ? 'deadline-urgent'
                           : ''
                       }`}
                     >
-                      {goal.days_remaining !== null && goal.days_remaining < 0
+                      {isCompleted
+                        ? `📅 ${formatDate(goal.deadline)}`
+                        : goal.days_remaining !== null && goal.days_remaining < 0
                         ? `⚠️ Quá hạn (${formatDate(goal.deadline)})`
                         : goal.days_remaining !== null && goal.days_remaining === 0
-                        ? '⏳ Hạn hôm nay'
+                        ? '🔥 Hạn chót hôm nay'
+                        : goal.days_remaining !== null && goal.days_remaining <= 3
+                        ? `⚡ Gấp: Còn ${goal.days_remaining} ngày`
                         : goal.days_remaining !== null
                         ? `⏳ Còn ${goal.days_remaining} ngày`
                         : `📅 ${formatDate(goal.deadline)}`}
@@ -891,10 +927,10 @@ const SavingGoals = () => {
                   <button
                     type="button"
                     className="btn-primary btn-goal-deposit"
-                    disabled={isCancelled || isCompleted}
+                    disabled={isCancelled}
                     onClick={() => openDepositModal(goal)}
                   >
-                    {isCompleted ? '✓ Đã hoàn thành' : '+ Nạp tiền'}
+                    {isCompleted ? '+ Nạp thêm' : '+ Nạp tiền'}
                   </button>
                 </div>
               </article>
@@ -1131,11 +1167,16 @@ const SavingGoals = () => {
                     type="button"
                     className="btn-use-max-balance"
                     onClick={() => {
-                      const maxCanDeposit = Math.min(availableBalance, Number(activeDepositGoal.remaining_amount));
+                      const rem = Number(activeDepositGoal.remaining_amount || 0);
+                      const maxCanDeposit = rem > 0 ? Math.min(availableBalance, rem) : availableBalance;
                       setDepositAmount(String(maxCanDeposit));
                     }}
                   >
-                    Nạp theo ví ({formatMoney(Math.min(availableBalance, Number(activeDepositGoal.remaining_amount)))})
+                    Dùng số dư ví ({formatMoney(
+                      Number(activeDepositGoal.remaining_amount || 0) > 0
+                        ? Math.min(availableBalance, Number(activeDepositGoal.remaining_amount))
+                        : availableBalance
+                    )})
                   </button>
                 )}
                 {Number(activeDepositGoal.remaining_amount) > 0 && (

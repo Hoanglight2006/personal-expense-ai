@@ -38,3 +38,10 @@ class ReportType(str, enum.Enum):
     MONTHLY_SUMMARY = "monthly_summary"
     BUDGET_SUGGESTION = "budget_suggestion"
     CHAT_ANSWER = "chat_answer"
+
+
+class UserRole(str, enum.Enum):
+    """Role of a user account: standard user or system administrator."""
+
+    USER = "user"
+    ADMIN = "admin"

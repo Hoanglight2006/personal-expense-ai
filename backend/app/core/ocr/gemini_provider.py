@@ -2,8 +2,10 @@ import json
 import logging
 from decimal import Decimal
 
-import google.generativeai as genai
-from pydantic import ValidationError
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 from app.config import settings
 from app.core.ocr.base import ExtractedTransaction, OcrProvider
@@ -18,6 +20,8 @@ class GeminiOcrProvider(OcrProvider):
     """OCR extraction using Google Gemini API."""
 
     def __init__(self):
+        if not genai:
+            raise RuntimeError("Thư viện google-generativeai chưa được cài đặt.")
         if not settings.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not configured in .env.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -95,7 +99,7 @@ class GeminiOcrProvider(OcrProvider):
                 payment_method_suggestion=method_sugg,
                 category_id=category_id,
             )
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.error(f"Failed to parse Gemini response as JSON: {text}")
             raise RuntimeError("Lỗi giải mã kết quả từ AI (không phải JSON hợp lệ).")
         except Exception as e:

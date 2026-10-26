@@ -54,6 +54,7 @@
 
 /* AI Config Card */
 .ai-config-card {
+  scroll-margin-top: 32px;
   background: #ffffff;
   border: 1.5px solid #fed7aa;
   border-radius: 24px;
@@ -188,6 +189,43 @@
 .ai-custom-select-wrap .custom-select__dropdown-indicator svg {
   width: 16px;
   height: 16px;
+}
+
+.ai-lookback-select-wrap {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+}
+
+.ai-lookback-select-wrap .custom-select__control {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-lookback-select-wrap .custom-select__control:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.ai-lookback-select-wrap .custom-select__control--is-focused {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+}
+
+.ai-lookback-select-wrap .custom-select__single-value {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: #1e293b;
+}
+
+.ai-lookback-select-wrap .custom-select-option-label {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: #1e293b;
 }
 
 .ai-focus-options-grid {
@@ -515,12 +553,15 @@
 }
 
 /* Polished AI report dashboard */
-.ai-report-tab-container {
+.ai-report-tab-container,
+.ai-budget-tab-container {
   width: 100%;
   min-width: 0;
+  overflow-anchor: none;
 }
 
 .ai-report-view-card {
+  scroll-margin-top: 32px;
   position: relative;
   overflow: hidden;
   background:
@@ -656,6 +697,11 @@
   --score-accent: #2563eb;
 }
 
+.ai-report-view-card .health-score-pill.score-tracking,
+.health-score-pill.score-tracking {
+  --score-accent: #0284c7;
+}
+
 .ai-report-view-card .health-score-pill.score-warning {
   --score-accent: #d97706;
 }
@@ -723,7 +769,7 @@
 
 .ai-report-view-card .report-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -769,6 +815,15 @@
 .ai-report-view-card .stat-tile.rate {
   --tile-accent: #6366f1;
   --tile-soft: #eef2ff;
+}
+
+.ai-report-view-card .stat-tile.goal {
+  --tile-accent: #0284c7;
+  --tile-soft: #f0f9ff;
+}
+
+.text-sky {
+  color: #0284c7 !important;
 }
 
 .ai-report-view-card .stat-tile-icon {
@@ -1086,6 +1141,7 @@
 
 /* AI Budget Results Tab */
 .ai-budget-results-card {
+  scroll-margin-top: 32px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 24px;
@@ -1356,4 +1412,34 @@
 .btn-apply-ai-budget:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.btn-reconfigure-bottom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-reconfigure-bottom:hover {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.btn-reconfigure-bottom:active {
+  transform: translateY(0);
 }

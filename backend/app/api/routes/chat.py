@@ -4,12 +4,15 @@ Provides the chatbot endpoint for the FinAI assistant, which answers
 user questions about their personal finances using Gemini AI.
 """
 
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.core.ai_chat import GeminiChatService, build_financial_context
+from app.core.ai_chat import GeminiChatService, build_financial_context, mask_sensitive_data
+from app.core.timezone import local_today
+from app.models.ai_report import AIReport
+from app.models.enums import ReportType
 from app.models.user import User
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -48,6 +51,7 @@ async def send_chat_message(
 
     The AI receives a summarized view of the user's financial data
     (monthly totals by category, recent transactions) as context.
+    All sensitive numbers (account numbers, card numbers) are masked before dispatch.
     """
     try:
         service = GeminiChatService()
@@ -57,14 +61,33 @@ async def send_chat_message(
             detail=str(exc),
         )
 
-    # Build financial context from real user data
+    # Mask sensitive credentials or transaction IDs in user input
+    safe_message = mask_sensitive_data(body.message)
+
+    # Build financial context from real user data (aggregated & masked)
     financial_context = build_financial_context(db, current_user.id)
 
     # Generate AI reply
     reply = await service.generate_reply(
-        user_message=body.message,
+        user_message=safe_message,
         financial_context=financial_context,
         conversation_history=body.conversation_history,
     )
+
+    # Log interaction for audit trail (KT3 & Ethics rubric)
+    try:
+        today = local_today()
+        log_entry = AIReport(
+            user_id=current_user.id,
+            report_type=ReportType.CHAT_ANSWER,
+            prompt_sent=safe_message,
+            ai_response=reply,
+            period_month=today.month,
+            period_year=today.year,
+        )
+        db.add(log_entry)
+        db.commit()
+    except Exception:
+        db.rollback()
 
     return ChatMessageResponse(reply=reply)

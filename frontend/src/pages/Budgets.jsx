@@ -240,13 +240,6 @@ const Budgets = () => {
     const amountNum = parseFloat(formAmount);
     if (!formAmount || Number.isNaN(amountNum) || amountNum <= 0) {
       errs.amount = 'Hạn mức ngân sách phải lớn hơn 0.';
-    } else {
-      const projectedTotal = editingBudget
-        ? Math.max(0, (budgetData.total_budget || 0) - (editingBudget.amount || 0) + amountNum)
-        : (budgetData.total_budget || 0) + amountNum;
-      if (availableBalance !== null && projectedTotal > availableBalance) {
-        errs.amount = `Tổng ngân sách không được vượt quá số dư khả dụng (${formatMoney(availableBalance)}).`;
-      }
     }
     if (!editingBudget && !formCategory) {
       errs.category = 'Vui lòng chọn danh mục chi tiêu.';
@@ -263,18 +256,30 @@ const Budgets = () => {
     setModalError('');
     try {
       if (editingBudget) {
-        await updateBudget(editingBudget.id, {
+        const res = await updateBudget(editingBudget.id, {
           amount: parseFloat(formAmount),
         });
-        setToastMessage('Đã cập nhật hạn mức ngân sách thành công.');
+        if (res?.status === 'exceeded') {
+          setToastMessage(`🚨 Cảnh báo: Ngân sách '${res.category_name}' đã bị vượt hạn mức (${res.percentage_used}% - Bội chi ${formatMoney(Math.abs(res.remaining_amount))})!`);
+        } else if (res?.status === 'warning') {
+          setToastMessage(`⚠️ Chú ý: Ngân sách '${res.category_name}' đã chạm ngưỡng cảnh báo (${res.percentage_used}%)!`);
+        } else {
+          setToastMessage('Đã cập nhật hạn mức ngân sách thành công.');
+        }
       } else {
-        await createBudget({
+        const res = await createBudget({
           category_id: Number(formCategory),
           amount: parseFloat(formAmount),
           month: Number(formMonth),
           year: Number(formYear),
         });
-        setToastMessage('Đã thiết lập ngân sách thành công.');
+        if (res?.status === 'exceeded') {
+          setToastMessage(`🚨 Cảnh báo: Ngân sách '${res.category_name}' đã vượt hạn mức (${res.percentage_used}%)!`);
+        } else if (res?.status === 'warning') {
+          setToastMessage(`⚠️ Chú ý: Ngân sách '${res.category_name}' đã chạm ngưỡng cảnh báo (${res.percentage_used}%)!`);
+        } else {
+          setToastMessage('Đã thiết lập ngân sách thành công.');
+        }
       }
       setModalOpen(false);
       fetchBudgets();
@@ -930,15 +935,30 @@ const Budgets = () => {
                 )}
               </label>
 
-              {availableBalance !== null && targetTotalBudget > availableBalance && parseFloat(formAmount) > 0 && (
-                <div className="budget-balance-warning-banner is-required" role="alert">
+              {editingBudget && editingBudget.spent_amount > parseFloat(formAmount || 0) && parseFloat(formAmount || 0) > 0 && (
+                <div className="budget-balance-warning-banner soft-warning" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%)' }} role="alert">
                   <div className="warning-banner-top">
-                    <span className="warning-banner-icon">⚠️</span>
+                    <span className="warning-banner-icon">🚨</span>
                     <div className="warning-banner-body">
-                      <strong>Ngân sách vượt số dư khả dụng</strong>
+                      <strong style={{ color: '#991b1b' }}>Cảnh báo: Hạn mức mới thấp hơn số tiền đã chi tiêu</strong>
+                      <p style={{ color: '#7f1d1d' }}>
+                        Bạn đã chi tiêu <strong>{formatMoney(editingBudget.spent_amount)}</strong> trong tháng này.
+                        Hạn mức mới (<strong>{formatMoney(parseFloat(formAmount))}</strong>) sẽ khiến ngân sách rơi vào tình trạng <strong>BỘI CHI ({Math.round((editingBudget.spent_amount / parseFloat(formAmount)) * 100)}%)</strong> và hệ thống sẽ gửi email cảnh báo tới bạn.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {availableBalance !== null && targetTotalBudget > availableBalance && parseFloat(formAmount) > 0 && (
+                <div className="budget-balance-warning-banner soft-warning" role="status">
+                  <div className="warning-banner-top">
+                    <span className="warning-banner-icon">💡</span>
+                    <div className="warning-banner-body">
+                      <strong>Cảnh báo mềm: Ngân sách vượt số dư khả dụng hiện tại</strong>
                       <p>
-                        Tổng ngân sách dự kiến tháng {formMonth} (<strong>{formatMoney(targetTotalBudget)}</strong>) đang cao hơn số dư khả dụng hiện có (<strong>{formatMoney(availableBalance)}</strong>).
-                        Bạn phải giảm hạn mức để tổng ngân sách không vượt quá số dư trước khi lưu.
+                        Tổng ngân sách dự kiến tháng {formMonth} (<strong>{formatMoney(targetTotalBudget)}</strong>) đang cao hơn số dư ví hiện có (<strong>{formatMoney(availableBalance)}</strong>).
+                        Ngân sách là kế hoạch chi tiêu tương lai — bạn vẫn có thể chủ động xác nhận lưu theo kế hoạch dự kiến.
                       </p>
                     </div>
                   </div>
@@ -957,7 +977,7 @@ const Budgets = () => {
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={submitting || (availableBalance !== null && targetTotalBudget > availableBalance)}
+                  disabled={submitting}
                 >
                   {submitting ? 'Đang lưu...' : editingBudget ? 'Cập nhật hạn mức' : 'Tạo ngân sách'}
                 </button>

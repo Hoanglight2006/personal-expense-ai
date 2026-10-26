@@ -20,7 +20,7 @@ class AIReport(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    report_type: Mapped[ReportType] = mapped_column(Enum(ReportType), nullable=False)
+    report_type: Mapped[ReportType] = mapped_column(Enum(ReportType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     prompt_sent: Mapped[str] = mapped_column(Text, nullable=False)
     ai_response: Mapped[str] = mapped_column(Text, nullable=False)
     period_month: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

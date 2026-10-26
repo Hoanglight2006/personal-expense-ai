@@ -8,6 +8,9 @@ CREATE DATABASE IF NOT EXISTS personal_expense
 
 USE personal_expense;
 
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 -- 1. USERS TABLE
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -15,10 +18,18 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     avatar_url VARCHAR(500) NULL,
+    role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    verification_code VARCHAR(10) NULL,
+    verification_code_expires_at DATETIME NULL,
+    reset_password_code VARCHAR(10) NULL,
+    reset_password_code_expires_at DATETIME NULL,
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+    has_seen_initial_balance_guide BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_users_email (email),
-    INDEX idx_users_username (username)
+    INDEX idx_users_role_status (role, is_locked)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. CATEGORIES TABLE
@@ -26,9 +37,9 @@ CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     name VARCHAR(50) NOT NULL,
-    name_normalized VARCHAR(150) NULL,
+    name_normalized VARCHAR(150) NOT NULL,
     icon VARCHAR(30) NOT NULL DEFAULT 'other',
-    color VARCHAR(20) NOT NULL DEFAULT '#6366F1',
+    color VARCHAR(20) NOT NULL DEFAULT '#D69A23',
     type ENUM('income', 'expense') NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
@@ -38,7 +49,6 @@ CREATE TABLE IF NOT EXISTS categories (
     CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_category_id_user UNIQUE (id, user_id),
     CONSTRAINT uq_category_user_normalized_name UNIQUE (user_id, name_normalized),
-    INDEX idx_categories_user (user_id),
     INDEX idx_categories_user_type (user_id, type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -57,10 +67,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
     CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_transactions_category_owner FOREIGN KEY (category_id, user_id) REFERENCES categories(id, user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_transaction_category_owner FOREIGN KEY (category_id, user_id) REFERENCES categories(id, user_id) ON DELETE CASCADE,
     CONSTRAINT ck_transaction_amount_positive CHECK (amount > 0),
     INDEX idx_transactions_user_date (user_id, transaction_date),
-    INDEX idx_transactions_user_deleted (user_id, is_deleted)
+    INDEX idx_transactions_user_active_date (user_id, is_deleted, transaction_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. BUDGETS TABLE
@@ -73,7 +83,7 @@ CREATE TABLE IF NOT EXISTS budgets (
     year SMALLINT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_budgets_category_owner FOREIGN KEY (category_id, user_id) REFERENCES categories(id, user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_budget_category_owner FOREIGN KEY (category_id, user_id) REFERENCES categories(id, user_id) ON DELETE CASCADE,
     CONSTRAINT uq_budget_user_category_period UNIQUE (user_id, category_id, month, year),
     CONSTRAINT ck_budget_amount_positive CHECK (amount > 0),
     CONSTRAINT ck_budget_month_range CHECK (month >= 1 AND month <= 12),
@@ -117,11 +127,12 @@ CREATE TABLE IF NOT EXISTS saving_withdrawals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     saving_goal_id INT NOT NULL,
     amount DECIMAL(15, 2) NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
     note VARCHAR(255) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_saving_withdrawals_goal FOREIGN KEY (saving_goal_id) REFERENCES saving_goals(id) ON DELETE CASCADE,
-    CONSTRAINT ck_withdrawal_amount_positive CHECK (amount > 0),
-    INDEX idx_saving_withdrawals_goal (saving_goal_id)
+    CONSTRAINT ck_saving_withdrawal_amount_positive CHECK (amount > 0),
+    CONSTRAINT uq_saving_withdrawal_goal_key UNIQUE (saving_goal_id, idempotency_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. SAVING WITHDRAWAL ALLOCATIONS TABLE
@@ -130,9 +141,10 @@ CREATE TABLE IF NOT EXISTS saving_withdrawal_allocations (
     withdrawal_id INT NOT NULL,
     contribution_id INT NOT NULL,
     amount DECIMAL(15, 2) NOT NULL,
-    CONSTRAINT fk_withdrawal_alloc_withdrawal FOREIGN KEY (withdrawal_id) REFERENCES saving_withdrawals(id) ON DELETE CASCADE,
-    CONSTRAINT fk_withdrawal_alloc_contrib FOREIGN KEY (contribution_id) REFERENCES saving_contributions(id) ON DELETE CASCADE,
-    CONSTRAINT ck_allocation_amount_positive CHECK (amount > 0),
+    CONSTRAINT fk_withdrawal_allocation_withdrawal FOREIGN KEY (withdrawal_id) REFERENCES saving_withdrawals(id) ON DELETE CASCADE,
+    CONSTRAINT fk_withdrawal_allocation_contribution FOREIGN KEY (contribution_id) REFERENCES saving_contributions(id) ON DELETE CASCADE,
+    CONSTRAINT ck_saving_withdrawal_allocation_amount_positive CHECK (amount > 0),
+    CONSTRAINT uq_withdrawal_contribution UNIQUE (withdrawal_id, contribution_id),
     INDEX idx_withdrawal_alloc_contrib (contribution_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -140,7 +152,7 @@ CREATE TABLE IF NOT EXISTS saving_withdrawal_allocations (
 CREATE TABLE IF NOT EXISTS ai_reports (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    report_type ENUM('MONTHLY_SUMMARY', 'BUDGET_SUGGESTION', 'CHAT_ANSWER') NOT NULL,
+    report_type ENUM('monthly_summary', 'budget_suggestion', 'chat_answer') NOT NULL,
     prompt_sent TEXT NOT NULL,
     ai_response TEXT NOT NULL,
     period_month SMALLINT NULL,
@@ -149,3 +161,45 @@ CREATE TABLE IF NOT EXISTS ai_reports (
     CONSTRAINT fk_ai_reports_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_ai_reports_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. DEFAULT SEED ACCOUNTS (DEMO & ADMIN)
+INSERT IGNORE INTO users (id, username, email, password_hash, role, is_locked)
+VALUES 
+(1, 'demouser', 'demo@example.com', '$2b$12$ce4/qhc9Ea4B/6vRjtKpXOrkFgva50wExEAlVEudr1iiA/5daZ4Mq', 'user', FALSE),
+(2, 'system_admin', 'admin@example.com', '$2b$12$Sqw9q1.mGYBtQT4fL0DzCOYl6T3fZrnRj1s1i1lYNNtdB9rPjFQ0S', 'admin', FALSE);
+
+INSERT IGNORE INTO categories (user_id, name, name_normalized, icon, color, type, is_active, is_default)
+VALUES
+(1, 'Ăn uống', 'an uong', 'food', '#E76452', 'expense', TRUE, TRUE),
+(1, 'Đi lại', 'di lai', 'transport', '#4F8CC9', 'expense', TRUE, TRUE),
+(1, 'Mua sắm', 'mua sam', 'shopping', '#9A6AC4', 'expense', TRUE, TRUE),
+(1, 'Nhà ở', 'nha o', 'home', '#D87542', 'expense', TRUE, TRUE),
+(1, 'Sức khỏe', 'suc khoe', 'health', '#DE5555', 'expense', TRUE, TRUE),
+(1, 'Giáo dục', 'giao duc', 'education', '#4F72BE', 'expense', TRUE, TRUE),
+(1, 'Giải trí', 'giai tri', 'entertainment', '#7D5BB2', 'expense', TRUE, TRUE),
+(1, 'Lương', 'luong', 'salary', '#4B9D67', 'income', TRUE, TRUE),
+(1, 'Thưởng', 'thuong', 'bonus', '#E9A22F', 'income', TRUE, TRUE),
+(1, 'Quà tặng', 'qua tang', 'gift', '#DD5C77', 'income', TRUE, TRUE),
+(1, 'Đầu tư', 'dau tu', 'investment', '#719F4E', 'income', TRUE, TRUE),
+(1, 'Khác', 'khac', 'other', '#D69A23', 'expense', TRUE, TRUE);
+
+-- 10. DEFAULT SEED ACCOUNTS (DEMO & ADMIN)
+INSERT IGNORE INTO users (id, username, email, password_hash, role, is_locked)
+VALUES 
+(1, 'demouser', 'demo@example.com', '$2b$12$ce4/qhc9Ea4B/6vRjtKpXOrkFgva50wExEAlVEudr1iiA/5daZ4Mq', 'user', FALSE),
+(2, 'system_admin', 'admin@example.com', '$2b$12$Sqw9q1.mGYBtQT4fL0DzCOYl6T3fZrnRj1s1i1lYNNtdB9rPjFQ0S', 'admin', FALSE);
+
+INSERT IGNORE INTO categories (user_id, name, name_normalized, icon, color, type, is_active, is_default)
+VALUES
+(1, 'Ăn uống', 'an uong', 'food', '#E76452', 'expense', TRUE, TRUE),
+(1, 'Đi lại', 'di lai', 'transport', '#4F8CC9', 'expense', TRUE, TRUE),
+(1, 'Mua sắm', 'mua sam', 'shopping', '#9A6AC4', 'expense', TRUE, TRUE),
+(1, 'Nhà ở', 'nha o', 'home', '#D87542', 'expense', TRUE, TRUE),
+(1, 'Sức khỏe', 'suc khoe', 'health', '#DE5555', 'expense', TRUE, TRUE),
+(1, 'Giáo dục', 'giao duc', 'education', '#4F72BE', 'expense', TRUE, TRUE),
+(1, 'Giải trí', 'giai tri', 'entertainment', '#7D5BB2', 'expense', TRUE, TRUE),
+(1, 'Lương', 'luong', 'salary', '#4B9D67', 'income', TRUE, TRUE),
+(1, 'Thưởng', 'thuong', 'bonus', '#E9A22F', 'income', TRUE, TRUE),
+(1, 'Quà tặng', 'qua tang', 'gift', '#DD5C77', 'income', TRUE, TRUE),
+(1, 'Đầu tư', 'dau tu', 'investment', '#719F4E', 'income', TRUE, TRUE),
+(1, 'Khác', 'khac', 'other', '#D69A23', 'expense', TRUE, TRUE);

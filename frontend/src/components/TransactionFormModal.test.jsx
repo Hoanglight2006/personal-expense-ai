@@ -41,8 +41,6 @@ it('shows an over-balance expense warning as a popup', async () => {
         description: '',
         payment_method: 'cash',
       }}
-      onExcelUpload={vi.fn()}
-      isExcelLoading={false}
       categoriesReady
     />,
   );
