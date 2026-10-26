@@ -1,6 +1,6 @@
 # Database và migration
 
-Ứng dụng dùng SQLAlchemy 2 và MySQL 8 trong môi trường thực tế. Test thông thường
+Ứng dụng chuẩn hóa sử dụng **MySQL 8.0 chạy trong Docker Container (`expense_mysql`)**. Khi chạy trọn gói Docker Compose, backend tự động kết nối qua mạng nội bộ Docker (`mysql:3306`). Khi kết nối từ máy host (DBeaver, Navicat hoặc local script), MySQL container được ánh xạ qua cổng **`3307`** (User: `expense_user` / `expense_password` hoặc `root` / `rootpassword`). Không yêu cầu cài đặt MySQL Server trên máy tính host. Test thông thường
 dùng SQLite in-memory để chạy nhanh; SQLite không xác minh được hành vi
 `SELECT ... FOR UPDATE` của MySQL.
 
@@ -65,13 +65,6 @@ application validation bị bỏ qua.
   `max(contribution.amount - withdrawal_allocated, 0)`, rồi mới kiểm tra số dư
   dự kiến. Vì vậy allocation đã rút không bị giải phóng hoặc khôi phục thêm lần
   nữa, còn contribution nạp sau đó vẫn được tính đầy đủ.
-
-### `import_idempotency_keys`
-
-- `id`, `user_id`, `idempotency_key`, `created_at`.
-- Unique `(user_id, idempotency_key)`.
-- Key chỉ được ghi khi batch có ít nhất một dòng import thành công.
-- Constraint database bảo vệ chống submit lặp giữa nhiều worker/process.
 
 ## Kiểu tiền
 

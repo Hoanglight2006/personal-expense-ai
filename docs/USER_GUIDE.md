@@ -11,10 +11,11 @@
 3. [Đăng Nhập Bằng Tài Khoản Demo Sẵn Có (6 Tháng Dữ Liệu)](#3-đăng-nhập-bằng-tài-khoản-demo-sẵn-có-6-tháng-dữ-liệu)
 4. [Quản Lý Giao Dịch Thu Chi & Thùng Rác](#4-quản-lý-giao-dịch-thu-chi--thùng-rác)
 5. [Quét Hóa Đơn Tự Động Bằng AI (AI OCR Receipt)](#5-quét-hóa-đơn-tự-động-bằng-ai-ai-ocr-receipt)
-6. [Nhập Sao Kê Giao Dịch Hàng Loạt Bằng File Excel](#6-nhập-sao-kê-giao-dịch-hàng-loạt-bằng-file-excel)
-7. [Thiết Lập & Theo Dõi Ngân Sách Tháng](#7-thiết-lập--theo-dõi-ngân-sách-tháng)
-8. [Quản Lý Mục Tiêu Tiết Kiệm & Trích Thu Nhập](#8-quản-lý-mục-tiêu-tiết-kiệm--trích-thu-nhập)
-9. [Tương Tác Với Trợ Lý Ảo FinAI & Báo Cáo Tài Chính AI](#9-tương-tác-với-trợ-lý-ảo-finai--báo-cáo-tài-chính-ai)
+6. [Theo Dõi 5 Chỉ Số Tài Chính & Bảng Thống Kê](#6-theo-dõi-5-chỉ-số-tài-chính--bảng-thống-kê)
+7. [Thiết Lập Ngân Sách & Cảnh Báo Bội Chi (Email & In-App)](#7-thiết-lập-ngân-sách--cảnh-báo-bội-chi-email--in-app)
+8. [Quản Lý Mục Tiêu Tiết Kiệm, Nạp/Rút & Cảnh Báo Hạn Chót](#8-quản-lý-mục-tiêu-tiết-kiệm-nạprút--cảnh-báo-hạn-chót)
+9. [Trợ Lý Ảo FinAI & Báo Cáo Tài Chính AI Đa Trọng Tâm](#9-trợ-lý-ảo-finai--báo-cáo-tài-chính-ai-đa-trọng-tâm)
+10. [Phân Hệ Quản Trị Hệ Thống Dành Cho Quản Trị Viên (Admin)](#10-phân-hệ-quản-trị-hệ-thống-dành-cho-quản-trị-viên-admin)
 
 ---
 
@@ -25,50 +26,73 @@ Nếu bạn là người mới tiếp cận dự án hoặc là Giảng viên/Ng
 1. 🎯 **Bắt đầu từ file này ([docs/USER_GUIDE.md](USER_GUIDE.md))**: Để cấu hình môi trường, chạy demo và trải nghiệm các tính năng trên web.
 2. 🏛️ **Đọc [docs/SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)**: Để đánh giá kiến trúc phần mềm, luồng xác thực JWT, sơ đồ ERD và cơ chế khóa dòng chống Race-condition.
 3. 🤖 **Đọc [docs/AI_DEVELOPMENT_LOG.md](AI_DEVELOPMENT_LOG.md)**: Để chấm điểm tiêu chí sử dụng AI (nhật ký Prompt 5 thành phần, phân tích BA và phần code sinh viên rà soát).
-4. 🚀 **Đọc [docs/DEVELOPMENT_PROCESS.md](DEVELOPMENT_PROCESS.md)**: Để nắm toàn bộ tiến độ 5 Sprint phát triển theo Agile/Scrum.
+4. 🚀 **Đọc [docs/DEVELOPMENT_PROCESS.md](DEVELOPMENT_PROCESS.md)**: Để nắm toàn bộ tiến độ 6 Sprint phát triển theo Agile/Scrum.
 5. 📡 **Tra cứu [docs/API.md](API.md) & [docs/DATABASE.md](DATABASE.md)**: Khi cần tra cứu chi tiết tham số API và bảng CSDL.
 
 ---
 
-## 2. CẤU HÌNH MÔI TRƯỜNG (.ENV), DATABASE & GEMINI API KEY
+## 2. KHỞI CHẠY HỆ THỐNG VÀ CƠ SỞ DỮ LIỆU DOCKER
 
-Trước khi chạy hệ thống và nạp dữ liệu mẫu, bạn cần tạo file cấu hình:
+> 💡 **Điểm cốt lõi**: Toàn bộ hệ thống sử dụng **CSDL MySQL 8.0 chạy hoàn toàn trong Docker Container** (`expense_mysql`).  
+> **Bạn KHÔNG CẦN phải cài đặt MySQL Server trên máy tính Windows!**
 
-### Bước 1: Tạo file cấu hình từ file mẫu
-```powershell
-# Sao chép file cấu hình mẫu từ thư mục config
-Copy-Item config/.env.example backend/.env
-```
+---
 
-### Bước 2: Chọn kiểu Cơ sở Dữ liệu (Database) trong `backend/.env`
-Mở file `backend/.env` và chọn **1 trong 2 tùy chọn**:
+### 🌟 Cách 1 (Khuyên Dùng): Khởi chạy 1-Click bằng Docker Compose
+Đây là cách nhanh nhất và thuận tiện nhất để trải nghiệm toàn bộ hệ thống:
 
-* **Tùy chọn A — Dùng SQLite (Khuyên dùng để chạy thử nghiệm 1-Click ngay)**:
-  ```env
-  DATABASE_URL=sqlite:///./personal_expense.db
-  ```
-  *(Không cần cài MySQL, không cần mật khẩu, hệ thống tự tạo file database cục bộ).*
+1. **Khởi động 3 dịch vụ (MySQL 8.0, Backend FastAPI, Frontend React)**:
+   ```powershell
+   docker compose up -d --build
+   ```
+2. **Nạp sẵn 74 giao dịch demo 6 tháng**:
+   ```powershell
+   docker compose exec backend python /app/database/seed_demo.py
+   ```
+3. **Mở trình duyệt truy cập ngay**:
+   * Giao diện Web: **`http://localhost:5173`**
+   * Tài liệu API Swagger: **`http://localhost:8000/docs`**
 
-* **Tùy chọn B — Dùng MySQL (Môi trường Database chuẩn)**:
-  ```env
-  DATABASE_URL=mysql+pymysql://root:MAT_KHAU_MYSQL_CUA_BAN@localhost:3306/personal_expense
-  ```
-  *(Thay `MAT_KHAU_MYSQL_CUA_BAN` bằng mật khẩu root MySQL trên máy của bạn).*
+---
 
-### Bước 3: Cấu hình Gemini API Key (Dành cho tính năng AI)
-* Nếu bạn muốn dùng thử tính năng **Quét hóa đơn AI**, **Chatbot FinAI**, **Báo cáo tài chính AI**:
-  1. Truy cập [Google AI Studio](https://aistudio.google.com/) $\rightarrow$ Đăng nhập Google $\rightarrow$ Bấm **"Get API key"** $\rightarrow$ Tạo key miễn phí.
-  2. Dán key vào file `backend/.env`:
+### 💻 Cách 2: Chạy trực tiếp trên máy host (Dành cho Lập trình viên)
+Nếu muốn chạy trực tiếp code Backend và Frontend để tiện debug, bạn vẫn sử dụng MySQL từ Docker (không cần cài MySQL trên Windows):
+
+1. **Bật container MySQL trên Docker**:
+   ```powershell
+   docker compose up -d mysql
+   ```
+   *(Container MySQL tự động ánh xạ cổng `3307` ra máy của bạn).*
+
+2. **Khởi tạo file cấu hình `.env`**:
+   ```powershell
+   Copy-Item config/.env.example .env
+   Copy-Item config/.env.example backend/.env
+   ```
+   *(Chuỗi kết nối mặc định trong file mẫu đã trỏ sẵn vào MySQL Docker qua cổng 3307: `mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense`).*
+
+3. **(Tùy chọn) Cấu hình Gemini API Key**:
+   * Để trải nghiệm các tính năng AI (Quét hóa đơn, FinAI chat, Báo cáo tháng), dán key vào file `backend/.env`:
      ```env
      GEMINI_API_KEY=AIzaSy...ChuoiKeyCuaBan...
      ```
-* *(Nếu chưa có API Key, toàn bộ tính năng CRUD Giao dịch, Thùng rác, Ngân sách, Tiết kiệm, Biểu đồ và Import Excel vẫn hoạt động 100%).*
+   * *(Nếu chưa có API Key, toàn bộ tính năng quản lý tài chính, ngân sách, tiết kiệm, biểu đồ vẫn hoạt động 100%).*
 
-### Bước 4: Nạp dữ liệu mẫu Demo
-Chạy lệnh sau tại thư mục gốc để tự động tạo tài khoản và nạp sẵn 74 giao dịch:
-```powershell
-python backend/seed_demo.py
-```
+4. **Nạp dữ liệu mẫu và chạy Backend**:
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install -r backend/requirements.txt
+   python database/seed_demo.py
+   python -m uvicorn app.main:app --reload --reload-dir backend --app-dir backend --host 127.0.0.1 --port 8000
+   ```
+
+5. **Khởi chạy Frontend React**:
+   ```powershell
+   cd frontend
+   npm ci
+   npm run dev
+   ```
 
 ---
 
@@ -127,57 +151,85 @@ Thay vì ngồi gõ từng con số, bạn chỉ cần chụp ảnh hóa đơn h
 
 ---
 
-## 6. NHẬP SAO KÊ GIAO DỊCH HÀNG LOẠT BẰNG FILE EXCEL
+## 6. THEO DÕI 5 CHỈ SỐ TÀI CHÍNH & BẢNG THỐNG KÊ
 
-1. Vào trang **"Giao dịch"** ➔ Nhấn nút **"📥 Import Excel"**.
-2. Chọn file Excel sao kê ngân hàng (`.xlsx` hoặc `.xls`).
-3. Màn hình **Xem trước (Preview)** sẽ hiện ra: Bạn có thể chọn ghép cột (Cột Ngày, Cột Số tiền, Cột Ghi chú).
-4. Bấm **"Xác nhận nhập dữ liệu"** ➔ Hàng chục giao dịch sẽ được thêm vào hệ thống cùng lúc chỉ trong vài giây.
+Tại trang **Thống kê** hoặc phần đầu của **Báo cáo Tài chính AI**, hệ thống tổng hợp bức tranh dòng tiền trực quan qua **5 ô thẻ chỉ số**:
+
+1. ↗️ **Tổng Thu Nhập**: Tổng số tiền thu vào từ lương, thưởng, kinh doanh...
+2. ↘️ **Tổng Chi Tiêu**: Tổng số tiền thực chi trong tháng.
+3. ◆ **Tiết Kiệm Ròng (Net Savings)**: Tính theo công thức `Tổng Thu - Tổng Chi`. Phản ánh chính xác phần thặng dư tài chính thực tế.
+4. % **Tỷ Lệ Tiết Kiệm (Savings Rate)**: Tỷ lệ phần trăm thặng dư trên tổng thu nhập. Mức an toàn được khuyến nghị từ **20% trở lên**.
+5. 🎯 **Tích Lũy Mục Tiêu (Net Goal Saved)**: Phản ánh số tiền thực tế được đưa vào các hũ mục tiêu tiết kiệm trong tháng theo công thức chuẩn: `max(0, Đã Nạp - Đã Rút)`. Đảm bảo nếu người dùng nạp vào rồi rút ra chi dùng thì chỉ số sẽ không bị tính khống.
 
 ---
 
-## 7. THIẾT LẬP & THEO DÕI NGÂN SÁCH THÁNG
+## 7. THIẾT LẬP NGÂN SÁCH & CẢNH BÁO BỘI CHI (EMAIL & IN-APP)
 
-Tính năng giúp bạn kiểm soát không bị "vung tay quá trán" trong tháng:
+Tính năng giúp bạn kiểm soát chi tiêu, không bị "vung tay quá trán":
 
-1. Vào mục **"Ngân sách"** trên thanh menu.
-2. Bấm **"+ Đặt ngân sách mới"**:
+1. Vào mục **"Ngân sách"** trên thanh menu ➔ Bấm **"+ Đặt ngân sách mới"**:
    * Chọn **Danh mục** (VD: *Ăn uống*).
-   * Nhập **Hạn mức tối đa** cho phép tiêu trong tháng (VD: `5.000.000 đ`).
-3. **Theo dõi tiến độ chi tiêu trực quan**:
+   * Nhập **Hạn mức tối đa** cho phép tiêu trong tháng (VD: `3.000.000 đ`).
+2. **Theo dõi tiến độ chi tiêu trực quan**:
    * 🟢 **Màu xanh lá**: Chi tiêu an toàn (< 70% ngân sách).
    * 🟡 **Màu vàng**: Chi tiêu sắp chạm mức (70% - 99%).
    * 🔴 **Màu đỏ**: **Cảnh báo bội chi** (> 100% - Đã chi vượt mức cho phép).
+3. **Cơ chế Cảnh báo Tự động qua Email**:
+   * Khi bạn thêm một giao dịch chi tiêu khiến ngân sách chạm ngưỡng **≥ 80%** hoặc **vượt 100%**, hệ thống lập tức gửi một email cảnh báo chi tiết qua **Gmail SMTP** tới hòm thư cá nhân của bạn, nhắc nhở điều chỉnh chi tiêu kịp thời.
 
 ---
 
-## 8. QUẢN LÝ MỤC TIÊU TIẾT KIỆM & TRÍCH THU NHẬP
+## 8. QUẢN LÝ MỤC TIÊU TIẾT KIỆM, NẠP/RÚT & CẢNH BÁO HẠN CHÓT
 
-Giúp bạn tích lũy tiền mua sắm tài sản lớn (Laptop, Xe máy, Quỹ du lịch...):
+Giúp bạn tích lũy tiền mua sắm tài sản lớn (Laptop, Quỹ dự phòng, Du lịch...):
 
 ### 🎯 Tạo Mục Tiêu Tiết Kiệm:
 1. Vào mục **"Mục tiêu tiết kiệm"** ➔ Bấm **"+ Tạo mục tiêu mới"**.
-2. Nhập: *Tên mục tiêu* (VD: *"Mua Macbook M3"*), *Số tiền cần đạt* (VD: `45.000.000 đ`), *Hạn chót hoàn thành*.
+2. Nhập: *Tên mục tiêu* (VD: *"Mua Laptop"*), *Số tiền cần đạt* (VD: `30.000.000 đ`), *Hạn chót hoàn thành* (Deadline).
 
-### 💰 Cách Nạp Tiền Vào Mục Tiêu:
-* **Cách 1 (Nạp tiền thủ công)**: Bấm nút **"Nạp tiền"** trên thẻ mục tiêu ➔ Nhập số tiền muốn trích từ số dư khả dụng vào quỹ.
-* **Cách 2 (Trích tự động khi có Lương/Thu nhập)**: Khi bạn tạo 1 giao dịch **Thu nhập** mới (VD: Lương 30 triệu), ở cuối form chọn mục *"Trích vào mục tiêu tiết kiệm"* $\rightarrow$ Nhập 5 triệu. Hệ thống sẽ tự động cộng 5 triệu vào quỹ tiết kiệm ngay khi thêm giao dịch.
+### 💰 Nạp & Rút Tiền Linh Hoạt:
+* **Nạp tiền**: Bấm nút **"Nạp tiền"** trên thẻ mục tiêu để chuyển tiền từ số dư khả dụng vào quỹ; hoặc chọn **"Trích từ thu nhập"** khi ghi nhận khoản thu mới.
+* **Rút tiền**: Bấm nút **"Rút tiền"** ➔ Nhập số tiền cần rút ➔ Tiền được giải phóng tức thì về số dư ví khả dụng. Cơ chế **Idempotency Key** bảo đảm không bị rút trùng khi mạng chập chờn.
 
-### 💸 Rút Tiền Từ Mục Tiêu Về Ví:
-* Khi cần dùng tiền, bấm nút **"Rút tiền"** trên thẻ mục tiêu ➔ Nhập số tiền cần rút ➔ Tiền sẽ ngay lập tức được hoàn trả về **Số dư khả dụng** trong ví của bạn.
+### ⏰ Cảnh Báo Hạn Chót Mục Tiêu (In-App Alert Banner):
+* Trên đầu trang Mục tiêu tiết kiệm và trang Dashboard, hệ thống tự động phát hiện các mục tiêu cận ngày:
+  * ⚠️ **Quá hạn**: Mục tiêu chưa hoàn thành nhưng đã quá ngày hạn chót.
+  * 🔥 **Hạn chót hôm nay**: Cần hoàn tất nạp tiền trong ngày.
+  * ⚡ **Gấp (Còn ≤ 3 ngày)**: Nhắc nhở người dùng gấp rút tích lũy.
 
 ---
 
-## 9. TƯƠNG TÁC VỚI TRỢ LÝ ẢO FINAI & BÁO CÁO TÀI CHÍNH AI
+## 9. TRỢ LÝ ẢO FINAI & BÁO CÁO TÀI CHÍNH AI ĐA TRỌNG TÂM
 
 ### 🪙 Trò Chuyện Với Trợ Lý FinAI Mascot 3D:
-1. Nhìn vào góc dưới cùng bên phải màn hình, bạn sẽ thấy **Nhân vật đồng xu 3D FinAI** đang bay lơ lửng.
-2. Nhấp chuột vào nhân vật để mở cửa sổ chat.
-3. Bạn có thể bấm các câu hỏi gợi ý nhanh hoặc tự gõ câu hỏi:
-   * *"Tháng này tôi tiêu nhiều nhất vào khoản nào?"*
-   * *"Làm sao để tôi tiết kiệm thêm 3 triệu mỗi tháng?"*
-   * *"Đánh giá tình hình tài chính tháng này của tôi."*
+* Nhấp vào nhân vật đồng xu 3D ở góc dưới màn hình để hỏi đáp thông minh:
+  * *"Tháng này tôi tiêu nhiều nhất vào khoản nào?"*
+  * *"Làm sao để tôi tiết kiệm thêm 2 triệu mỗi tháng?"*
 
-### 📊 Xem Báo Cáo Phân Tích Tài Chính Tháng Do AI Tạo:
-1. Vào mục **"Báo cáo thống kê"** hoặc trang **"Ngân sách"** ➔ Bấm nút **"✨ Tạo Báo cáo AI"**.
-2. AI sẽ tự động phân tích toàn bộ dữ liệu thu chi trong tháng, chấm điểm sức khỏe tài chính và đưa ra các đề xuất điều chỉnh ngân sách cực kỳ thông minh.
+### 📊 Báo Cáo Tài Chính AI Đa Trọng Tâm:
+1. Vào mục **"Báo cáo thống kê"** ➔ Chuyển sang tab **"✨ Báo Cáo AI"**.
+2. Lựa chọn **Tháng phân tích** và **1 trong 3 trọng tâm**:
+   * 🌐 **Phân Tích Toàn Diện (360 Độ)**: Cân đối giữa thu chi, tỷ lệ tiết kiệm và phân bổ tài sản.
+   * 💡 **Tối Ưu Tiết Kiệm**: Soi xét các khoản chi hao phí và đưa ra 3 biện pháp cắt giảm chi phí thực chiến.
+   * 🛡️ **Cảnh Báo Rủi Ro & An Toàn**: Đánh giá nguy cơ thâm hụt dòng tiền, thanh khoản và lập quỹ khẩn cấp.
+3. Bấm **"Xác Nhận & Sinh Báo Cáo AI"**:
+   * **Nhận thức thời gian thực**: AI nhận diện chính xác ngày hiện tại trong tháng (ví dụ: ngày 26 cuối tháng ít dữ liệu vs đầu tháng) để đưa ra nhận định sắc bén.
+   * **Bắt lỗi vượt ngân sách**: Nếu có danh mục bị vượt hạn mức (như *Ăn uống chi 3.450.000 đ / 3.000.000 đ*), AI sẽ chỉ đích danh tên danh mục, phân tích mức độ bội chi và yêu cầu cắt giảm khẩn cấp trong phần Khuyến nghị.
+
+---
+
+## 10. PHÂN HỆ QUẢN TRỊ HỆ THỐNG DÀNH CHO QUẢN TRỊ VIÊN (ADMIN)
+
+Phân hệ dành riêng cho vai trò **Quản trị viên (System Administrator)** để vận hành hệ thống:
+
+1. **Đăng nhập Tài khoản Admin**:
+   * 📧 Email: `admin@example.com`
+   * 🔒 Mật khẩu: `AdminPass123@`
+2. **Dashboard Giám Sát Toàn Hệ Thống (`/admin`)**:
+   * Theo dõi tổng số lượng người dùng trong hệ thống và trạng thái hoạt động.
+   * Giám sát tổng số lượt gọi AI Gemini và tổng lượng Token API đã sử dụng để kiểm soát chi phí.
+3. **Quản Trị Người Dùng & Khắc Phục Sự Cố**:
+   * **Khóa / Mở khóa tài khoản**: Vô hiệu hóa quyền truy cập của tài khoản khi phát hiện dấu hiệu vi phạm hoặc theo yêu cầu bảo vệ người dùng.
+   * **Cấp mật khẩu tạm thời**: Tạo mật khẩu tạm 8 ký tự hỗ trợ người dùng khi họ bị mất quyền truy cập email hoặc quên mật khẩu.
+4. **Nguyên Tắc Bảo Vệ Quyền Riêng Tư (Zero-Knowledge Privacy)**:
+   * Quản trị viên chỉ quản lý trạng thái tài khoản và tài nguyên kỹ thuật, tuyệt đối **không có quyền xem chi tiết các giao dịch thu/chi cá nhân** của người dùng.

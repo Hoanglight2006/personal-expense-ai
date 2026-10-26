@@ -6,7 +6,7 @@ Tài liệu ghi nhận toàn bộ quá trình lập kế hoạch, phân tích, t
 
 ## 1. TỔNG QUAN PHƯƠNG PHÁP LUẬN (METHODOLOGY)
 
-Dự án áp dụng mô hình **Agile / Scrum** chia thành **5 Sprint** phát triển liên tục (mỗi Sprint tập trung vào một nhóm giá trị nghiệp vụ cốt lõi), kết hợp với quy trình kiểm thử tự động (**CI & TDD/BDD**) để đảm bảo chất lượng phần mềm không bị hồi quy (*Zero Regression*).
+Dự án áp dụng mô hình **Agile / Scrum** chia thành **6 Sprint** phát triển liên tục (mỗi Sprint tập trung vào một nhóm giá trị nghiệp vụ cốt lõi), kết hợp với quy trình kiểm thử tự động (**CI & TDD/BDD**) để đảm bảo chất lượng phần mềm không bị hồi quy (*Zero Regression*).
 
 ```mermaid
 gantt
@@ -17,7 +17,7 @@ gantt
     Hạ tầng Backend, DB, JWT Auth     :done, s1_2, 2026-08-06, 2026-08-10
     section Sprint 2
     CRUD Danh mục & Giao dịch         :done, s2_1, 2026-08-11, 2026-08-16
-    Thùng rác & Import Excel          :done, s2_2, 2026-08-17, 2026-08-20
+    Thùng rác & Quản lý giao dịch     :done, s2_2, 2026-08-17, 2026-08-20
     section Sprint 3
     Phân hệ Ngân sách (Budgets)       :done, s3_1, 2026-08-21, 2026-08-24
     Mục tiêu tiết kiệm & Phân bổ      :done, s3_2, 2026-08-25, 2026-08-27
@@ -27,6 +27,9 @@ gantt
     section Sprint 5
     Module hóa CSS & Kiểm thử Tự động :done, s5_1, 2026-09-01, 2026-09-02
     Nghiệm thu & Hoàn thiện Tài liệu  :done, s5_2, 2026-09-02, 2026-09-03
+    section Sprint 6
+    Admin Portal & Quản trị User      :done, s6_1, 2026-09-04, 2026-09-06
+    Cảnh báo Email & AI Đa trọng tâm :done, s6_2, 2026-09-07, 2026-09-10
 ```
 
 ---
@@ -51,7 +54,7 @@ gantt
   * **Danh mục (Categories)**: CRUD danh mục, hỗ trợ 12 danh mục mặc định, tính năng Ẩn/Hiện (*Soft-hide*) để bảo vệ các giao dịch lịch sử.
   * **Giao dịch (Transactions)**: Thêm/Sửa/Xem/Phân trang, lọc theo ngày tháng, danh mục, loại thu chi.
   * **Thùng rác (Recycle Bin)**: Cơ chế Soft-delete (`is_deleted = true`), hỗ trợ Khôi phục (Restore) hoặc Xóa vĩnh viễn (Permanent Delete).
-  * **Tính năng phụ trợ**: Nhân bản nhanh giao dịch (`Duplicate`), Import sao kê hàng loạt từ file Excel.
+  * **Tính năng phụ trợ**: Nhân bản nhanh giao dịch (`Duplicate`).
 * **Kết quả nghiệm thu**: Tất cả các thao tác CRUD đều đạt tốc độ phản hồi < 100ms, có debounce tìm kiếm và xử lý trạng thái rỗng (*Empty State*).
 
 ---
@@ -83,11 +86,34 @@ gantt
 * **Nội dung thực hiện**:
   * **Refactoring CSS**: Bóc tách file khổng lồ `index.css` (16.552 dòng) thành **28 file CSS module hóa** độc lập theo từng component/page, giữ nguyên 100% tính toàn vẹn giao diện.
   * **Tạo dữ liệu mẫu (Seed Data)**: Xây dựng script `seed_demo.py` khởi tạo tài khoản demo `demo@example.com` với 74 giao dịch trải dài 6 tháng.
-  * **Kiểm thử tự động**: Viết và chạy thành công 55 bộ test unit & integration trên frontend (Vitest) và backend (Pytest).
+  * **Kiểm thử tự động**: Viết và chạy thành công 222 bài test tự động (165 backend + 57 frontend) trên frontend (Vitest) và backend (Pytest).
   * **Tài liệu hóa**: Xây dựng bộ 5 file tài liệu kỹ thuật hoàn chỉnh trong `docs/`.
 * **Kết quả nghiệm thu**: Toàn bộ hệ thống vượt qua tất cả bài kiểm thử, build production thành công trong 428ms.
 
 ---
+
+
+---
+
+### 📌 SPRINT 6: Phân Hệ Quản Trị Admin, Cảnh Báo Tài Chính Tự Động & Báo Cáo AI Đa Trọng Tâm
+* **Mục tiêu**: Bổ sung phân hệ Quản trị viên (Admin), hoàn thiện cơ chế cảnh báo ngân sách tự động qua Email và nâng cấp năng lực phân tích tài chính thời gian thực cho Gemini AI.
+* **Nội dung thực hiện**:
+  * **Phân hệ Quản trị viên (Admin Portal)**:
+    * Xây dựng Dashboard giám sát tài nguyên, tổng người dùng, tổng giao dịch và chi phí Token gọi API Gemini.
+    * Quản lý người dùng: Khóa/Mở khóa tài khoản khi phát hiện bất thường, Cấp mật khẩu tạm thời cho người dùng gặp sự cố.
+    * Tuân thủ triệt để nguyên tắc **Zero-Knowledge Privacy** (Quản trị viên tuyệt đối không can thiệp hay xem chi tiết thu chi cá nhân của người dùng).
+  * **Cảnh báo Ngân sách Bội chi Tự động**:
+    * Tích hợp Gmail SMTP và In-App Alert: Tự động gửi email cảnh báo khi chi tiêu chạm ngưỡng cảnh báo (>= 80%) hoặc vượt trần (100%).
+  * **Rút tiền Mục tiêu & Cảnh báo Hạn chót**:
+    * Cho phép rút tiền từ mục tiêu về số dư khả dụng với cơ chế **Idempotency Key** chống trùng lặp.
+    * Banner cảnh báo hạn chót In-App: Tự động phát hiện mục tiêu quá hạn, hạn chót hôm nay hoặc sắp đến hạn trong 3 ngày.
+    * Công thức tính Tích lũy Mục tiêu ròng: `max(0, Đã Nạp - Đã Rút)` chuẩn xác.
+  * **Báo cáo Tài chính AI Đa Trọng Tâm & Nhận thức Thời gian thực**:
+    * 3 tùy chọn phân tích: Toàn diện, Tối ưu tiết kiệm, Cảnh báo rủi ro & an toàn.
+    * Nhận thức thời gian thực: Phân biệt chính xác ngày đầu tháng vs giữa/cuối tháng ít dữ liệu vs tháng đã chốt sổ.
+    * Chỉ đích danh danh mục bị vượt hạn mức ngân sách và yêu cầu hành động cắt giảm khẩn cấp.
+  * **Kiểm thử tự động toàn diện**: Mở rộng bộ test lên **222 test cases (165 backend + 57 frontend)** với tỷ lệ pass 100%.
+* **Kết quả nghiệm thu**: Toàn bộ các tính năng mới hoạt động trơn tru, không phát sinh lỗi hồi quy, đáp ứng trọn vẹn 100% tài liệu `REQUIREMENTS.md`.
 
 ## 3. QUẢN LÝ RỦI RO & GIẢI PHÁP KỸ THUẬT (RISK MANAGEMENT)
 

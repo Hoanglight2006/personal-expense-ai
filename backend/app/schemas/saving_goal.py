@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.timezone import local_today
 from app.models.enums import ContributionSource, GoalStatus
 
 
@@ -127,7 +128,7 @@ class SavingGoalCreate(SavingGoalBase):
     @field_validator("deadline")
     @classmethod
     def validate_deadline_not_past(cls, v: date | None) -> date | None:
-        if v is not None and v < date.today():
+        if v is not None and v < local_today():
             raise ValueError("Hạn chót không được ở trong quá khứ.")
         return v
 

@@ -219,11 +219,14 @@ const Transactions = () => {
 
   useEffect(() => {
     if (location.state?.openAddModal) {
-      openCreate();
+      setEditingTxn(null);
+      setPrefillData(location.state?.initialType ? { type: location.state.initialType } : null);
+      setModalOpen(true);
+      setModalError('');
       // Clear state so it doesn't reopen on refresh
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location, navigate, openCreate]);
+  }, [location, navigate]);
 
   const openEdit = useCallback((txn) => {
     setEditingTxn(txn);

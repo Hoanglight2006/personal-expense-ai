@@ -430,3 +430,80 @@ def test_upload_avatar_invalid_type(client: TestClient):
     assert response.status_code == 400
     assert "Định dạng ảnh không hợp lệ" in response.json()["detail"]
 
+
+
+
+def test_forgot_password_otp_and_reset(client, db):
+    # 1. Register a test user
+    email = f"otp_user_{random_string().lower()}@test.com"
+    pwd = "OriginalPassword123@"
+    reg_resp = client.post("/api/v1/auth/register", json={"username": f"otp_u_{random_string().lower()}", "email": email, "password": pwd})
+    assert reg_resp.status_code == 201
+
+    # 2. Request OTP
+    forgot_resp = client.post("/api/v1/auth/forgot-password", json={"email": email})
+    assert forgot_resp.status_code == 200
+
+    # 3. Retrieve OTP from DB
+    user = db.query(User).filter(User.email == email).first()
+    assert user.reset_password_code is not None
+    otp = user.reset_password_code
+
+    # 4. Reset with wrong OTP should fail
+    fail_resp = client.post("/api/v1/auth/reset-password", json={"email": email, "code": "999999", "password": "NewPassword456@"})
+    assert fail_resp.status_code == 400
+
+    # 5. Reset with correct OTP should succeed
+    new_pwd = "NewPassword456@"
+    ok_resp = client.post("/api/v1/auth/reset-password", json={"email": email, "code": otp, "password": new_pwd})
+    assert ok_resp.status_code == 200
+
+    # 6. Verify login with new password
+    login_resp = client.post("/api/v1/auth/login", data={"username": email, "password": new_pwd})
+    assert login_resp.status_code == 200
+
+
+def test_email_verification_and_balance_guide_flows(client, db):
+    email = f"verify_user_{random_string().lower()}@test.com"
+    username = f"ver_u_{random_string().lower()}"
+    pwd = "Password123@"
+    client.post("/api/v1/auth/register", json={"username": username, "email": email, "password": pwd})
+
+    login_resp = client.post("/api/v1/auth/login", data={"username": username, "password": pwd})
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Check me shows unverified
+    me_resp = client.get("/api/v1/auth/me", headers=headers)
+    assert me_resp.json()["is_verified"] is False
+    assert me_resp.json()["has_seen_initial_balance_guide"] is False
+
+    # 2. Send verification email
+    send_resp = client.post("/api/v1/auth/send-verification-email", headers=headers)
+    assert send_resp.status_code == 200
+
+    # 3. Retrieve verification code from DB
+    user = db.query(User).filter(User.email == email).first()
+    assert user.verification_code is not None
+    code = user.verification_code
+
+    # 4. Verify email with code
+    verify_resp = client.post("/api/v1/auth/verify-email", headers=headers, json={"code": code})
+    assert verify_resp.status_code == 200
+    assert verify_resp.json()["is_verified"] is True
+
+    # 5. Dismiss balance guide
+    dismiss_resp = client.post("/api/v1/auth/dismiss-balance-guide", headers=headers)
+    assert dismiss_resp.status_code == 200
+
+    # 6. Check me again
+    me_resp2 = client.get("/api/v1/auth/me", headers=headers)
+    assert me_resp2.json()["is_verified"] is True
+    assert me_resp2.json()["has_seen_initial_balance_guide"] is True
+
+
+def test_forgot_password_anti_enumeration(client: TestClient):
+    """OWASP Anti-Enumeration: Đảm bảo email không tồn tại vẫn trả về 200 và thông báo bảo vệ danh tính."""
+    resp = client.post("/api/v1/auth/forgot-password", json={"email": "definitely_not_existing_user@finai.com"})
+    assert resp.status_code == 200
+    assert resp.json()["message"].startswith("Nếu email tồn tại")

@@ -95,6 +95,10 @@ class MonthlyReportRequest(BaseModel):
         pattern=r"^\d{4}-\d{2}$",
         description="Month in YYYY-MM format, e.g. '2026-08'",
     )
+    focus: str | None = Field(
+        default="comprehensive",
+        description="Focus of report: 'comprehensive', 'saving', or 'risk'",
+    )
 
 
 class MonthlyReportResponse(BaseModel):
@@ -105,7 +109,7 @@ class MonthlyReportResponse(BaseModel):
         ..., ge=0, le=100, description="Financial Health Score from 0 to 100"
     )
     health_status: str = Field(
-        ..., description="Status badge: 'Xuất sắc', 'Tốt', 'Cần chú ý', 'Báo động'"
+        ..., description="Status badge: 'Xuất sắc', 'Tốt', 'Cần chú ý', 'Báo động', 'Đang theo dõi'"
     )
     total_income: Decimal
     total_expense: Decimal
@@ -120,6 +124,9 @@ class MonthlyReportResponse(BaseModel):
     conclusion: str
     raw_markdown: str
     generated_at: datetime
+    focus: str = Field(default="comprehensive", description="Trọng tâm phân tích báo cáo")
+    total_saving_deposited: Decimal = Field(default=Decimal("0.00"), description="Tổng số tiền đã nạp vào các mục tiêu tiết kiệm trong tháng")
+    active_goals_count: int = Field(default=0, description="Số lượng mục tiêu tiết kiệm đang hoạt động trong tháng")
 
 
 # ---------------------------------------------------------------------------

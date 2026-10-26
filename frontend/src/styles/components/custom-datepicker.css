@@ -20,8 +20,8 @@
   font-size: 1rem;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
+
   color: var(--text-color);
   transition: all 0.3s ease;
   font-family: inherit;

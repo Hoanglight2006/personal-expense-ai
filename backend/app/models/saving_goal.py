@@ -28,7 +28,7 @@ class SavingGoal(Base):
     current_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False, default=Decimal("0.00"), server_default="0")
     deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     status: Mapped[GoalStatus] = mapped_column(
-        Enum(GoalStatus), nullable=False, default=GoalStatus.ACTIVE, server_default=GoalStatus.ACTIVE.value
+        Enum(GoalStatus, values_callable=lambda x: [e.value for e in x]), nullable=False, default=GoalStatus.ACTIVE, server_default=GoalStatus.ACTIVE.value
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 

@@ -26,8 +26,6 @@ const TransactionFormModal = ({
   onClose,
   onSubmit,
   prefillData,
-  onExcelUpload,
-  isExcelLoading,
   categoriesReady = true,
 }) => {
   useModalLock(true, onClose);
@@ -114,7 +112,7 @@ const TransactionFormModal = ({
       .then((res) => {
         if (componentMountedRef.current) {
           const items = res?.items || [];
-          setActiveGoals(items.filter((g) => g.status === 'active' && Number(g.remaining_amount) > 0));
+          setActiveGoals(items.filter((g) => g.status !== 'cancelled'));
         }
       })
       .catch(() => {});
@@ -235,11 +233,6 @@ const TransactionFormModal = ({
         errs.allocation = 'Vui lòng nhập số tiền trích hợp lệ lớn hơn 0.';
       } else if (amount && allocVal > amount) {
         errs.allocation = 'Số tiền trích không được vượt quá số tiền thu nhập.';
-      } else {
-        const targetGoal = activeGoals.find((g) => String(g.id) === String(selectedGoalId));
-        if (targetGoal && allocVal > Number(targetGoal.remaining_amount)) {
-          errs.allocation = `Số tiền trích (${formatMoney(allocVal)}) vượt quá số tiền còn thiếu (${formatMoney(targetGoal.remaining_amount)}).`;
-        }
       }
     }
 
@@ -252,7 +245,7 @@ const TransactionFormModal = ({
 
     setErrors({});
     return true;
-  }, [form, categories, isEdit, transaction, selectedGoalId, allocationAmount, activeGoals, availableBalance]);
+  }, [form, categories, isEdit, transaction, selectedGoalId, allocationAmount, availableBalance]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -335,26 +328,8 @@ const TransactionFormModal = ({
               <button
                 type="button"
                 className="btn-secondary btn-sm btn-modal-tool"
-                onClick={() => document.getElementById('txn-excel-input')?.click()}
-                disabled={submitting || scanning || isExcelLoading}
-                title="Nhập nhiều giao dịch từ file Excel"
-              >
-                {isExcelLoading ? 'Đang xử lý...' : '📄 Nhập Excel'}
-              </button>
-              <input
-                id="txn-excel-input"
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  onExcelUpload(e);
-                }}
-              />
-              <button
-                type="button"
-                className="btn-secondary btn-sm btn-modal-tool"
                 onClick={handleScanClick}
-                disabled={submitting || scanning || isExcelLoading}
+                disabled={submitting || scanning}
               >
                 {scanning ? 'Đang quét...' : '📷 Quét hóa đơn'}
               </button>
@@ -369,19 +344,17 @@ const TransactionFormModal = ({
           )}
         </div>
 
-        {(scanning || isExcelLoading) && (
+        {scanning && (
           <div className="txn-processing-overlay" aria-live="polite">
             <div className="txn-processing-card">
               <div className="txn-clean-spinner" />
               
               <h3 className="txn-processing-title">
-                {scanning ? 'Đang đọc thông tin hóa đơn...' : 'Đang xử lý tệp Excel...'}
+                Đang đọc thông tin hóa đơn...
               </h3>
               
               <p className="txn-processing-desc">
-                {scanning
-                  ? 'Hệ thống đang tự động trích xuất số tiền, ngày và phân loại giao dịch.'
-                  : 'Đang đọc các dòng giao dịch và đối chiếu dữ liệu sao kê.'}
+                Hệ thống đang tự động trích xuất số tiền, ngày và phân loại giao dịch.
               </p>
             </div>
           </div>
@@ -546,7 +519,10 @@ const TransactionFormModal = ({
                         { value: '', label: '-- Không trích (Mặc định) --' },
                         ...activeGoals.map((g) => ({
                           value: g.id,
-                          label: `${g.name} (còn thiếu ${formatMoney(g.remaining_amount)})`,
+                          label:
+                            g.status === 'completed'
+                              ? `${g.name} (Đã hoàn thành - Hiện có ${formatMoney(g.current_amount)})`
+                              : `${g.name} (Còn thiếu ${formatMoney(g.remaining_amount)})`,
                         })),
                       ]}
                     />
@@ -572,18 +548,21 @@ const TransactionFormModal = ({
                               </button>
                             );
                           })}
-                          {activeGoals.find((g) => String(g.id) === String(selectedGoalId)) && (
-                            <button
-                              type="button"
-                              className="quick-chip-btn quick-chip-fill"
-                              onClick={() => {
-                                const g = activeGoals.find((goal) => String(goal.id) === String(selectedGoalId));
-                                if (g) setAllocationAmount(String(g.remaining_amount));
-                              }}
-                            >
-                              🎯 Đủ thiếu ({formatMoney(activeGoals.find((g) => String(g.id) === String(selectedGoalId)).remaining_amount)})
-                            </button>
-                          )}
+                          {(() => {
+                            const g = activeGoals.find((goal) => String(goal.id) === String(selectedGoalId));
+                            if (g && Number(g.remaining_amount) > 0) {
+                              return (
+                                <button
+                                  type="button"
+                                  className="quick-chip-btn quick-chip-fill"
+                                  onClick={() => setAllocationAmount(String(g.remaining_amount))}
+                                >
+                                  🎯 Đủ thiếu ({formatMoney(g.remaining_amount)})
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
 

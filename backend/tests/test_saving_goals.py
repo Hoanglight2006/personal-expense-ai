@@ -203,7 +203,7 @@ class TestSavingGoalsCRUD:
         assert Decimal(data["target_amount"]) == Decimal("28000000.00")
         assert data["days_remaining"] == 45
 
-    def test_cannot_update_completed_goal(self, client, user_a):
+    def test_can_update_completed_goal(self, client, user_a):
         # Create a goal with 100% initial deposit (already completed)
         created = client.post(
             GOALS_URL,
@@ -213,14 +213,16 @@ class TestSavingGoalsCRUD:
         goal_id = created["id"]
         assert created["status"] == "completed"
 
-        # Try to update completed goal -> Must fail with 400
+        # Updating completed goal is allowed in piggy bank model
         resp = client.patch(
             f"{GOALS_URL}/{goal_id}",
             json={"name": "Đổi tên mục tiêu đã xong", "target_amount": "5000000.00"},
             headers=user_a,
         )
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Mục tiêu đã hoàn thành không thể chỉnh sửa."
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "Đổi tên mục tiêu đã xong"
+        # Since target (5M) > current (1M), status drops back to active
+        assert resp.json()["status"] == "active"
 
     def test_delete_saving_goal(self, client, user_a):
         created = client.post(
@@ -278,14 +280,16 @@ class TestSavingContributions:
         assert d2_data["status"] == "completed"
         assert len(d2_data["contributions"]) == 2
 
-        # Deposit again into completed goal -> Must fail with 400
+        # Deposit again into completed goal -> Allowed in piggy bank model
         deposit_3 = client.post(
             f"{GOALS_URL}/{goal_id}/contribute",
             json={"amount": "100000.00"},
             headers=user_a,
         )
-        assert deposit_3.status_code == 400
-        assert deposit_3.json()["detail"] == "Mục tiêu đã hoàn thành, không thể nạp thêm tiền."
+        assert deposit_3.status_code == 200
+        d3_data = deposit_3.json()
+        assert Decimal(d3_data["current_amount"]) == Decimal("5100000.00")
+        assert d3_data["status"] == "completed"
 
     def test_deposit_validation(self, client, user_a):
         goal = client.post(
@@ -446,7 +450,7 @@ class TestSavingContributions:
             headers=user_a,
         )
 
-    def test_deposit_fails_when_exceeding_remaining_needed(self, client, user_a):
+    def test_deposit_can_exceed_target_amount(self, client, user_a):
         goal = client.post(
             GOALS_URL,
             json={"name": "Mục tiêu test remaining", "target_amount": "1000000.00"},
@@ -459,8 +463,9 @@ class TestSavingContributions:
             json={"amount": "2000000.00"},
             headers=user_a,
         )
-        assert resp.status_code == 400
-        assert "vượt quá số tiền còn thiếu" in resp.json()["detail"]
+        assert resp.status_code == 200
+        assert Decimal(resp.json()["current_amount"]) == Decimal("2000000.00")
+        assert resp.json()["status"] == "completed"
 
     def test_deposit_fails_when_exceeding_available_balance(self, client):
         # Register a fresh user with 0 income
@@ -627,7 +632,7 @@ class TestSavingWithdrawals:
         after = client.get("/api/v1/transactions/summary", headers=user).json()
         assert Decimal(after["available_balance"]) == Decimal("60000.00")
 
-    def test_withdrawal_from_completed_goal_keeps_completed_status(self, client, user_a):
+    def test_withdrawal_from_completed_goal_demotes_to_active(self, client, user_a):
         goal = client.post(
             GOALS_URL,
             json={
@@ -646,7 +651,7 @@ class TestSavingWithdrawals:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "completed"
+        assert data["status"] == "active"
         assert Decimal(data["current_amount"]) == Decimal("750000.00")
         assert Decimal(data["remaining_amount"]) == Decimal("250000.00")
 
@@ -776,9 +781,8 @@ class TestSavingWithdrawals:
             json={"amount": "20000.00", "idempotency_key": "cancelled-withdrawal-1"},
             headers=user,
         )
-        assert response.status_code == 200
-        assert response.json()["status"] == "cancelled"
-        assert Decimal(response.json()["current_amount"]) == Decimal("40000.00")
+        assert response.status_code == 400
+        assert "Mục tiêu đã bị hủy" in response.json()["detail"]
 
         after = client.get("/api/v1/transactions/summary", headers=user).json()
         assert Decimal(after["available_balance"]) == Decimal("100000.00")

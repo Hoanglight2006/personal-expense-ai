@@ -1355,3 +1355,32 @@
     transform-origin: bottom right !important;
   }
 }
+
+/* Dashboard Saving Alert Banner */
+.dashboard-saving-alert-banner {
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(254, 249, 195, 0.9) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-left: 5px solid #f59e0b;
+  border-radius: 18px;
+  padding: 18px 22px;
+  box-shadow: 0 10px 25px -4px rgba(245, 158, 11, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+  animation: fadeIn 0.35s ease-out;
+  backdrop-filter: blur(12px);
+}
+
+.dashboard-saving-alert-banner .alert-banner-title strong {
+  color: #92400e;
+}
+
+.dashboard-saving-alert-banner .alert-banner-title p {
+  color: #78350f;
+}
+
+.dashboard-saving-alert-banner .alert-banner-btn {
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.35);
+}

@@ -7,7 +7,8 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('vi-VN').format(num) + ' đ';
 };
 
-const getScoreColorClass = (score) => {
+const getScoreColorClass = (score, status) => {
+  if (status === 'Đang theo dõi') return 'score-tracking';
   if (score >= 80) return 'score-excellent';
   if (score >= 65) return 'score-good';
   if (score >= 45) return 'score-warning';
@@ -83,7 +84,7 @@ const AiReportTab = ({ defaultMonth }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await generateMonthlyReport(selectedMonth);
+      const data = await generateMonthlyReport(selectedMonth, focusOption);
       setReport(data);
       setHasGenerated(true);
       setShowConfig(false);
@@ -214,12 +215,12 @@ const AiReportTab = ({ defaultMonth }) => {
             <div className="ai-report-view-title">
               <span className="ai-badge-sub">✨ Báo Cáo Tài Chính AI</span>
               <h2>Phân Tích Chi Tiêu {monthDisplay}</h2>
-              <p>Trọng tâm: {FOCUS_OPTIONS.find((o) => o.id === focusOption)?.title || 'Toàn diện'}</p>
+              <p>Trọng tâm: {FOCUS_OPTIONS.find((o) => o.id === (report?.focus || focusOption))?.title || 'Toàn diện'}</p>
             </div>
 
             <div className="ai-report-view-meta">
               <div
-                className={`health-score-pill ${getScoreColorClass(report.financial_health_score)}`}
+                className={`health-score-pill ${getScoreColorClass(report.financial_health_score, report.health_status)}`}
                 aria-label={`Điểm sức khỏe tài chính ${report.financial_health_score} trên 100, ${report.health_status}`}
               >
                 <span className="score-caption">Sức khỏe tài chính</span>
@@ -271,6 +272,14 @@ const AiReportTab = ({ defaultMonth }) => {
                 <strong className="stat-tile-value text-indigo">{report.savings_rate}%</strong>
               </div>
             </div>
+            <div className="stat-tile goal">
+              <span className="stat-tile-icon" aria-hidden="true">🎯</span>
+              <div className="stat-tile-content">
+                <span className="stat-tile-label">Tích Lũy Mục Tiêu</span>
+                <strong className="stat-tile-value text-sky">{formatCurrency(report.total_saving_deposited)}</strong>
+              </div>
+            </div>
+
           </div>
 
           {/* Deep Insights */}

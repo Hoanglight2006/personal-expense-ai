@@ -22,7 +22,6 @@ class Settings(BaseSettings):
 
     # ---- File Uploads & External Services ----
     MAX_IMAGE_SIZE_MB: int = 10
-    MAX_EXCEL_SIZE_MB: int = 5
     OCR_PROVIDER: str = "gemini"  # 'local', 'gemini', or 'none' for fallback
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-3.5-flash-lite"

@@ -178,59 +178,6 @@ class TransactionRestoreResponse(BaseModel):
 TransactionSort = Literal["date_desc", "date_asc", "amount_desc", "amount_asc"]
 
 
-class BulkTransactionRow(BaseModel):
-    """A single row in a bulk import request."""
-
-    amount: Decimal
-    type: CategoryType
-    category_id: int
-    transaction_date: date
-    description: str | None = Field(
-        default=None, max_length=MAX_TRANSACTION_NOTE_LENGTH
-    )
-    payment_method: PaymentMethod = PaymentMethod.BANK_TRANSFER
-
-    model_config = ConfigDict(extra="forbid")
-
-    @field_validator("amount", mode="before")
-    @classmethod
-    def validate_amount(cls, value) -> Decimal:
-        return _validate_amount(value)
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def validate_description(cls, value) -> str | None:
-        return _clean_description(value)
-
-
-class BulkImportRequest(BaseModel):
-    """Request body for confirmed bulk import."""
-
-    idempotency_key: str = Field(..., min_length=1, max_length=64)
-    rows: list[BulkTransactionRow] = Field(..., min_length=1, max_length=1000)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class RowResult(BaseModel):
-    """Result for a single row in a bulk import."""
-
-    index: int
-    status: Literal["success", "error", "skipped"]
-    error: str | None = None
-    transaction_id: int | None = None
-
-
-class BulkImportResponse(BaseModel):
-    """Response for a bulk import operation."""
-
-    total: int
-    success_count: int
-    error_count: int
-    skipped_count: int
-    results: list[RowResult]
-
-
 class TransactionSummaryResponse(BaseModel):
     """Financial balance and flow summary response."""
 

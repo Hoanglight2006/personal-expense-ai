@@ -53,13 +53,22 @@ Dự án được chuẩn hóa theo đúng cấu trúc tiêu chuẩn công nghi�
 
 ```text
 personal-expense-ai/
-├── 🌐 frontend/                # [FRONTEND] Giao diện người dùng React 19 + Vite
+├── 🌐 frontend/                # [FRONTEND] React 19 + Vite (Feature-Based Architecture)
 │   ├── src/
 │   │   ├── api/                # Axios API client modules
-│   │   ├── components/         # Reusable React components (Modals, Popups, Mascot)
+│   │   ├── components/         # Reusable common UI (Modals, Popups, DatePicker, Mascot)
+│   │   ├── constants/          # Application constants & presets
 │   │   ├── context/            # Global Auth & App State Context
-│   │   ├── pages/              # Màn hình chức năng (Dashboard, Transactions, Budgets...)
-│   │   ├── styles/             # Hệ thống 28 file CSS Module hóa (Base, Layout, Components, Pages)
+│   │   ├── features/           # Feature Modules (Co-located Page.jsx, Page.css, Page.test.jsx)
+│   │   │   ├── auth/           # Login, Register, Forgot/Reset Password pages
+│   │   │   ├── budgets/        # BudgetsPage & BudgetCard, BudgetFormModal + Co-located CSS & Test
+│   │   │   ├── categories/     # CategoriesPage & category management + Co-located CSS & Test
+│   │   │   ├── dashboard/      # DashboardPage & summary widgets + Co-located CSS
+│   │   │   ├── profile/        # ProfilePage & avatar/password management + Co-located CSS & Test
+│   │   │   ├── saving-goals/   # SavingGoalsPage & Modals + Co-located CSS & Test
+│   │   │   ├── statistics/     # StatisticsPage & trend/insight reports + Co-located CSS & Test
+│   │   │   └── transactions/   # TransactionsPage, TransactionTrashPage + Co-located CSS & Test
+│   │   ├── styles/             # Shared Design Tokens, Base Resets, Layout & Shared Component CSS
 │   │   ├── utils/              # Helper functions (Định dạng tiền tệ, ngày tháng)
 │   │   ├── App.jsx             # React Router & Navigation shell
 │   │   ├── index.css           # Master CSS Hub (@import)
@@ -67,21 +76,31 @@ personal-expense-ai/
 │   ├── package.json            # Quản lý dependencies frontend
 │   └── vite.config.js          # Cấu hình Vite & proxy
 │
-├── ⚙️ backend/                 # [BACKEND] Máy chủ logic nghiệp vụ và API FastAPI
+├── ⚙️ backend/                 # [BACKEND] Kiến trúc 3 lớp (3-Tier) với FastAPI & SQLAlchemy
 │   ├── app/
-│   │   ├── api/routes/         # Các endpoint REST API (/auth, /transactions, /budgets...)
+│   │   ├── api/routes/         # Thin Controllers: Tiếp nhận HTTP request & ủy quyền cho Service
+│   │   │   ├── auth.py         # Router xác thực & hồ sơ (< 150 dòng)
+│   │   │   ├── budgets.py      # Router ngân sách (< 150 dòng)
+│   │   │   ├── categories.py   # Router danh mục (< 130 dòng)
+│   │   │   ├── saving_goals.py # Router mục tiêu tiết kiệm (< 150 dòng)
+│   │   │   └── transactions.py # Router giao dịch thu/chi & thùng rác (< 150 dòng)
+│   │   ├── services/           # Service Layer: Đóng gói 100% nghiệp vụ tài chính & tính toán
+│   │   │   ├── auth_service.py # Xử lý đăng ký, đăng nhập, token, đổi mật khẩu
+│   │   │   ├── budget_service.py # Xử lý ngân sách, cảnh báo ngưỡng 80%, bội chi
+│   │   │   ├── category_service.py # Xử lý danh mục, gán preset icon, khôi phục
+│   │   │   ├── saving_service.py # Xử lý tích lũy, nạp/rút tiền, kiểm tra số dư ví
+│   │   │   └── transaction_service.py # Xử lý CRUD giao dịch, khóa dòng, phân bổ mục tiêu
 │   │   ├── core/               # Bảo mật, JWT, hashing, AI prompt logic
 │   │   ├── models/             # SQLAlchemy ORM Models (User, Transaction, Category...)
 │   │   ├── schemas/            # Pydantic Schemas (Request/Response validation)
-│   │   ├── services/           # Nghiệp vụ xử lý phức tạp (AI OCR, Excel importer...)
 │   │   ├── config.py           # Quản lý biến môi trường Pydantic Settings
 │   │   ├── database.py         # Kết nối DB Engine & Session factory
 │   │   └── main.py             # FastAPI Application initialization
-│   ├── tests/                  # Bộ kiểm thử tự động pytest (167 test cases)
+│   ├── tests/                  # Bộ kiểm thử tự động pytest (165 test cases)
 │   └── requirements.txt        # Danh sách thư viện Python
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data
-│   ├── migrations/             # Các file SQL Migration (001 -> 004)
+│   ├── migrations/             # Các file SQL Migration (001 -> 006)
 │   ├── schema.sql              # File DDL toàn vẹn của CSDL MySQL 8.0
 │   ├── seed_demo.py            # Script khởi tạo 74 giao dịch demo 6 tháng
 │   └── README.md               # Hướng dẫn quản trị và migration CSDL
@@ -93,10 +112,15 @@ personal-expense-ai/
 ├── 📖 docs/                    # [DOCS] Bộ tài liệu kỹ thuật toàn diện
 │   ├── USER_GUIDE.md           # Hướng dẫn sử dụng chi tiết A-Z
 │   ├── SYSTEM_ARCHITECTURE.md  # Tài liệu kiến trúc hệ thống (Tài liệu này)
-│   ├── DEVELOPMENT_PROCESS.md  # Kế hoạch và quy trình phát triển 5 Sprint
+│   ├── DEVELOPMENT_PROCESS.md  # Kế hoạch và quy trình phát triển 6 Sprint
 │   ├── AI_DEVELOPMENT_LOG.md   # Nhật ký và minh chứng sử dụng AI (Prompt 5 thành phần & BA)
 │   ├── API.md                  # Đặc tả chi tiết toàn bộ REST API
-│   └── DATABASE.md             # Thiết kế CSDL, quy tắc khóa dòng & migration
+│   ├── DATABASE.md             # Thiết kế CSDL, quy tắc khóa dòng & migration
+│   ├── database_design.md      # Thiết kế chi tiết CSDL
+│   ├── requirements.md         # Đặc tả yêu cầu kỹ thuật
+│   ├── use_cases.md            # Các ca sử dụng chi tiết
+│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (222 test cases: 165 backend + 57 frontend)
+│   └── reports/                # Thư mục chứa các tài liệu báo cáo học phần
 │
 └── README.md                   # Hướng dẫn tổng quan & cài đặt nhanh
 ```

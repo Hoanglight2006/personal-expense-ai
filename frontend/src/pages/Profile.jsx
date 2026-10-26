@@ -3,6 +3,8 @@ import { AuthContext } from '../context/auth-context';
 import { changePassword, updateProfile, uploadAvatar } from '../api/authApi';
 import { useModalLock } from '../hooks/useModalLock';
 import AvatarSelectModal from '../components/AvatarSelectModal';
+import EmailVerificationSection from '../components/EmailVerificationSection';
+import { useLocation } from 'react-router-dom';
 import { getAvatarSrc } from '../utils/avatar';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -200,6 +202,15 @@ const SuccessModal = ({ isOpen, title, message, type = 'profile', onClose }) => 
 };
 
 const Profile = () => {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.state?.scrollToVerify) {
+      setTimeout(() => {
+        const el = document.getElementById('verify-email-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+  }, [location.state]);
   const { user, setUser } = useContext(AuthContext);
 
   // Forms state
@@ -364,6 +375,7 @@ const Profile = () => {
       return;
     }
 
+    const emailChanged = email !== user?.email?.toLowerCase();
     setSavingProfile(true);
     try {
       const updated = await updateProfile({ username, email });
@@ -371,7 +383,9 @@ const Profile = () => {
       setModalState({
         isOpen: true,
         title: 'Cập nhật thành công!',
-        message: 'Thông tin hồ sơ đã được cập nhật.',
+        message: emailChanged
+          ? 'Thông tin hồ sơ đã được lưu. Do bạn vừa đổi sang email mới, hệ thống đã đặt lại trạng thái và bạn cần xác minh địa chỉ email mới này.'
+          : 'Thông tin hồ sơ đã được cập nhật.',
         type: 'profile',
       });
     } catch (error) {
@@ -641,6 +655,7 @@ const Profile = () => {
           </form>
         </section>
       </div>
+      <EmailVerificationSection />
     </div>
   );
 };

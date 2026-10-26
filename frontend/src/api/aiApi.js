@@ -16,12 +16,13 @@ export const getMonthlyTrend = async (months = 6, signal) => {
 /**
  * Generate AI Monthly Spending Report following REQUIREMENTS.md.
  * @param {string} month - Format 'YYYY-MM'
+ * @param {string} [focus='comprehensive'] - Focus: 'comprehensive', 'saving', or 'risk'
  * @param {AbortSignal} [signal]
  */
-export const generateMonthlyReport = async (month, signal) => {
+export const generateMonthlyReport = async (month, focus = 'comprehensive', signal) => {
   const response = await axiosClient.post(
     '/ai/monthly-report',
-    { month },
+    { month, focus },
     { signal },
   );
   return response.data;
@@ -30,11 +31,16 @@ export const generateMonthlyReport = async (month, signal) => {
 /**
  * Get AI Budget Recommendations based on historical spend.
  * @param {string} [month] - Format 'YYYY-MM' (optional target month)
+ * @param {number} [lookbackMonths=3] - Lookback months count (1, 3, 6)
  * @param {AbortSignal} [signal]
  */
-export const getBudgetRecommendations = async (month, signal) => {
+export const getBudgetRecommendations = async (month, lookbackMonths = 3, signal) => {
+  const params = {};
+  if (month) params.month = month;
+  if (lookbackMonths) params.lookback_months = lookbackMonths;
+
   const response = await axiosClient.get('/ai/budget-recommendations', {
-    params: month ? { month } : {},
+    params,
     signal,
   });
   return response.data;

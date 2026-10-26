@@ -6,9 +6,8 @@ Provides endpoints for:
 - AI Budget Recommendations and 1-click batch application
 """
 
-from datetime import date
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -18,6 +17,7 @@ from app.core.ai_service import (
     generate_monthly_ai_report,
     get_monthly_trend_data,
 )
+from app.core.timezone import local_today
 from app.models.user import User
 from app.schemas.ai import (
     ApplyBudgetRecommendationsRequest,
@@ -66,7 +66,8 @@ async def create_monthly_report(
     current_user: User = Depends(get_current_user),
 ) -> MonthlyReportResponse:
     """Generate structured AI monthly financial report following REQUIREMENTS.md."""
-    return await generate_monthly_ai_report(db, current_user.id, payload.month)
+    focus = payload.focus or "comprehensive"
+    return await generate_monthly_ai_report(db, current_user.id, payload.month, focus=focus)
 
 
 # ---------------------------------------------------------------------------
@@ -87,11 +88,19 @@ async def get_ai_budget_recommendations(
             description="Tháng cần lập ngân sách (YYYY-MM). Mặc định là tháng tiếp theo.",
         ),
     ] = None,
+    lookback_months: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=12,
+            description="Số tháng quá khứ hoàn thành dùng để tính trung bình chi tiêu",
+        ),
+    ] = 3,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BudgetRecommendationResponse:
-    """Compute 1-3 month historical averages and generate AI budget suggestions."""
-    today = date.today()
+    """Compute 1-N month historical averages and generate AI budget suggestions."""
+    today = local_today()
     if month:
         parts = month.split("-")
         target_year = int(parts[0])
@@ -102,7 +111,11 @@ async def get_ai_budget_recommendations(
         target_year = today.year if today.month < 12 else today.year + 1
 
     return await generate_budget_recommendations(
-        db, current_user.id, target_month=target_month, target_year=target_year
+        db,
+        current_user.id,
+        target_month=target_month,
+        target_year=target_year,
+        lookback_months=lookback_months,
     )
 
 

@@ -45,7 +45,7 @@ Trình bày Markdown rõ ràng, có tiêu đề và bảng biểu trực quan.
 ```
 
 #### 2. Phản hồi của AI:
-* **Yêu cầu còn thiếu**: Cần bổ sung tính năng *“Nhân bản giao dịch” (Duplicate)* để người dùng tạo nhanh các khoản chi định kỳ, và *“Nhập sao kê hàng loạt từ Excel”*.
+* **Yêu cầu còn thiếu**: Cần bổ sung tính năng *“Nhân bản giao dịch” (Duplicate)* để người dùng tạo nhanh các khoản chi định kỳ.
 * **Edge cases quan trọng**:
   * Người dùng xóa khoản Thu nhập 10 triệu, nhưng trước đó đã tiêu hết 8 triệu và gửi tiết kiệm 2 triệu $\rightarrow$ Xóa xong ví sẽ bị **âm tiền**.
   * Người dùng khôi phục giao dịch từ thùng rác nhưng danh mục cũ đã bị xóa vĩnh viễn trước đó.
@@ -222,6 +222,38 @@ AI sinh ra các component `CoinAssistant.jsx`, `ChatPopup.jsx` và các keyframe
 
 ---
 
+### 🔹 Ca 6: Thiết Kế Báo Cáo Tài Chính AI Đa Trọng Tâm, Nhận Thức Thời Gian Thực & Cảnh Báo Bội Chi
+
+#### 1. Prompt của Sinh viên:
+```text
+[Context]
+Bạn là một Financial Analyst & AI Prompt Engineer cao cấp xây dựng module phân tích báo cáo tài chính hàng tháng cho ứng dụng Personal Expense AI.
+
+[Instructions]
+Thiết kế System Prompt và logic sinh báo cáo tài chính hàng tháng tự động với 3 chế độ trọng tâm (focus modes: comprehensive, savings, risk_alert):
+- Nhận thức thời gian thực (Real-time Temporal Awareness): Phân biệt rõ thời điểm đầu tháng (mới có 1-3 ngày hoặc ít giao dịch ban đầu), giữa/cuối tháng (dữ liệu tích lũy đầy đủ), và tháng cũ (đã chốt sổ).
+- Tự động đối chiếu ngân sách: Chỉ đích danh danh mục nào bị vượt hạn mức (overbudget) hoặc chạm ngưỡng cảnh báo, kèm hành động khẩn cấp.
+- Đưa ra khuyến nghị chi tiêu cụ thể, khả thi thay vì các lời khuyên chung chung.
+
+[Constraints]
+- Tuyệt đối không phán xét vội vã là "người dùng tiêu ít/tiết kiệm vượt trội" khi thực chất họ chỉ mới bắt đầu 1-2 ngày đầu tháng.
+- Định dạng xuất Markdown chuyên nghiệp, có icon, bảng tóm tắt và hành động khuyến nghị rõ ràng.
+```
+
+#### 2. Phản hồi của AI:
+AI cung cấp prompt khung và hàm `generate_monthly_financial_report()` phân tích chi tiêu tổng quát theo tỉ lệ danh mục.
+
+#### 3. Phần Sinh viên kiểm tra, rà soát và tối ưu:
+* **Lỗi & Hạn chế phát hiện**:
+  * Nếu chỉ cung cấp danh sách giao dịch mà không truyền ngữ cảnh ngày trong tháng (`day_of_month`), AI sẽ nhầm lẫn giữa người dùng chi tiêu tiết kiệm với người dùng mới đang ở những ngày đầu tháng (ảo giác phân tích).
+  * AI ban đầu chỉ nhận xét tổng quan mà không bám sát ngân sách từng danh mục cụ thể mà người dùng đã thiết lập.
+* **Cải tiến sinh viên đã triển khai**:
+  * Bổ sung trường `temporal_context` (`current_day_of_month`, `days_in_month`, `is_early_month`, `is_closed_month`) vào payload gửi tới Gemini AI, hướng dẫn AI nhận thức chính xác chu kỳ thời gian.
+  * Tích hợp bảng đối chiếu ngân sách (`actual_spent` vs `budget_amount`) vào prompt, buộc AI phải cảnh báo danh mục vượt ngưỡng ngay phần đầu báo cáo.
+  * Xây dựng giao diện Tab 3 chế độ (`AiReportTab.jsx`) cho phép người dùng chuyển đổi linh hoạt giữa Toàn diện, Tiết kiệm và Cảnh báo rủi ro.
+
+---
+
 ## 📊 4. BẢNG TỔNG HỢP CÁC PROMPT TRONG DỰ ÁN
 
 | STT | Phân hệ / Nhiệm vụ | Vai trò (Role) | Kỹ thuật Prompt | Đóng góp & Tinh chỉnh của Sinh viên |
@@ -232,6 +264,7 @@ AI sinh ra các component `CoinAssistant.jsx`, `ChatPopup.jsx` và các keyframe
 | **4** | **AI OCR Hóa đơn** | AI Engineer | Few-Shot Examples + JSON Schema | Thêm lớp Regex kiểm tra JSON, validate số tiền dương và fallback an toàn |
 | **5** | **Trợ lý ảo FinAI 3D** | UI/UX Specialist | Instructions + Constraints (`100dvh`) | Tối ưu responsive trên màn hình điện thoại và thêm tính năng ẩn mascot |
 | **6** | **Tạo Dữ liệu mẫu (Seed)** | Backend Engineer | Context + Instructions + Constraints | Sửa lỗi encoding UTF-8 trên Windows console và nạp sẵn 74 giao dịch demo |
+| **7** | **Báo cáo AI & Bội chi** | Financial Analyst | Temporal Awareness + Multi-focus Prompt | Thêm ngữ cảnh ngày đầu tháng, đối chiếu ngân sách từng danh mục, ngăn ảo giác phân tích |
 
 ---
 

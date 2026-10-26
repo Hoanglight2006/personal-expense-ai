@@ -37,8 +37,6 @@ Swagger UI tại `/docs` là nguồn tham chiếu tương tác cho toàn bộ sc
 | `POST` | `/transactions/{id}/restore` | Restore Transaction và contribution liên quan. |
 | `DELETE` | `/transactions/{id}` | Xóa vĩnh viễn; Transaction phải ở trong thùng rác. |
 | `POST` | `/transactions/{id}/duplicate` | Trả dữ liệu để prefill form; không tạo record mới. |
-| `POST` | `/transactions/parse-excel` | Parse file Excel và trả preview. |
-| `POST` | `/transactions/import` | Import tối đa 1.000 dòng đã xác nhận. |
 
 Query của `GET /transactions`:
 
@@ -166,35 +164,6 @@ cảnh báo để người dùng cập nhật Category.
 - `available_balance = total_balance - saving_balance`.
 - `month_net = month_income - month_expense` trong tháng hiện tại.
 
-### Excel và idempotency
-
-`POST /transactions/parse-excel` nhận `multipart/form-data`, field `file`, hỗ trợ
-`.xlsx`/`.xls`, giới hạn bởi `MAX_EXCEL_SIZE_MB`. Endpoint chỉ parse, đánh dấu
-`is_duplicate`, gợi ý Category và trả preview; chưa ghi Transaction.
-
-Sau khi người dùng xác nhận, gọi:
-
-```json
-{
-  "idempotency_key": "550e8400-e29b-41d4-a716-446655440000",
-  "rows": [
-    {
-      "amount": "45000.00",
-      "type": "expense",
-      "category_id": 3,
-      "transaction_date": "2026-08-18",
-      "description": "Ăn trưa",
-      "payment_method": "bank_transfer"
-    }
-  ]
-}
-```
-
-Key dài 1–64 ký tự và duy nhất theo user. Import xử lý từng dòng trong savepoint,
-vì vậy response có thể thành công một phần. Nếu có ít nhất một dòng thành công,
-key được ghi vào `import_idempotency_keys`; gửi lại cùng key trả `409` và không
-tạo bản ghi trùng. Nếu không dòng nào thành công, key chưa được tiêu thụ.
-
 ## Category
 
 ### Endpoint
@@ -274,7 +243,6 @@ FastAPI trả lỗi dạng `{"detail": "..."}` hoặc danh sách validation deta
 | `409 Conflict` | Trùng tên Category, đổi type Category đã được dùng, idempotency key đã xử lý hoặc database conflict. |
 | `422 Unprocessable Content` | Payload/query sai schema, amount/date sai, Category hidden/type không khớp, thao tác trash/restore sai trạng thái. |
 
-Excel còn có thể trả `413` khi file vượt giới hạn và `500` nếu parser gặp lỗi nội bộ.
 
 ## Saving Goal contribution công khai
 
@@ -328,3 +296,106 @@ Quy tắc:
 - Mỗi withdrawal được phân bổ vào các contribution mà nó đã tiêu thụ.
   Trash/restore chỉ cộng hoặc trừ phần contribution chưa từng được rút, không
   cộng/trừ trực tiếp toàn bộ allocation nguồn.
+
+
+---
+
+## Phân Hệ Trí Tuệ Nhân Tạo (AI Endpoints)
+
+Base URL: `/api/v1/ai` và `/api/v1/ocr`
+
+### 1. Báo Cáo Tài Chính AI Tháng (`POST /ai/monthly-report`)
+Sinh báo cáo phân tích chi tiêu chuyên sâu với 5 chỉ số tài chính, chấm điểm sức khỏe tài chính và 3 khuyến nghị điều chỉnh.
+
+**Request Body:**
+```json
+{
+  "month": "2026-10",
+  "focus": "comprehensive"
+}
+```
+* `month`: Định dạng `YYYY-MM`.
+* `focus`: 1 trong 3 trọng tâm: `"comprehensive"` (Toàn diện 360 độ), `"saving"` (Tối ưu cắt giảm chi phí), `"risk"` (Cảnh báo rủi ro & an toàn).
+
+**Response (200 OK):**
+```json
+{
+  "month": "2026-10",
+  "financial_health_score": 85,
+  "health_status": "Xuất sắc",
+  "total_income": "37500000.00",
+  "total_expense": "14080000.00",
+  "net_savings": "23420000.00",
+  "savings_rate": 62.5,
+  "total_saving_deposited": "0.00",
+  "overview": "Tổng quan tài chính tháng 10/2026 duy trì thặng dư ấn tượng...",
+  "trend_analysis": "Chi tiêu tập trung ở Nhà ở và Ăn uống...",
+  "adjustments": [
+    "Cắt giảm chi tiêu ở danh mục Ăn uống do đã vượt hạn mức ngân sách...",
+    "Thiết lập quỹ dự phòng khẩn cấp...",
+    "Tiếp tục duy trì tỷ lệ tiết kiệm trên 20%..."
+  ],
+  "conclusion": "Tiếp tục duy trì kỷ luật ghi chép...",
+  "raw_markdown": "# Báo Cáo Phân Tích Chi Tiêu..."
+}
+```
+
+### 2. Gợi Ý Ngân Sách AI (`POST /ai/budget-recommendations`)
+Phân tích lịch sử chi tiêu trung bình và đề xuất hạn mức chi tiêu tối ưu cho từng danh mục cho tháng tới.
+
+**Request Body:**
+```json
+{
+  "target_month": 11,
+  "target_year": 2026,
+  "lookback_months": 3
+}
+```
+
+### 3. Áp Dụng Ngân Sách Gợi Ý (`POST /ai/budget-recommendations/apply`)
+Lưu hàng loạt các hạn mức ngân sách AI đề xuất vào cơ sở dữ liệu chỉ với 1 click.
+
+### 4. Trợ Lý Chat FinAI Mascot (`POST /ai/chat`)
+Trò chuyện và hỏi đáp thông minh với trợ lý chi tiêu FinAI.
+```json
+{
+  "message": "Tháng này tôi tiêu nhiều nhất vào đâu?"
+}
+```
+
+### 5. Quét Hóa Đơn AI OCR (`POST /ocr/receipt`)
+Tải lên file ảnh hóa đơn (`multipart/form-data`) để trích xuất tự động số tiền, ngày giao dịch và gợi ý danh mục chi tiêu qua Gemini Vision.
+
+---
+
+## Phân Hệ Quản Trị Hệ Thống (System Admin Endpoints)
+
+Base URL: `/api/v1/admin`  
+Yêu cầu quyền: Người dùng phải có quyền Quản trị viên (`role = "admin"`). Trả về `403 Forbidden` nếu người dùng thông thường truy cập.
+
+### 1. Tổng Quan Hệ Thống & Giám Sát Tài Nguyên (`GET /admin/overview`)
+Trả về số liệu thống kê kỹ thuật toàn hệ thống:
+```json
+{
+  "total_users": 25,
+  "active_users": 23,
+  "locked_users": 2,
+  "total_transactions": 1420,
+  "total_ai_tokens": 158420,
+  "total_ai_requests": 340
+}
+```
+
+### 2. Danh Sách Người Dùng (`GET /admin/users`)
+Hỗ trợ tìm kiếm theo username/email và lọc theo trạng thái (`status=all|active|locked`).
+
+### 3. Khóa / Mở Khóa Tài Khoản (`POST /admin/users/{user_id}/status`)
+```json
+{
+  "status": "locked",
+  "reason": "Phát hiện đăng nhập bất thường"
+}
+```
+
+### 4. Cấp Mật Khẩu Tạm Thời (`POST /admin/users/{user_id}/temp-password`)
+Hỗ trợ cấp mật khẩu tạm thời 8 ký tự cho người dùng gặp sự cố quên/mất tài khoản.

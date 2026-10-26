@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getTransactions, getTransactionSummary } from '../api/transactionApi';
 import { getBudgetAlerts } from '../api/budgetApi';
+import { getSavingGoals } from '../api/savingGoalApi';
 import TransactionCard from '../components/TransactionCard';
 import CategoryIcon from '../components/CategoryIcon';
 
@@ -18,6 +19,7 @@ const Dashboard = () => {
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [budgetAlerts, setBudgetAlerts] = useState({ count: 0, items: [] });
+  const [savingAlerts, setSavingAlerts] = useState({ count: 0, items: [] });
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -31,11 +33,19 @@ const Dashboard = () => {
   const fetchDashboardData = async (signal) => {
     setLoading(true);
     try {
-      const [sumData, txnData, alertData] = await Promise.all([
+      const [sumData, txnData, alertData, goalsData] = await Promise.all([
         getTransactionSummary(signal),
         getTransactions({ page: 1, page_size: 5 }, signal),
         getBudgetAlerts({}, signal).catch(() => ({ count: 0, items: [] })),
+        getSavingGoals(signal).catch(() => ({ items: [] })),
       ]);
+
+      if (goalsData?.items) {
+        const urgent = goalsData.items.filter(
+          (g) => g.status === 'active' && g.deadline && g.days_remaining !== null && g.days_remaining <= 3
+        );
+        setSavingAlerts({ count: urgent.length, items: urgent });
+      }
 
       if (sumData) {
         setSummary({
@@ -122,6 +132,44 @@ const Dashboard = () => {
         </div>
       ) : (
         <>
+          {savingAlerts.count > 0 && (
+            <div className="dashboard-saving-alert-banner" role="alert">
+              <div className="alert-banner-header">
+                <div className="alert-banner-title">
+                  <span className="alert-banner-icon">🎯</span>
+                  <div>
+                    <strong>Cảnh báo hạn chót mục tiêu tiết kiệm ({savingAlerts.count} mục tiêu)</strong>
+                    <p>Có mục tiêu tiết kiệm sắp đến hạn trong vòng 3 ngày tới hoặc đã quá hạn cần bạn xem xét.</p>
+                  </div>
+                </div>
+                <Link to="/saving-goals" className="alert-banner-btn">
+                  <span>Quản lý mục tiêu</span>
+                  <span className="btn-arrow">→</span>
+                </Link>
+              </div>
+
+              <div className="alert-banner-items">
+                {savingAlerts.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`alert-mini-card ${item.days_remaining < 0 ? 'mini-exceeded' : 'mini-warning'}`}
+                  >
+                    <div className="mini-card-text">
+                      <span className="mini-name">{item.name}</span>
+                      <span className="mini-status">
+                        {item.days_remaining < 0
+                          ? `Quá hạn ${Math.abs(item.days_remaining)} ngày`
+                          : item.days_remaining === 0
+                          ? 'Hạn hôm nay!'
+                          : `Còn ${item.days_remaining} ngày`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {budgetAlerts.count > 0 && (
             <div className="dashboard-budget-alert-banner" role="alert">
               <div className="alert-banner-header">
