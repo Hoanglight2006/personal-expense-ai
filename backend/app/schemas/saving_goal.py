@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -26,6 +26,13 @@ class SavingContributionBase(BaseModel):
         description="Ghi chú cho lần nạp tiền",
     )
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount_integer(cls, v: Decimal) -> Decimal:
+        if v % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền nạp phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
+
 
 class SavingContributionCreate(SavingContributionBase):
     """Public payload for a manual contribution to a saving goal.
@@ -50,6 +57,13 @@ class SavingContributionResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
 
 class SavingWithdrawalCreate(BaseModel):
     """Public payload for withdrawing saved money from a goal."""
@@ -73,6 +87,13 @@ class SavingWithdrawalCreate(BaseModel):
         description="Ghi chú cho lần rút tiền",
     )
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount_integer(cls, v: Decimal) -> Decimal:
+        if v % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền rút phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
+
     model_config = ConfigDict(extra="forbid")
 
 
@@ -86,6 +107,13 @@ class SavingWithdrawalResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 # ==========================================
@@ -113,6 +141,13 @@ class SavingGoalBase(BaseModel):
         description="Hạn chót hoàn thành mục tiêu (YYYY-MM-DD)",
     )
 
+    @field_validator("target_amount")
+    @classmethod
+    def validate_target_integer(cls, v: Decimal) -> Decimal:
+        if v % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền mục tiêu phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
+
 
 class SavingGoalCreate(SavingGoalBase):
     """Payload for creating a new saving goal."""
@@ -130,6 +165,13 @@ class SavingGoalCreate(SavingGoalBase):
     def validate_deadline_not_past(cls, v: date | None) -> date | None:
         if v is not None and v < local_today():
             raise ValueError("Hạn chót không được ở trong quá khứ.")
+        return v
+
+    @field_validator("initial_deposit")
+    @classmethod
+    def validate_initial_deposit_integer(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and v % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền nạp ban đầu phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
         return v
 
 
@@ -158,6 +200,13 @@ class SavingGoalUpdate(BaseModel):
         description="Trạng thái mục tiêu (active, completed, cancelled)",
     )
 
+    @field_validator("target_amount")
+    @classmethod
+    def validate_target_integer(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and v % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền mục tiêu phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
+
 
 class SavingGoalResponse(BaseModel):
     """Detailed response model for a saving goal."""
@@ -177,6 +226,13 @@ class SavingGoalResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 class SavingGoalListResponse(BaseModel):

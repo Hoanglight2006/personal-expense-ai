@@ -28,6 +28,7 @@ def create_user_helper(client: TestClient, role: UserRole = UserRole.USER):
         db = TestingSessionLocal()
         try:
             db_user = db.query(User).filter(User.id == user_data["id"]).first()
+            assert db_user is not None
             db_user.role = UserRole.ADMIN
             db.commit()
         finally:
@@ -79,6 +80,9 @@ def test_admin_list_users_and_stats(client: TestClient):
     assert "items" in data
     assert data["total"] >= 2
     assert data["active_count"] >= 2
+    assert "transaction_count" in data["items"][0]
+    assert "transactions_count" in data["items"][0]
+    assert data["items"][0]["transaction_count"] == data["items"][0]["transactions_count"]
 
     # Check search filter
     resp = client.get(

@@ -41,17 +41,21 @@ Nếu bạn là người mới tiếp cận dự án hoặc là Giảng viên/Ng
 ### 🌟 Cách 1 (Khuyên Dùng): Khởi chạy 1-Click bằng Docker Compose
 Đây là cách nhanh nhất và thuận tiện nhất để trải nghiệm toàn bộ hệ thống:
 
-1. **Khởi động 3 dịch vụ (MySQL 8.0, Backend FastAPI, Frontend React)**:
-   ```powershell
+1. **Khởi tạo file cấu hình .env**:
+   `powershell
+   Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
+   `
+2. **Khởi động 3 dịch vụ (MySQL 8.0, Backend FastAPI, Frontend React)**:
+   `powershell
    docker compose up -d --build
-   ```
-2. **Nạp sẵn 74 giao dịch demo 6 tháng**:
-   ```powershell
+   `
+3. **Nạp sẵn 74 giao dịch demo 6 tháng**:
+   `powershell
    docker compose exec backend python /app/database/seed_demo.py
-   ```
-3. **Mở trình duyệt truy cập ngay**:
-   * Giao diện Web: **`http://localhost:5173`**
-   * Tài liệu API Swagger: **`http://localhost:8000/docs`**
+   `
+4. **Mở trình duyệt truy cập ngay**:
+   * Giao diện Web: **http://localhost:5173**
+   * Tài liệu API Swagger: **http://localhost:8000/docs**
 
 ---
 
@@ -59,20 +63,20 @@ Nếu bạn là người mới tiếp cận dự án hoặc là Giảng viên/Ng
 Nếu muốn chạy trực tiếp code Backend và Frontend để tiện debug, bạn vẫn sử dụng MySQL từ Docker (không cần cài MySQL trên Windows):
 
 1. **Bật container MySQL trên Docker**:
-   ```powershell
+   `powershell
    docker compose up -d mysql
-   ```
-   *(Container MySQL tự động ánh xạ cổng `3307` ra máy của bạn).*
+   `
+   *(Container MySQL tự động ánh xạ cổng 3307 ra máy của bạn).*
 
-2. **Khởi tạo file cấu hình `.env`**:
-   ```powershell
-   Copy-Item config/.env.example .env
-   Copy-Item config/.env.example backend/.env
-   ```
-   *(Chuỗi kết nối mặc định trong file mẫu đã trỏ sẵn vào MySQL Docker qua cổng 3307: `mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense`).*
+2. **Khởi tạo file cấu hình .env**:
+   `powershell
+   # Sao chép file cấu hình mẫu ra file .env duy nhất ở thư mục gốc
+   Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
+   `
+   *(File .env duy nhất ở thư mục gốc được Backend FastAPI và Docker tự động nhận diện. Chuỗi kết nối mặc định đã trỏ sẵn vào MySQL Docker qua cổng 3307: mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense).*
 
 3. **(Tùy chọn) Cấu hình Gemini API Key**:
-   * Để trải nghiệm các tính năng AI (Quét hóa đơn, FinAI chat, Báo cáo tháng), dán key vào file `backend/.env`:
+   * Để trải nghiệm các tính năng AI (Quét hóa đơn, FinAI chat, Báo cáo tháng), dán key vào file .env ở thư mục gốc:
      ```env
      GEMINI_API_KEY=AIzaSy...ChuoiKeyCuaBan...
      ```

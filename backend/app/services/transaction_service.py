@@ -20,6 +20,7 @@ from app.models.enums import CategoryType, ContributionSource, GoalStatus, Payme
 from app.core.timezone import local_today
 from app.models.saving_contribution import SavingContribution
 from app.models.saving_goal import SavingGoal
+from app.models.saving_withdrawal import SavingWithdrawal
 from app.models.saving_withdrawal_allocation import SavingWithdrawalAllocation
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -208,6 +209,10 @@ class TransactionService:
         include_deleted: bool = False,
     ) -> Transaction:
         """Return a Transaction owned by user or raise 404."""
+        if transaction_id >= 1_000_000_000:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=TRANSACTION_NOT_FOUND
+            )
         query = self.db.query(Transaction).filter(
             Transaction.id == transaction_id,
             Transaction.user_id == self.user.id,
@@ -266,6 +271,21 @@ class TransactionService:
                 color=txn.category.color,
                 is_active=txn.category.is_active,
             )
+        saving_goal_id = None
+        saving_goal_name = None
+        saving_goal_amount = None
+        if txn.type == CategoryType.INCOME:
+            contrib = (
+                self.db.query(SavingContribution, SavingGoal.name)
+                .join(SavingGoal, SavingGoal.id == SavingContribution.saving_goal_id)
+                .filter(SavingContribution.transaction_id == txn.id)
+                .first()
+            )
+            if contrib:
+                saving_goal_id = contrib[0].saving_goal_id
+                saving_goal_name = contrib[1]
+                saving_goal_amount = contrib[0].amount
+
         return TransactionResponse(
             id=txn.id,
             amount=txn.amount,
@@ -279,7 +299,127 @@ class TransactionService:
             created_at=txn.created_at,
             updated_at=txn.updated_at,
             deleted_at=txn.deleted_at,
+            saving_goal_id=saving_goal_id,
+            saving_goal_name=saving_goal_name,
+            saving_goal_amount=saving_goal_amount,
+            movement_type=None,
         )
+
+    def _saving_contribution_to_response(self, c: SavingContribution, goal_name: str) -> TransactionResponse:
+        saving_cat = CategoryInfo(
+            id=0,
+            name="Hũ tiết kiệm",
+            icon="savings",
+            color="#6366F1",
+            is_active=True,
+        )
+        note_suffix = f" - {c.note}" if c.note else ""
+        t_date = c.created_at.date() if isinstance(c.created_at, (datetime, date)) else local_today()
+        c_at = c.created_at or datetime.now(timezone.utc)
+        return TransactionResponse(
+            id=1_000_000_000 + c.id,
+            amount=c.amount,
+            type=CategoryType.TRANSFER,
+            category_id=0,
+            category=saving_cat,
+            transaction_date=t_date,
+            description=f"Nạp vào hũ: {goal_name}{note_suffix}",
+            payment_method=PaymentMethod.CASH,
+            is_deleted=False,
+            created_at=c_at,
+            updated_at=c_at,
+            deleted_at=None,
+            saving_goal_id=c.saving_goal_id,
+            saving_goal_name=goal_name,
+            saving_goal_amount=c.amount,
+            movement_type="deposit",
+        )
+
+    def _saving_withdrawal_to_response(self, w: SavingWithdrawal, goal_name: str) -> TransactionResponse:
+        withdraw_cat = CategoryInfo(
+            id=0,
+            name="Rút tiết kiệm",
+            icon="savings",
+            color="#0EA5E9",
+            is_active=True,
+        )
+        note_suffix = f" - {w.note}" if w.note else ""
+        t_date = w.created_at.date() if isinstance(w.created_at, (datetime, date)) else local_today()
+        w_at = w.created_at or datetime.now(timezone.utc)
+        return TransactionResponse(
+            id=2_000_000_000 + w.id,
+            amount=w.amount,
+            type=CategoryType.TRANSFER,
+            category_id=0,
+            category=withdraw_cat,
+            transaction_date=t_date,
+            description=f"Rút từ hũ: {goal_name}{note_suffix}",
+            payment_method=PaymentMethod.CASH,
+            is_deleted=False,
+            created_at=w_at,
+            updated_at=w_at,
+            deleted_at=None,
+            saving_goal_id=w.saving_goal_id,
+            saving_goal_name=goal_name,
+            saving_goal_amount=w.amount,
+            movement_type="withdraw",
+        )
+
+    def _get_saving_responses(
+        self,
+        *,
+        search: str | None = None,
+        date_start: date | None = None,
+        date_end: date | None = None,
+        amount_min: Decimal | None = None,
+        amount_max: Decimal | None = None,
+        category_id: int | None = None,
+        payment_method: PaymentMethod | None = None,
+    ) -> list[TransactionResponse]:
+        if category_id is not None and category_id != 0:
+            return []
+        if payment_method is not None and payment_method != PaymentMethod.CASH:
+            return []
+
+        c_query = (
+            self.db.query(SavingContribution, SavingGoal.name)
+            .join(SavingGoal, SavingGoal.id == SavingContribution.saving_goal_id)
+            .filter(
+                SavingGoal.user_id == self.user.id,
+                SavingContribution.source == ContributionSource.MANUAL,
+            )
+        )
+        w_query = (
+            self.db.query(SavingWithdrawal, SavingGoal.name)
+            .join(SavingGoal, SavingGoal.id == SavingWithdrawal.saving_goal_id)
+            .filter(SavingGoal.user_id == self.user.id)
+        )
+
+        if amount_min is not None:
+            c_query = c_query.filter(SavingContribution.amount >= amount_min)
+            w_query = w_query.filter(SavingWithdrawal.amount >= amount_min)
+        if amount_max is not None:
+            c_query = c_query.filter(SavingContribution.amount <= amount_max)
+            w_query = w_query.filter(SavingWithdrawal.amount <= amount_max)
+
+        c_items = c_query.all()
+        w_items = w_query.all()
+
+        responses = [self._saving_contribution_to_response(c, name) for c, name in c_items]
+        responses.extend([self._saving_withdrawal_to_response(w, name) for w, name in w_items])
+
+        if date_start:
+            responses = [r for r in responses if r.transaction_date >= date_start]
+        if date_end:
+            responses = [r for r in responses if r.transaction_date <= date_end]
+        if search:
+            kw = search.strip().lower()
+            responses = [
+                r for r in responses
+                if kw in (r.description or "").lower() or kw in (r.saving_goal_name or "").lower()
+            ]
+
+        return responses
 
     def _recomputed_goal_current_amount(
         self,
@@ -353,6 +493,11 @@ class TransactionService:
     # -----------------------------------------------------------------------
 
     def create_transaction(self, payload: TransactionCreate) -> TransactionResponse:
+        if payload.type == CategoryType.TRANSFER:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Giao dịch loại tiết kiệm được tự động tạo khi nạp hoặc rút từ mục tiêu tiết kiệm.",
+            )
         self._lock_user_balance()
         self._validate_category(payload.category_id, payload.type, require_active=True)
 
@@ -492,24 +637,86 @@ class TransactionService:
         if payment_method:
             query = query.filter(Transaction.payment_method == payment_method)
 
-        total_count = query.count()
+        def _sort_key(x: TransactionResponse):
+            ts = x.created_at.timestamp() if x.created_at else 0.0
+            return (x.transaction_date, ts, x.id)
 
-        if sort == "date_asc":
-            query = query.order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
-        elif sort == "amount_desc":
-            query = query.order_by(Transaction.amount.desc(), Transaction.id.desc())
-        elif sort == "amount_asc":
-            query = query.order_by(Transaction.amount.asc(), Transaction.id.asc())
-        else:
-            query = query.order_by(
-                Transaction.transaction_date.desc(), Transaction.id.desc()
+        if type == CategoryType.TRANSFER:
+            saving_items = self._get_saving_responses(
+                search=search,
+                date_start=date_start,
+                date_end=date_end,
+                amount_min=amount_min,
+                amount_max=amount_max,
+                category_id=category_id,
+                payment_method=payment_method,
+            )
+            total_count = len(saving_items)
+            if sort == "date_asc":
+                saving_items.sort(key=_sort_key)
+            elif sort == "amount_desc":
+                saving_items.sort(key=lambda x: x.amount, reverse=True)
+            elif sort == "amount_asc":
+                saving_items.sort(key=lambda x: x.amount)
+            else:
+                saving_items.sort(key=_sort_key, reverse=True)
+
+            offset = (page - 1) * page_size
+            return TransactionListResponse(
+                items=saving_items[offset : offset + page_size],
+                total_count=total_count,
+                page=page,
+                page_size=page_size,
             )
 
-        offset = (page - 1) * page_size
-        items = query.offset(offset).limit(page_size).all()
+        if type in (CategoryType.EXPENSE, CategoryType.INCOME):
+            total_count = query.count()
+            if sort == "date_asc":
+                query = query.order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
+            elif sort == "amount_desc":
+                query = query.order_by(Transaction.amount.desc(), Transaction.id.desc())
+            elif sort == "amount_asc":
+                query = query.order_by(Transaction.amount.asc(), Transaction.id.asc())
+            else:
+                query = query.order_by(
+                    Transaction.transaction_date.desc(), Transaction.id.desc()
+                )
 
+            offset = (page - 1) * page_size
+            items = query.offset(offset).limit(page_size).all()
+            return TransactionListResponse(
+                items=[self._to_response(txn) for txn in items],
+                total_count=total_count,
+                page=page,
+                page_size=page_size,
+            )
+
+        # type is None (Tất cả): kết hợp giao dịch thu chi và biến động hũ tiết kiệm
+        txn_items = [self._to_response(txn) for txn in query.all()]
+        saving_items = self._get_saving_responses(
+            search=search,
+            date_start=date_start,
+            date_end=date_end,
+            amount_min=amount_min,
+            amount_max=amount_max,
+            category_id=category_id,
+            payment_method=payment_method,
+        )
+        combined = txn_items + saving_items
+        total_count = len(combined)
+
+        if sort == "date_asc":
+            combined.sort(key=_sort_key)
+        elif sort == "amount_desc":
+            combined.sort(key=lambda x: x.amount, reverse=True)
+        elif sort == "amount_asc":
+            combined.sort(key=lambda x: x.amount)
+        else:
+            combined.sort(key=_sort_key, reverse=True)
+
+        offset = (page - 1) * page_size
         return TransactionListResponse(
-            items=[self._to_response(txn) for txn in items],
+            items=combined[offset : offset + page_size],
             total_count=total_count,
             page=page,
             page_size=page_size,
@@ -629,6 +836,11 @@ class TransactionService:
     def update_transaction(
         self, transaction_id: int, payload: TransactionUpdate
     ) -> TransactionResponse:
+        if transaction_id >= 1_000_000_000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không thể chỉnh sửa giao dịch tiết kiệm tại đây. Vui lòng thao tác tại trang Mục tiêu tiết kiệm.",
+            )
         self._lock_user_balance()
         txn = self._owned_transaction_or_404(transaction_id)
 
@@ -692,6 +904,11 @@ class TransactionService:
         return self._to_response(txn)
 
     def trash_transaction(self, transaction_id: int) -> TransactionResponse:
+        if transaction_id >= 1_000_000_000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không thể xóa giao dịch tiết kiệm tại đây. Vui lòng thao tác tại trang Mục tiêu tiết kiệm.",
+            )
         self._lock_user_balance()
         txn = self._owned_transaction_or_404(transaction_id)
 
@@ -842,5 +1059,10 @@ class TransactionService:
         self._commit_or_raise()
 
     def duplicate_transaction(self, transaction_id: int) -> TransactionResponse:
+        if transaction_id >= 1_000_000_000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không thể nhân bản giao dịch tiết kiệm.",
+            )
         txn = self._owned_transaction_or_404(transaction_id)
         return self._to_response(txn)

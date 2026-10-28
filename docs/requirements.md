@@ -48,6 +48,7 @@ graph TD
         A7["7. Dashboard thống kê số dư, cơ cấu chi tiêu & biểu đồ SVG"]
         A8["8. AI Báo cáo tháng, AI Gợi ý ngân sách & AI Chatbot FinAI"]
         A9["9. AI OCR Quét hóa đơn mua hàng bằng Gemini 1.5 Vision"]
+        A10["10. Phân hệ Quản trị Admin & Giám sát AI Telemetry"]
     end
 
     subgraph OUT_SCOPE ["❌ NGOÀI PHẠM VI HỆ THỐNG (OUT-OF-SCOPE)"]

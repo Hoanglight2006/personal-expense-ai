@@ -26,9 +26,10 @@ backend_dir = root_dir / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-if hasattr(sys.stdout, "reconfigure"):
+reconfigure_stdout = getattr(sys.stdout, "reconfigure", None)
+if callable(reconfigure_stdout):
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
+        reconfigure_stdout(encoding="utf-8")
     except Exception:
         pass
 

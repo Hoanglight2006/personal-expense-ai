@@ -192,6 +192,8 @@ const TransactionFormModal = ({
     }
     if (!form.amount || Number.isNaN(amount) || amount <= 0) {
       errs.amount = 'Vui lòng nhập số tiền lớn hơn 0.';
+    } else if (!Number.isInteger(amount)) {
+      errs.amount = 'Số tiền giao dịch phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
     }
     
     let currentType = form.type;
@@ -227,10 +229,21 @@ const TransactionFormModal = ({
       }
     }
 
+    if (isEdit && transaction?.saving_goal_amount && !Number.isNaN(amount) && amount > 0) {
+      const minRequired = Number(transaction.saving_goal_amount);
+      if (currentType === 'expense') {
+        errs.type = `Giao dịch thu nhập này đang trích ${formatMoney(minRequired)} vào mục tiêu tiết kiệm, không thể đổi loại thành chi tiêu.`;
+      } else if (amount < minRequired) {
+        errs.amount = `Số tiền thu nhập mới (${formatMoney(amount)}) không thể nhỏ hơn số tiền đã trích vào mục tiêu tiết kiệm (${formatMoney(minRequired)}).`;
+      }
+    }
+
     if (!isEdit && currentType === 'income' && selectedGoalId) {
       const allocVal = parseFloat(allocationAmount);
       if (!allocationAmount || isNaN(allocVal) || allocVal <= 0) {
         errs.allocation = 'Vui lòng nhập số tiền trích hợp lệ lớn hơn 0.';
+      } else if (!Number.isInteger(allocVal)) {
+        errs.allocation = 'Số tiền trích phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
       } else if (amount && allocVal > amount) {
         errs.allocation = 'Số tiền trích không được vượt quá số tiền thu nhập.';
       }
@@ -394,12 +407,17 @@ const TransactionFormModal = ({
               </div>
               <input
                 type="number"
-                step="any"
-                min="0"
+                step="1"
+                min="1"
                 value={form.amount}
                 onChange={handleChange('amount')}
+                onKeyDown={(e) => {
+                  if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 onWheel={(e) => e.currentTarget.blur()}
-                placeholder="0.00"
+                placeholder="0"
                 className={errors.amount ? 'input-error' : ''}
                 aria-invalid={Boolean(errors.amount)}
               />
@@ -487,6 +505,34 @@ const TransactionFormModal = ({
           </label>
 
           {/* Income Saving Goal Allocation Section */}
+          {isEdit && isIncomeTransaction && transaction?.saving_goal_name && (
+            <div className="income-goal-allocation-card allocation-card-readonly">
+              <div className="allocation-header-row">
+                <div className="allocation-header-title">
+                  <span className="allocation-icon">🎯</span>
+                  <strong>Mục tiêu tiết kiệm đã trích</strong>
+                </div>
+                <span className="allocation-badge-count">Đã liên kết</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '0.88rem',
+                  padding: '10px 14px',
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  borderRadius: '10px',
+                  color: '#4338ca',
+                  marginTop: '10px',
+                  lineHeight: '1.5',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                }}
+              >
+                Giao dịch này đang trích{' '}
+                <strong>{formatMoney(transaction.saving_goal_amount)}</strong> vào mục tiêu{' '}
+                <strong>{transaction.saving_goal_name}</strong>.
+              </div>
+            </div>
+          )}
+
           {!isEdit && isIncomeTransaction && (
             <div className="income-goal-allocation-card">
               <div className="allocation-header-row">
@@ -576,8 +622,9 @@ const TransactionFormModal = ({
                             setAllocationAmount(e.target.value);
                             if (errors.allocation) setErrors((p) => ({ ...p, allocation: '' }));
                           }}
+                          onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                           min="1"
-                          step="any"
+                          step="1"
                           onWheel={(e) => e.currentTarget.blur()}
                           className={errors.allocation ? 'input-error' : ''}
                           aria-invalid={Boolean(errors.allocation)}

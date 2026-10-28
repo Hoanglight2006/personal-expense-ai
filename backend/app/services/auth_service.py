@@ -113,9 +113,9 @@ class AuthService:
                 detail="Tài khoản của bạn đã bị tạm khóa bởi quản trị viên. Vui lòng liên hệ hỗ trợ.",
             )
 
-        user_role = getattr(user, "role", "user")
-        if hasattr(user_role, "value"):
-            user_role = user_role.value
+        role_attr = getattr(user, "role", "user")
+        user_role = str(getattr(role_attr, "value", role_attr))
+
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(

@@ -8,9 +8,10 @@ Thư mục này quản lý toàn bộ các file mẫu cấu hình môi trường
 
 ```text
 config/
-├── .env.example    # File mẫu biến môi trường tổng thể cho toàn dự án
 ├── prompts.json    # Tập trung định nghĩa các AI system prompts và templates
 └── README.md       # Giải thích ý nghĩa và hướng dẫn cấu hình (File này)
+
+> 💡 **Lưu ý**: File cấu hình biến môi trường Master của toàn dự án được đặt tại thư mục gốc: [.env.example](../.env.example).
 ```
 
 ---
@@ -33,6 +34,6 @@ config/
 
 Để khởi tạo cấu hình môi trường:
 ```powershell
-# Sao chép file cấu hình mẫu sang backend và frontend
-Copy-Item config/.env.example backend/.env
+# Sao chép file cấu hình mẫu Master ở thư mục gốc
+Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
 ```

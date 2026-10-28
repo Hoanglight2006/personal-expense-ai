@@ -204,7 +204,7 @@ def test_hide_is_soft_delete_and_keeps_historical_transaction(client: TestClient
             user_id=user_id,
             category_id=category["id"],
             type=CategoryType.EXPENSE,
-            amount=Decimal("125.50"),
+            amount=Decimal("125.00"),
             description="Dữ liệu giả",
             transaction_date=date(2026, 8, 15),
         )
@@ -219,7 +219,7 @@ def test_hide_is_soft_delete_and_keeps_historical_transaction(client: TestClient
     ).status_code == 200
     db = TestingSessionLocal()
     try:
-        assert db.query(Transaction).filter(Transaction.id == transaction_id).one().amount == Decimal("125.50")
+        assert db.query(Transaction).filter(Transaction.id == transaction_id).one().amount == Decimal("125.00")
     finally:
         db.close()
     stats = client.get(
@@ -228,7 +228,7 @@ def test_hide_is_soft_delete_and_keeps_historical_transaction(client: TestClient
         params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
     ).json()["items"]
     item = next(item for item in stats if item["id"] == category["id"])
-    assert item["total_amount"] == "125.50"
+    assert item["total_amount"] == "125.00"
     assert item["transaction_count"] == 1
 
     type_patch_resp = client.patch(

@@ -183,23 +183,3 @@ VALUES
 (1, 'Đầu tư', 'dau tu', 'investment', '#719F4E', 'income', TRUE, TRUE),
 (1, 'Khác', 'khac', 'other', '#D69A23', 'expense', TRUE, TRUE);
 
--- 10. DEFAULT SEED ACCOUNTS (DEMO & ADMIN)
-INSERT IGNORE INTO users (id, username, email, password_hash, role, is_locked)
-VALUES 
-(1, 'demouser', 'demo@example.com', '$2b$12$ce4/qhc9Ea4B/6vRjtKpXOrkFgva50wExEAlVEudr1iiA/5daZ4Mq', 'user', FALSE),
-(2, 'system_admin', 'admin@example.com', '$2b$12$Sqw9q1.mGYBtQT4fL0DzCOYl6T3fZrnRj1s1i1lYNNtdB9rPjFQ0S', 'admin', FALSE);
-
-INSERT IGNORE INTO categories (user_id, name, name_normalized, icon, color, type, is_active, is_default)
-VALUES
-(1, 'Ăn uống', 'an uong', 'food', '#E76452', 'expense', TRUE, TRUE),
-(1, 'Đi lại', 'di lai', 'transport', '#4F8CC9', 'expense', TRUE, TRUE),
-(1, 'Mua sắm', 'mua sam', 'shopping', '#9A6AC4', 'expense', TRUE, TRUE),
-(1, 'Nhà ở', 'nha o', 'home', '#D87542', 'expense', TRUE, TRUE),
-(1, 'Sức khỏe', 'suc khoe', 'health', '#DE5555', 'expense', TRUE, TRUE),
-(1, 'Giáo dục', 'giao duc', 'education', '#4F72BE', 'expense', TRUE, TRUE),
-(1, 'Giải trí', 'giai tri', 'entertainment', '#7D5BB2', 'expense', TRUE, TRUE),
-(1, 'Lương', 'luong', 'salary', '#4B9D67', 'income', TRUE, TRUE),
-(1, 'Thưởng', 'thuong', 'bonus', '#E9A22F', 'income', TRUE, TRUE),
-(1, 'Quà tặng', 'qua tang', 'gift', '#DD5C77', 'income', TRUE, TRUE),
-(1, 'Đầu tư', 'dau tu', 'investment', '#719F4E', 'income', TRUE, TRUE),
-(1, 'Khác', 'khac', 'other', '#D69A23', 'expense', TRUE, TRUE);

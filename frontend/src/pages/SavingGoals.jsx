@@ -15,24 +15,13 @@ import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
 import WarningPopup from '../components/WarningPopup';
 import { useModalLock } from '../hooks/useModalLock';
+import { formatDateVn as formatDate, formatDateTimeVn as formatDateTime } from '../utils/date';
 
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
-
-const formatDateTime = (dtStr) => {
-  if (!dtStr) return '';
-  const d = new Date(dtStr);
-  if (isNaN(d.getTime())) return dtStr;
-  return `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
-};
+// formatDate and formatDateTime imported from ../utils/date
 
 const createRequestKey = () => {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -292,12 +281,16 @@ const SavingGoals = () => {
     const targetVal = parseFloat(formTargetAmount);
     if (!formTargetAmount || isNaN(targetVal) || targetVal <= 0) {
       errors.target_amount = 'Số tiền mục tiêu phải lớn hơn 0.';
+    } else if (!Number.isInteger(targetVal)) {
+      errors.target_amount = 'Số tiền mục tiêu phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
     }
 
     if (formInitialDeposit) {
       const initVal = parseFloat(formInitialDeposit);
       if (isNaN(initVal) || initVal < 0) {
         errors.initial_deposit = 'Số tiền nạp ban đầu không được âm.';
+      } else if (!Number.isInteger(initVal)) {
+        errors.initial_deposit = 'Số tiền nạp ban đầu phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
       } else if (!isNaN(targetVal) && initVal > targetVal) {
         errors.initial_deposit = 'Số tiền nạp ban đầu không thể lớn hơn số tiền mục tiêu.';
       } else if (!editingGoal && initVal > availableBalance) {
@@ -378,6 +371,12 @@ const SavingGoals = () => {
       showWarning(message, 'deposit-amount');
       return;
     }
+    if (!Number.isInteger(amountVal)) {
+      const message = 'Số tiền nạp phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
+      setDepositError(message);
+      showWarning(message, 'deposit-amount');
+      return;
+    }
 
     if (amountVal > availableBalance) {
       const message = `Số tiền nạp (${formatMoney(amountVal)}) vượt quá số dư khả dụng hiện có (${formatMoney(availableBalance)}).`;
@@ -418,6 +417,12 @@ const SavingGoals = () => {
     const amountVal = parseFloat(withdrawAmount);
     if (!withdrawAmount || isNaN(amountVal) || amountVal <= 0) {
       const message = 'Vui lòng nhập số tiền rút hợp lệ lớn hơn 0.';
+      setWithdrawError(message);
+      showWarning(message, 'withdraw-amount');
+      return;
+    }
+    if (!Number.isInteger(amountVal)) {
+      const message = 'Số tiền rút phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
       setWithdrawError(message);
       showWarning(message, 'withdraw-amount');
       return;
@@ -642,7 +647,7 @@ const SavingGoals = () => {
                   <span key={g.id} className={`urgent-mini-tag ${tagClass}`}>
                     <span className="urgent-tag-name">{g.name}</span>
                     <span className="urgent-tag-time">({timeText})</span>
-                    <span className="urgent-tag-remain">· Còn thiếu {formatCurrency(remainAmount)}</span>
+                    <span className="urgent-tag-remain">· Còn thiếu {formatMoney(remainAmount)}</span>
                   </span>
                 );
               })}
@@ -1002,8 +1007,9 @@ const SavingGoals = () => {
                     placeholder="Ví dụ: 20000000"
                     value={formTargetAmount}
                     onChange={(e) => setFormTargetAmount(e.target.value)}
+                    onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                     min="1"
-                    step="any"
+                    step="1"
                     className={formErrors.target_amount ? 'input-error' : ''}
                     aria-invalid={Boolean(formErrors.target_amount)}
                     required
@@ -1042,8 +1048,9 @@ const SavingGoals = () => {
                     placeholder={`Tối đa khả dụng: ${formatMoney(availableBalance)}`}
                     value={formInitialDeposit}
                     onChange={(e) => setFormInitialDeposit(e.target.value)}
+                    onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                     min="0"
-                    step="any"
+                    step="1"
                     className={formErrors.initial_deposit ? 'input-error' : ''}
                     aria-invalid={Boolean(formErrors.initial_deposit)}
                   />
@@ -1203,8 +1210,9 @@ const SavingGoals = () => {
                     setDepositAmount(e.target.value);
                     if (depositError) setDepositError('');
                   }}
+                  onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                   min="1"
-                  step="any"
+                  step="1"
                   className={depositError ? 'input-error' : ''}
                   aria-invalid={Boolean(depositError)}
                   autoFocus
@@ -1329,9 +1337,10 @@ const SavingGoals = () => {
                     setWithdrawAmount(e.target.value);
                     if (withdrawError) setWithdrawError('');
                   }}
+                  onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                   min="1"
                   max={Number(activeWithdrawGoal.current_amount || 0)}
-                  step="any"
+                  step="1"
                   className={withdrawError ? 'input-error' : ''}
                   aria-invalid={Boolean(withdrawError)}
                   autoFocus

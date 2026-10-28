@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { sendChatMessage } from '../api/chatApi';
+import { AuthContext } from '../context/auth-context';
 
 const botAvatar = '/finai-winged-coin-favicon.png';
 
@@ -15,23 +16,70 @@ const QUICK_SUGGESTIONS = [
   'Tóm tắt thu chi tháng này',
 ];
 
+const getChatStorageKey = (userId) => (userId ? `finai_chat_${userId}` : 'finai_chat_guest');
+
+const loadInitialMessages = (storageKey) => {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Không thể đọc lịch sử chat từ localStorage', err);
+  }
+  return [WELCOME_MESSAGE];
+};
+
 const ChatPopup = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+  const { user } = useContext(AuthContext);
+  const storageKey = getChatStorageKey(user?.id);
+
+  const [messages, setMessages] = useState(() => loadInitialMessages(storageKey));
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const chipsContainerRef = useRef(null);
 
+  // Sync to localStorage whenever messages change
+  useEffect(() => {
+    try {
+      if (messages.length > 1 || (messages.length === 1 && messages[0].content !== WELCOME_MESSAGE.content)) {
+        localStorage.setItem(storageKey, JSON.stringify(messages));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (err) {
+      console.error('Không thể lưu lịch sử chat vào localStorage', err);
+    }
+  }, [messages, storageKey]);
+
+  // If user switches, reload initial messages for that user
+  useEffect(() => {
+    setMessages(loadInitialMessages(storageKey));
+  }, [storageKey]);
+
+  const handleClearChat = () => {
+    setMessages([WELCOME_MESSAGE]);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // ignore
+    }
+  };
+
   const scrollChips = (offset) => {
-    if (chipsContainerRef.current) {
+    if (chipsContainerRef.current?.scrollBy) {
       chipsContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
     }
   };
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current?.scrollIntoView) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isTyping]);
@@ -56,7 +104,7 @@ const ChatPopup = ({ isOpen, onClose }) => {
     try {
       // Build conversation_history for API (exclude welcome message)
       const history = updatedMessages
-        .filter((m) => m !== WELCOME_MESSAGE)
+        .filter((m) => m.content !== WELCOME_MESSAGE.content)
         .map((m) => ({ role: m.role, content: m.content }));
 
       const data = await sendChatMessage({
@@ -104,6 +152,17 @@ const ChatPopup = ({ isOpen, onClose }) => {
           <span>Trợ lý chi tiêu</span>
         </div>
         <div className="chat-popup-actions">
+          {messages.length > 1 && (
+            <button
+              type="button"
+              className="chat-popup-clear"
+              onClick={handleClearChat}
+              aria-label="Xóa lịch sử và bắt đầu đoạn chat mới"
+              title="Đoạn chat mới"
+            >
+              🔄
+            </button>
+          )}
           <button type="button" className="chat-popup-close" onClick={onClose} aria-label="Đóng chat" title="Đóng cửa sổ chat">
             ✕
           </button>

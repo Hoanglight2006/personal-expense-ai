@@ -67,7 +67,7 @@ const EmailVerificationSection = () => {
   };
 
   return (
-    <section id="verify-email-section" className="profile-panel" style={{ marginTop: '24px' }}>
+    <section id="verify-email-section" className="profile-panel profile-verify-panel">
       <div className="profile-panel-heading">
         <span
           className="profile-panel-icon"
@@ -78,92 +78,41 @@ const EmailVerificationSection = () => {
         >
           {user.is_verified ? '🛡️' : '✉️'}
         </span>
-        <div>
+        <div className="profile-panel-heading-text">
           <h2>Xác thực địa chỉ Email</h2>
           <p>Nhận báo cáo tổng quan & cảnh báo chi tiêu vượt ngưỡng trực tiếp qua email của bạn.</p>
         </div>
       </div>
 
       {user.is_verified ? (
-        <div
-          style={{
-            background: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            borderRadius: '16px',
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: '#10b981',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '22px',
-              flexShrink: 0,
-            }}
-          >
+        <div className="email-verify-box email-verify-box-success">
+          <div className="email-verify-icon-wrap" aria-hidden="true">
             ✓
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <strong style={{ fontSize: '1rem', color: '#065f46' }}>Email đã được xác thực an toàn</strong>
-              <span
-                style={{
-                  background: '#d1fae5',
-                  color: '#047857',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                }}
-              >
+          <div className="email-verify-content">
+            <strong className="email-verify-title">Email đã được xác thực an toàn</strong>
+            <div className="email-verify-badge-row">
+              <span className="email-verify-address-tag">
                 {user.email}
               </span>
             </div>
-            <p style={{ margin: 0, fontSize: '0.88rem', color: '#047857', lineHeight: 1.5 }}>
+            <p className="email-verify-desc">
               Tài khoản đã kích hoạt nhận thông báo tài chính và cảnh báo thông minh qua email khi có khoản chi tiêu vượt mức kế hoạch.
             </p>
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div
-            style={{
-              background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
-              borderRadius: '16px',
-              padding: '18px 22px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '14px',
-            }}
-          >
-            <span style={{ fontSize: '24px', lineHeight: 1 }}>⚠️</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <strong style={{ fontSize: '0.96rem', color: '#92400e' }}>Chưa xác minh địa chỉ:</strong>
-                <span
-                  style={{
-                    background: '#fef3c7',
-                    color: '#92400e',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                  }}
-                >
+        <div className="email-verify-unverified-wrap">
+          <div className="email-verify-box email-verify-box-warning">
+            <span className="email-verify-warning-icon" aria-hidden="true">⚠️</span>
+            <div className="email-verify-content">
+              <strong className="email-verify-title email-verify-title-warning">Chưa xác minh địa chỉ email</strong>
+              <div className="email-verify-badge-row">
+                <span className="email-verify-address-tag email-verify-address-tag-warning">
                   {user.email}
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: '0.86rem', color: '#b45309', lineHeight: 1.5 }}>
+              <p className="email-verify-desc email-verify-desc-warning">
                 Để nhận được cảnh báo tự động khi sắp hết ngân sách hoặc tài khoản có biến động bất thường, vui lòng xác minh email của bạn ngay hôm nay.
               </p>
             </div>
@@ -176,18 +125,7 @@ const EmailVerificationSection = () => {
           )}
 
           {success && (
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: '10px',
-                background: '#ecfdf5',
-                border: '1px solid #6ee7b7',
-                color: '#065f46',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-              }}
-              role="status"
-            >
+            <div className="email-verify-feedback-success" role="status">
               ✨ {success}
             </div>
           )}
@@ -196,21 +134,20 @@ const EmailVerificationSection = () => {
             <div>
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-primary email-verify-send-btn"
                 onClick={handleSendCode}
                 disabled={sending}
-                style={{ padding: '10px 20px', borderRadius: '12px' }}
               >
                 {sending ? 'Đang gửi mã…' : '✉️ Gửi mã OTP xác nhận'}
               </button>
             </div>
           ) : (
-            <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleVerify} className="email-verify-form">
               <div className="input-group" style={{ margin: 0 }}>
                 <label htmlFor="verify-email-otp" style={{ fontSize: '0.88rem', fontWeight: 600 }}>
                   Nhập mã OTP 6 số đã gửi tới {user.email}
                 </label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="email-verify-otp-row">
                   <input
                     id="verify-email-otp"
                     type="text"
@@ -219,23 +156,13 @@ const EmailVerificationSection = () => {
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="VD: 123456"
-                    style={{
-                      maxWidth: '180px',
-                      padding: '10px 14px',
-                      fontSize: '1.2rem',
-                      fontWeight: 700,
-                      letterSpacing: '4px',
-                      textAlign: 'center',
-                      borderRadius: '12px',
-                      border: '1px solid var(--border-color)',
-                    }}
+                    className="email-verify-otp-input"
                     required
                   />
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-primary email-verify-btn"
                     disabled={verifying || code.length < 6}
-                    style={{ padding: '10px 20px', borderRadius: '12px' }}
                   >
                     {verifying ? 'Đang xác thực…' : 'Xác minh'}
                   </button>

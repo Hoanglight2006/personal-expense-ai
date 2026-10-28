@@ -40,7 +40,7 @@ const AdminUserRow = React.memo(({ user: u, isSelf, isBusy, onLockClick, onReset
       </td>
       <td>{formatDate(u.created_at)}</td>
       <td>
-        <strong>{u.transactions_count || 0}</strong> giao dịch
+        <strong>{u.transactions_count ?? u.transaction_count ?? 0}</strong> giao dịch
       </td>
       <td>
         <span

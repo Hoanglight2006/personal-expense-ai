@@ -18,7 +18,15 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_FROM_EMAIL: str | None = None
-    CORS_ORIGINS: list[str] = Field(default_factory=list)
+    CORS_ORIGINS: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost",
+            "http://127.0.0.1",
+            "http://localhost:80",
+        ]
+    )
 
     # ---- File Uploads & External Services ----
     MAX_IMAGE_SIZE_MB: int = 10

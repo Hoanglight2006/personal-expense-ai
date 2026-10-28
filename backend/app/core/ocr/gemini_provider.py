@@ -30,13 +30,13 @@ class GeminiOcrProvider(OcrProvider):
     def extract_transaction(self, image_bytes: bytes, categories: list | None = None) -> ExtractedTransaction:
         categories_context = ""
         if categories:
-            categories_list = "\n".join([f"- ID {c.id}: {c.name} ({c.type.value if hasattr(c.type, 'value') else c.type})" for c in categories])
+            categories_list = "\n".join([f"- ID {c.id}: {c.name} ({getattr(c.type, 'value', str(c.type))})" for c in categories])
             categories_context = f"""
-        Available Categories in system:
-        {categories_list}
-        
-        Based on the items/products in the receipt and the store name, choose the MOST LOGICAL category_id from the list above. If you cannot determine it confidently, return null.
-        """
+Danh sách danh mục thu/chi trong hệ thống:
+{categories_list}
+
+Dựa vào các mặt hàng/dịch vụ trên hóa đơn và tên cửa hàng/đơn vị thanh toán, hãy chọn ID danh mục (category_id) phù hợp nhất từ danh sách trên. Nếu không chắc chắn, hãy trả về null.
+"""
         
         prompt = format_prompt("receipt_ocr", "prompt_template", categories_context=categories_context)
         
@@ -68,6 +68,8 @@ class GeminiOcrProvider(OcrProvider):
             if data.get("amount") is not None:
                 try:
                     amount = Decimal(str(data["amount"]))
+                    if amount % Decimal("1") != Decimal("0"):
+                        amount = amount.quantize(Decimal("1"))
                 except Exception:
                     pass
                     

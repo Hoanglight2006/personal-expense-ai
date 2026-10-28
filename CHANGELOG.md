@@ -417,6 +417,38 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 
 ---
 
+---
+
+### 📅 25/10 – 28/10/2026: Tối Ưu Hóa Responsive Mobile, Lưu Trữ Chatbot & Mở Rộng Test Cases
+* **Việc cần làm:**
+  - Đồng bộ hiển thị múi giờ Việt Nam (UTC+7) trên toàn bộ hệ thống (danh sách giao dịch, lịch sử nạp/rút tiết kiệm, dashboard admin).
+  - Tối ưu hóa hiển thị Responsive Mobile trên các màn hình hẹp (<= 420px): chuyển cụm nút thao tác thẻ giao dịch (Sửa, Sao chép, Xóa) sang dạng Grid 3 cột đều nhau, tái cấu trúc khối xác thực Email tránh hiện tượng bóp nghẹt chữ theo hàng dọc.
+  - Bổ sung cơ chế lưu trữ lịch sử hội thoại Chatbot FinAI theo từng phiên đăng nhập của người dùng (inai_chat_{user_id}), tự động xóa sạch khi đăng xuất và thêm nút làm mới đoạn hội thoại.
+  - Viết bổ sung các bộ Unit Test cho ChatPopup.test.jsx, TransactionCard.test.jsx, date.test.js, nâng tổng số test case lên 238 tests (168 Backend + 70 Frontend, 100% Passed).
+* **Minh chứng sử dụng AI:**
+  - *Prompt:*
+    `	ext
+    [Context]
+    Tôi đang hoàn thiện trải nghiệm người dùng trên thiết bị di động và tính năng Chatbot AI cho ứng dụng Personal Expense AI.
+    
+    [Instructions]
+    1. Thiết kế cơ chế lưu trữ tin nhắn Chatbot FinAI theo tài khoản mà không làm rò rỉ dữ liệu khi đổi người dùng.
+    2. Tối ưu CSS Responsive cho thẻ giao dịch và khối thông tin xác thực email trên mobile viewports hẹp.
+    
+    [Input Data / Constraints]
+    - Chatbot lưu ở localStorage với key gắn user_id, purge khi logout.
+    - Responsive phải hiển thị đẹp, rõ ràng trên màn hình từ 320px đến 420px, không bị tràn viền hay che khuất nút bấm.
+    
+    [Output Format]
+    Giải pháp phân tích CSS, React Hook và mã nguồn kiểm thử tự động tương ứng.
+    `
+  - *AI phản hồi:* AI đưa ra ý tưởng lưu toàn bộ chat history không phân biệt tài khoản vào key chung và đề xuất overflow-x: scroll cho cả thẻ giao dịch.
+* **Phát hiện lỗi và sửa:**
+  - Lỗi rò rỉ dữ liệu giữa các tài khoản: Key chung trong localStorage khiến User B sau khi đăng nhập vẫn nhìn thấy lịch sử chat của User A. Nhóm sửa lại: gán tiền tố theo user.id (inai_chat_) và móc nối vào sự kiện logout() để purge toàn bộ inai_chat_*.
+  - Lỗi giao diện di động: Dùng thanh cuộn ngang overflow-x: scroll trên thẻ giao dịch gây cảm giác vụng về, khó bấm. Nhóm chuyển sang thiết kế bố cục Mobile: cụm tiền tệ hiển thị hàng trên, cụm 3 nút thao tác (Sửa, Sao chép, Xóa) chuyển thành Grid 3 cột co giãn full-width bên dưới, tạo touch target lý tưởng cho thao tác ngón tay.
+
+---
+
 ## 🎯 TỔNG KẾT BÀI HỌC KINH NGHIỆM KHI SỬ DỤNG AI
 
 1. **Không copy nguyên văn code AI ở các phần xử lý tiền bạc:** AI thường mắc lỗi tính toán làm tròn (dùng `float` thay vì `Decimal`), quên các khoản trích lũy phụ và không để ý đến các trường hợp race condition khi có nhiều request đồng thời.

@@ -54,5 +54,43 @@ it('shows an over-balance expense warning as a popup', async () => {
   expect(onSubmit).not.toHaveBeenCalled();
 
   await user.click(within(popup).getByRole('button', { name: 'Đã hiểu' }));
-  await waitFor(() => expect(screen.getByPlaceholderText('0.00')).toHaveFocus());
+  await waitFor(() => expect(screen.getByPlaceholderText('0')).toHaveFocus());
+});
+
+it('rejects decimal amounts with a friendly integer warning', async () => {
+  const user = userEvent.setup();
+  const onSubmit = vi.fn();
+  getTransactionSummary.mockResolvedValue({ available_balance: 1000000 });
+  render(
+    <TransactionFormModal
+      transaction={null}
+      categories={[{
+        id: 1,
+        name: 'Ăn uống',
+        type: 'expense',
+        icon: 'food',
+        color: '#D69A23',
+        is_active: true,
+      }]}
+      submitting={false}
+      apiError=""
+      onClose={vi.fn()}
+      onSubmit={onSubmit}
+      prefillData={{
+        amount: '50000.5',
+        type: 'expense',
+        category_id: 1,
+        transaction_date: '2026-08-18',
+        description: '',
+        payment_method: 'cash',
+      }}
+      categoriesReady
+    />,
+  );
+
+  await waitFor(() => expect(getTransactionSummary).toHaveBeenCalled());
+  await user.click(screen.getByRole('button', { name: 'Thêm giao dịch' }));
+  const popup = screen.getByRole('alertdialog', { name: 'Không thể thực hiện' });
+  expect(popup).toHaveTextContent('phải là số nguyên');
+  expect(onSubmit).not.toHaveBeenCalled();
 });

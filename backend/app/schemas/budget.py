@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CategorySimpleInfo(BaseModel):
@@ -31,6 +31,13 @@ class BudgetBase(BaseModel):
     month: int = Field(..., ge=1, le=12, description="Tháng áp dụng (1-12)")
     year: int = Field(..., ge=2000, le=2100, description="Năm áp dụng (2000-2100)")
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount_integer(cls, v: Decimal) -> Decimal:
+        if v % Decimal("1") != Decimal("0"):
+            raise ValueError("Hạn mức ngân sách phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
+
 
 class BudgetCreate(BudgetBase):
     """Payload for creating a monthly category budget."""
@@ -48,6 +55,13 @@ class BudgetUpdate(BaseModel):
         decimal_places=2,
         description="Hạn mức ngân sách mới (VNĐ)",
     )
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount_integer(cls, v: Decimal) -> Decimal:
+        if v % Decimal("1") != Decimal("0"):
+            raise ValueError("Hạn mức ngân sách phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return v
 
 
 class BudgetResponse(BaseModel):

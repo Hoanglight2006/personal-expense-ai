@@ -102,7 +102,7 @@ phân và từ chối số âm, zero, NaN, infinity hoặc vượt giới hạn.
 
 ## Khởi tạo database mới
 
-Tạo database MySQL UTF-8, cấu hình `backend/.env`, rồi khởi động backend. Hàm
+Tạo database MySQL UTF-8, cấu hình file `.env` ở thư mục gốc, rồi khởi động backend. Hàm
 `Base.metadata.create_all()` tạo bảng còn thiếu:
 
 ```sql

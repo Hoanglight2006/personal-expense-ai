@@ -6,7 +6,8 @@
 [![React](https://img.shields.io/badge/Frontend-React_19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Bundler-Vite_8-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev)
 [![MySQL](https://img.shields.io/badge/Database-MySQL_8.0-4479A1.svg?logo=mysql&logoColor=white)](https://www.mysql.com)
-[![Tests](https://img.shields.io/badge/Tests-222%20Passed-success.svg)](docs/DEVELOPMENT_PROCESS.md)
+[![CI Pipeline](https://github.com/Hoanglight2006/personal-expense-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Hoanglight2006/personal-expense-ai/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/Tests-238%20Passed-success.svg)](docs/DEVELOPMENT_PROCESS.md)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -30,7 +31,7 @@ graph LR
 3. 🤖 **Bước 3 — Đánh giá Minh chứng Ứng dụng AI khi Lập trình**:
    👉 Đọc **[docs/AI_DEVELOPMENT_LOG.md](docs/AI_DEVELOPMENT_LOG.md)**: Tổng hợp Prompt chuẩn 5 thành phần, phân tích BA, phần code AI sinh ra và phần sinh viên trực tiếp rà soát, sửa lỗi.
 4. 🚀 **Bước 4 — Đánh giá Kế hoạch & Quy trình Phát triển Phần mềm**:
-   👉 Đọc **[docs/DEVELOPMENT_PROCESS.md](docs/DEVELOPMENT_PROCESS.md)**: Báo cáo 6 Sprint theo mô hình Agile/Scrum và kết quả kiểm thử 222/222 test cases.
+   👉 Đọc **[docs/DEVELOPMENT_PROCESS.md](docs/DEVELOPMENT_PROCESS.md)**: Báo cáo 6 Sprint theo mô hình Agile/Scrum và kết quả kiểm thử 238/238 test cases.
 5. 📡 **Bước 5 — Tra cứu Kỹ thuật Chuyên sâu**:
    👉 Xem **[docs/API.md](docs/API.md)** (Đặc tả RESTful API) và **[docs/DATABASE.md](docs/DATABASE.md)** (Cấu trúc bảng CSDL & Migration).
 
@@ -44,7 +45,7 @@ graph LR
 | 🏛️ [**SYSTEM_ARCHITECTURE.md**](docs/SYSTEM_ARCHITECTURE.md) | **Kiến trúc hệ thống toàn diện**: Phân tầng, luồng bảo mật JWT, sơ đồ ERD, cơ chế khóa dòng chống Race-condition. |
 | 🤖 [**AI_DEVELOPMENT_LOG.md**](docs/AI_DEVELOPMENT_LOG.md) | **Minh chứng sử dụng AI**: Nhật ký Prompt 5 thành phần, phân tích BA, code AI sinh ra, quá trình rà soát và kiểm thử của sinh viên. |
 | 🚀 [**DEVELOPMENT_PROCESS.md**](docs/DEVELOPMENT_PROCESS.md) | **Quy trình & Lộ trình phát triển**: Kế hoạch 6 Sprint Agile/Scrum, quản lý rủi ro và kết quả kiểm thử. |
-| 🧪 [**TEST_CASES.md**](docs/TEST_CASES.md) | **Ma trận kiểm thử tự động**: 222 bài test chi tiết (165 backend + 57 frontend) bao phủ toàn diện 7 phân hệ nghiệp vụ. |
+| 🧪 [**TEST_CASES.md**](docs/TEST_CASES.md) | **Ma trận kiểm thử tự động**: 238 bài test chi tiết (168 backend + 70 frontend) bao phủ toàn diện 7 phân hệ nghiệp vụ. |
 | 📡 [**API.md**](docs/API.md) | Đặc tả chi tiết toàn bộ các RESTful API endpoints, request/response models. |
 | 🗄️ [**DATABASE.md**](docs/DATABASE.md) | Thiết kế bảng cơ sở dữ liệu, quan hệ khóa ngoại, index và hướng dẫn migration. |
 | 📝 [**CHANGELOG.md**](CHANGELOG.md) | Lịch sử cập nhật và các mốc phát hành tính năng. |
@@ -116,7 +117,7 @@ personal-expense-ai/
 │   │   ├── schemas/            # Pydantic validation schemas
 │   │   ├── config.py           # Quản lý cấu hình môi trường
 │   │   └── main.py             # FastAPI App entry point
-│   ├── tests/                  # Bộ test tự động pytest (165 backend + 57 frontend test cases)
+│   ├── tests/                  # Bộ test tự động pytest (168 backend + 70 frontend test cases)
 │   └── requirements.txt
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data
@@ -157,10 +158,13 @@ personal-expense-ai/
 **Yêu cầu duy nhất**: Máy tính đã cài đặt [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```powershell
-# 1. Khởi động toàn bộ 3 dịch vụ: MySQL 8.0, Backend FastAPI và Frontend React
+# 1. (Khuyên dùng) Tạo file .env từ file mẫu để điền GEMINI_API_KEY nếu có
+Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
+
+# 2. Khởi động toàn bộ 3 dịch vụ: MySQL 8.0, Backend FastAPI và Frontend React
 docker compose up -d --build
 
-# 2. Nạp sẵn 74 giao dịch demo 6 tháng sống động vào hệ thống
+# 3. Nạp sẵn 74 giao dịch demo 6 tháng sống động vào hệ thống
 docker compose exec backend python /app/database/seed_demo.py
 ```
 
@@ -185,12 +189,11 @@ docker compose up -d mysql
 ```
 
 #### Bước 2: Cấu hình môi trường (.env)
-```powershell
-# Sao chép file cấu hình mẫu từ thư mục config
-Copy-Item config/.env.example .env
-Copy-Item config/.env.example backend/.env
-```
-*(File cấu hình mẫu đã được thiết lập sẵn chuỗi kết nối tới MySQL container: `mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense`).*
+`powershell
+# Sao chép file cấu hình mẫu ra file .env duy nhất ở thư mục gốc
+Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
+`
+*(File .env duy nhất ở thư mục gốc được cả Backend FastAPI lẫn Docker Compose tự động nhận diện. File mẫu đã thiết lập sẵn chuỗi kết nối MySQL qua cổng 3307: mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense).*
 
 #### Bước 3: Khởi động Backend FastAPI & Nạp Dữ Liệu Demo
 ```powershell
@@ -216,6 +219,29 @@ npm ci
 npm run dev
 ```
 * Mở trình duyệt truy cập ngay **`http://localhost:5173`**.
+
+---
+
+### ⚙️ GIẢI THÍCH CHI TIẾT CÁC BIẾN MÔI TRƯỜNG (.ENV)
+
+| Biến môi trường | Mục đích & Hướng dẫn | Giá trị khuyến nghị |
+|---|---|---|
+| `DATABASE_URL` | Chuỗi kết nối CSDL MySQL. Khi chạy ngoài máy host, kết nối qua cổng ánh xạ `3307` của Docker. | `mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense` |
+| `SECRET_KEY` | Khóa bí mật dùng để mã hóa và ký JSON Web Token (JWT). | Chuỗi ngẫu nhiên tối thiểu 32 ký tự |
+| `GEMINI_API_KEY` | Khóa API dịch vụ Google Gemini (dùng cho Chatbot FinAI, quét hóa đơn OCR và báo cáo tháng). Lấy miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey). *(Nếu để trống, các tính năng tài chính khác vẫn hoạt động 100%)*. | `AIzaSy...` |
+| `SMTP_*` | Cấu hình gửi cảnh báo bội chi ngân sách qua Gmail SMTP *(Tùy chọn)*. | `smtp.gmail.com` (Port 587) |
+
+---
+
+### ⚠️ BẢNG KHẮC PHỤC SỰ CỐ THƯỜNG GẶP (TROUBLESHOOTING)
+
+| Hiện tượng lỗi | Nguyên nhân gốc rễ | Cách xử lý trong 5 giây |
+|---|---|---|
+| `docker compose up` báo lỗi không kết nối được Docker daemon | Docker Desktop chưa được bật trên máy tính | Mở ứng dụng Docker Desktop lên và đợi biểu tượng góc dưới chuyển sang màu xanh lá (Engine running). |
+| `Activate.ps1 cannot be loaded because running scripts is disabled` | Chính sách bảo mật PowerShell của Windows chặn script `.ps1` | Chạy lệnh này trên PowerShell trước khi kích hoạt venv:<br>`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
+| Chạy `seed_demo.py` báo lỗi kết nối CSDL | Container MySQL chưa khởi động xong hoàn toàn | Đợi khoảng 5–10 giây cho MySQL hoàn tất khởi tạo ban đầu rồi chạy lại lệnh `python database/seed_demo.py`. |
+| Chatbot AI hoặc Quét hóa đơn OCR báo lỗi | Chưa điền hoặc sai `GEMINI_API_KEY` | Vào [Google AI Studio](https://aistudio.google.com/app/apikey) tạo key miễn phí và dán vào dòng `GEMINI_API_KEY=...` trong file `.env`. |
+| Port 3307 bị báo lỗi `address already in use` | Máy tính đã có ứng dụng khác chiếm cổng 3307 | Đổi số cổng phía trước trong `docker-compose.yml` (ví dụ `"3308:3306"`) và sửa số cổng tương ứng trong `.env`. |
 
 ---
 
@@ -250,7 +276,7 @@ Dự án có sẵn script sao lưu và phục hồi cho cả SQLite và MySQL, d
 
 ## 🧪 KIỂM THỬ TỰ ĐỘNG (TESTING)
 
-Hệ thống đạt tỷ lệ kiểm thử thành công **100% (165 Backend + 57 Frontend = 222 Tests Passed)**:
+Hệ thống đạt tỷ lệ kiểm thử thành công **100% (168 Backend + 70 Frontend = 238 Tests Passed)**:
 
 ```powershell
 # Chạy kiểm thử Frontend (Vitest)

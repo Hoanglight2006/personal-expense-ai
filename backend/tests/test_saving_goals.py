@@ -127,6 +127,24 @@ class TestSavingGoalsCRUD:
         )
         assert resp.status_code == 422
 
+        # Target amount fractional/decimal (VND must be integer)
+        resp_fractional = client.post(
+            GOALS_URL,
+            json={"name": "Test", "target_amount": "500000.50"},
+            headers=user_a,
+        )
+        assert resp_fractional.status_code == 422
+        assert "phải là số nguyên" in resp_fractional.text
+
+        # Initial deposit fractional/decimal
+        resp_init_fractional = client.post(
+            GOALS_URL,
+            json={"name": "Test", "target_amount": "500000", "initial_deposit": "1000.25"},
+            headers=user_a,
+        )
+        assert resp_init_fractional.status_code == 422
+        assert "phải là số nguyên" in resp_init_fractional.text
+
         # Past deadline
         past_date = (date.today() - timedelta(days=5)).isoformat()
         resp = client.post(
@@ -306,6 +324,15 @@ class TestSavingContributions:
             headers=user_a,
         )
         assert resp.status_code == 422
+
+        # Fractional deposit amount
+        resp_frac_deposit = client.post(
+            f"{GOALS_URL}/{goal_id}/contribute",
+            json={"amount": "50000.75"},
+            headers=user_a,
+        )
+        assert resp_frac_deposit.status_code == 422
+        assert "phải là số nguyên" in resp_frac_deposit.text
 
         resp_neg = client.post(
             f"{GOALS_URL}/{goal_id}/contribute",
@@ -727,6 +754,15 @@ class TestSavingWithdrawals:
             headers=user_a,
         )
         assert invalid.status_code == 422
+
+        # Fractional withdrawal amount
+        frac_withdraw = client.post(
+            f"{GOALS_URL}/{goal['id']}/withdraw",
+            json={"amount": "5000.50", "idempotency_key": "frac-withdrawal-1"},
+            headers=user_a,
+        )
+        assert frac_withdraw.status_code == 422
+        assert "phải là số nguyên" in frac_withdraw.text
 
         unchanged = client.get(f"{GOALS_URL}/{goal['id']}", headers=user_a).json()
         assert Decimal(unchanged["current_amount"]) == Decimal("300000.00")

@@ -1,7 +1,7 @@
 # 📋 BẢNG ĐẶC TẢ MA TRẬN TEST CASES HỆ THỐNG
 > **Dự án**: Hệ thống Quản lý Chi tiêu Cá nhân Tích hợp AI (Personal Expense AI)  
 > **Phiên bản tài liệu**: 1.0.0  
-> **Tổng số ca kiểm thử tự động**: 165 Pytest (Backend) + 57 Vitest (11 Suites Frontend) = 222 Tests  
+> **Tổng số ca kiểm thử tự động**: 168 Pytest (Backend) + 70 Vitest (14 Suites Frontend) = 238 Tests  
 > **Tỷ lệ vượt qua (Pass Rate)**: 100% (Zero Regression)
 
 ---
@@ -158,7 +158,7 @@ Hệ thống áp dụng mô hình kim tự tháp kiểm thử (**Testing Pyramid
 cd backend
 source venv/bin/activate  # Hoặc venv\Scripts\activate trên Windows
 
-# Chạy toàn bộ 165 bài test backend với thống kê chi tiết
+# Chạy toàn bộ 168 bài test backend với thống kê chi tiết
 pytest -v
 
 # Chạy riêng phân hệ AI
@@ -180,6 +180,6 @@ npm run test
 ```
 
 ### 3. Báo cáo Tóm tắt Kết quả Thực nghiệm
-* **Tổng số bài test tự động**: 165 Pytest (Backend) + 57 Vitest trong 11 Suites (Frontend) = 222 Test Cases
+* **Tổng số bài test tự động**: 168 Pytest (Backend) + 70 Vitest trong 14 Suites (Frontend) = 238 Test Cases
 * **Kết quả kiểm thử**: 100% PASSED (Không có bài test thất bại)
 * **Thời gian thực thi trung bình**: ~4.5 giây (Backend) và ~2.1 giây (Frontend)

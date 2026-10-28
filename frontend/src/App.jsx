@@ -5,6 +5,7 @@ import AdminRoute from './components/AdminRoute';
 import UserRoute from './components/UserRoute';
 import AppLayout from './components/AppLayout';
 import { AuthContext } from './context/auth-context';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -45,7 +46,8 @@ function App() {
   }, []);
 
   return (
-    <Routes>
+    <ErrorBoundary>
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -143,6 +145,7 @@ function App() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }
 

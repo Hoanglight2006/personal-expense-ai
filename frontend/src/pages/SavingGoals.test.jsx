@@ -439,6 +439,44 @@ describe('SavingGoals Page', () => {
     expect(screen.getByText('“Rút thử nghiệm”')).toBeInTheDocument();
   });
 
+
+  it('renders urgent alert banner without crashing when goals are near deadline or overdue', async () => {
+    const mockUrgentGoal = {
+      id: 99,
+      user_id: 1,
+      name: 'Mục tiêu gấp',
+      target_amount: 10000000,
+      current_amount: 2000000,
+      deadline: '2026-10-28',
+      status: 'active',
+      progress_percentage: 20.0,
+      remaining_amount: 8000000,
+      days_remaining: 1,
+      contributions: [],
+      withdrawals: [],
+      created_at: '2026-10-01T10:00:00',
+    };
+
+    getSavingGoals.mockResolvedValueOnce({
+      total_target_amount: 10000000,
+      total_current_amount: 2000000,
+      total_goals_count: 1,
+      active_goals_count: 1,
+      completed_goals_count: 0,
+      items: [mockUrgentGoal],
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      const banner = screen.getByRole('alert', { name: /Cảnh báo hạn chót mục tiêu tiết kiệm/i });
+      expect(banner).toBeInTheDocument();
+      expect(within(banner).getByText('Mục tiêu gấp')).toBeInTheDocument();
+      expect(within(banner).getByText(/Còn 1 ngày/)).toBeInTheDocument();
+      expect(within(banner).getByText(/Còn thiếu/)).toBeInTheDocument();
+    });
+  });
+
   it('deletes a goal after confirmation', async () => {
     const user = userEvent.setup();
     deleteSavingGoal.mockResolvedValue({ detail: 'Đã xóa mục tiêu tiết kiệm thành công.' });

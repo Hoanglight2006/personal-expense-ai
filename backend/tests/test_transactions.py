@@ -124,13 +124,21 @@ class TestCreateTransaction:
     def test_create_valid_income(self, client, user_a, cat_income_a):
         resp = create_transaction(
             client, user_a, cat_income_a["id"],
-            type="income", amount="5000.50", payment_method="bank_transfer",
+            type="income", amount="5000.00", payment_method="bank_transfer",
         )
         assert resp.status_code == 201
         data = resp.json()
         assert data["type"] == "income"
-        assert data["amount"] == "5000.50"
+        assert data["amount"] == "5000.00"
         assert data["payment_method"] == "bank_transfer"
+
+    def test_create_transaction_rejects_fractional_amount(self, client, user_a, cat_expense_a):
+        resp = create_transaction(
+            client, user_a, cat_expense_a["id"],
+            type="expense", amount="50000.50",
+        )
+        assert resp.status_code == 422
+        assert "phải là số nguyên" in resp.text
 
     def test_create_without_description(self, client, user_a, cat_expense_a):
         resp = create_transaction(
@@ -248,11 +256,22 @@ class TestUpdateTransaction:
         txn_id = resp.json()["id"]
         resp = client.patch(
             f"{TRANSACTIONS_URL}/{txn_id}",
-            json={"amount": "250.75"},
+            json={"amount": "250.00"},
             headers=user_a,
         )
         assert resp.status_code == 200
-        assert resp.json()["amount"] == "250.75"
+        assert resp.json()["amount"] == "250.00"
+
+    def test_update_transaction_rejects_fractional_amount(self, client, user_a, cat_expense_a):
+        resp = create_transaction(client, user_a, cat_expense_a["id"])
+        txn_id = resp.json()["id"]
+        resp = client.patch(
+            f"{TRANSACTIONS_URL}/{txn_id}",
+            json={"amount": "1.05"},
+            headers=user_a,
+        )
+        assert resp.status_code == 422
+        assert "phải là số nguyên" in resp.text
 
     def test_update_description(self, client, user_a, cat_expense_a):
         resp = create_transaction(client, user_a, cat_expense_a["id"])
@@ -713,7 +732,10 @@ class TestCategoryValidationConstraints:
             headers=user_a,
         )
         assert txn_resp.status_code == 201
-        txn_id = txn_resp.json()["id"]
+        txn_data = txn_resp.json()
+        txn_id = txn_data["id"]
+        assert txn_data["saving_goal_id"] == goal_id
+        assert Decimal(txn_data["saving_goal_amount"]) == Decimal("2000000.00")
 
         # 3. Verify saving goal updated
         goal_updated = client.get(f"/api/v1/saving-goals/{goal_id}", headers=user_a).json()
@@ -1250,3 +1272,109 @@ class TestAvailableBalanceEnforcement:
             f"{TRANSACTIONS_URL}/{income['id']}", headers=user
         )
         assert still_active.status_code == 200
+
+
+class TestSavingGoalTransferTransactions:
+    """Tests for saving goal deposits/withdrawals reflected in transactions feed (Phuong an 2)."""
+
+    def test_transfer_transactions_in_feed_and_safeguards(self, client):
+        user = register_and_login(client, "transfer_user", "transfer_user@test.com")
+        cat_inc = create_category(client, user, "Luong", type="income")
+
+        # 1. Create income 1,000,000
+        inc_res = create_transaction(
+            client, user, cat_inc["id"], type="income", amount="1000000.00", description="Luong thang 10"
+        )
+        assert inc_res.status_code == 201
+
+        # 2. Create saving goal
+        goal_res = client.post(
+            "/api/v1/saving-goals",
+            json={"name": "Mua laptop", "target_amount": 500000, "target_date": "2026-12-31"},
+            headers=user,
+        )
+        assert goal_res.status_code == 201
+        goal_id = goal_res.json()["id"]
+
+        # 3. Deposit 200,000 into saving goal
+        dep_res = client.post(
+            f"/api/v1/saving-goals/{goal_id}/contribute",
+            json={"amount": 200000, "note": "Tiet kiem dot 1"},
+            headers=user,
+        )
+        assert dep_res.status_code == 200
+
+        # 4. Withdraw 50,000 from saving goal
+        w_res = client.post(
+            f"/api/v1/saving-goals/{goal_id}/withdraw",
+            json={"amount": 50000, "note": "Rut mua phu kien", "idempotency_key": "key-w-1"},
+            headers=user,
+        )
+        assert w_res.status_code == 200
+
+        # 5. List transactions with type=transfer
+        list_transfer = client.get(f"{TRANSACTIONS_URL}?type=transfer", headers=user)
+        assert list_transfer.status_code == 200
+        transfer_items = list_transfer.json()["items"]
+        assert len(transfer_items) == 2
+
+        # Verify types and movements
+        deposit_txn = next(item for item in transfer_items if item["movement_type"] == "deposit")
+        withdraw_txn = next(item for item in transfer_items if item["movement_type"] == "withdraw")
+
+        assert deposit_txn["type"] == "transfer"
+        assert deposit_txn["amount"] == "200000.00"
+        assert deposit_txn["saving_goal_name"] == "Mua laptop"
+        assert Decimal(deposit_txn["saving_goal_amount"]) == Decimal("200000.00")
+        assert "Nạp vào hũ: Mua laptop" in deposit_txn["description"]
+
+        assert withdraw_txn["type"] == "transfer"
+        assert withdraw_txn["amount"] == "50000.00"
+        assert withdraw_txn["saving_goal_name"] == "Mua laptop"
+        assert Decimal(withdraw_txn["saving_goal_amount"]) == Decimal("50000.00")
+        assert "Rút từ hũ: Mua laptop" in withdraw_txn["description"]
+
+        # 6. Combined list (type=None) contains all 3: income + deposit + withdraw
+        list_all = client.get(f"{TRANSACTIONS_URL}", headers=user)
+        assert list_all.status_code == 200
+        all_items = list_all.json()["items"]
+        assert len(all_items) == 3
+
+        # 7. Summary balances remain pure
+        summary_res = client.get(f"{TRANSACTIONS_URL}/summary", headers=user)
+        assert summary_res.status_code == 200
+        summary = summary_res.json()
+        assert summary["all_time_income"] == "1000000.00"
+        assert summary["all_time_expense"] == "0.00"
+        assert summary["saving_balance"] == "150000.00"
+        assert summary["available_balance"] == "850000.00"
+
+        # 8. Safeguard: cannot manually create type=transfer
+        create_transfer_res = client.post(
+            TRANSACTIONS_URL,
+            json={
+                "amount": "100000.00",
+                "type": "transfer",
+                "category_id": cat_inc["id"],
+                "transaction_date": "2026-10-28",
+            },
+            headers=user,
+        )
+        assert create_transfer_res.status_code == 422
+
+        # 9. Safeguard: cannot update/trash synthetic transaction id
+        synth_id = deposit_txn["id"]
+        upd_res = client.patch(
+            f"{TRANSACTIONS_URL}/{synth_id}",
+            json={"amount": "300000.00"},
+            headers=user,
+        )
+        assert upd_res.status_code == 400
+        assert "trang Mục tiêu tiết kiệm" in upd_res.json()["detail"]
+
+        trash_res = client.post(
+            f"{TRANSACTIONS_URL}/{synth_id}/trash",
+            headers=user,
+        )
+        assert trash_res.status_code == 400
+        assert "trang Mục tiêu tiết kiệm" in trash_res.json()["detail"]

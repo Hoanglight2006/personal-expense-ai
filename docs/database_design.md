@@ -38,6 +38,8 @@ erDiagram
         string avatar_url
         enum role "user, admin"
         boolean is_locked
+        boolean is_verified
+        boolean must_change_password
         datetime created_at
         datetime updated_at
     }
@@ -393,4 +395,4 @@ Theo Mục 4.3.2 của [kn2.docx](file:///d:/code%20vscode/presonal-expense/pers
 
 Theo Mục 4.3.2 của [kn2.docx](file:///d:/code%20vscode/presonal-expense/personal-expense-ai/kn2.docx):
 * **Script khởi tạo dữ liệu mẫu**: Chạy script [database/seed_demo.py](file:///d:/code%20vscode/presonal-expense/personal-expense-ai/database/seed_demo.py) nạp thành công tài khoản `demo@example.com` (mật khẩu: `demo123456`) với **74 giao dịch demo trải dài 6 tháng** thực tế, giúp giảng viên và người dùng trải nghiệm ngay lập tức các biểu đồ xu hướng và tính năng AI sinh báo cáo.
-* **Bộ test tự động**: 222/222 test cases vượt qua hoàn hảo (bao gồm 165 backend + 57 frontend, kèm các test case kiểm tra migration an toàn trên MySQL cô lập).
+* **Bộ test tự động**: 238/238 test cases vượt qua hoàn hảo (bao gồm 168 backend + 70 frontend, kèm các test case kiểm tra migration an toàn trên MySQL cô lập).

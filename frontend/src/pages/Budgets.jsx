@@ -240,6 +240,8 @@ const Budgets = () => {
     const amountNum = parseFloat(formAmount);
     if (!formAmount || Number.isNaN(amountNum) || amountNum <= 0) {
       errs.amount = 'Hạn mức ngân sách phải lớn hơn 0.';
+    } else if (!Number.isInteger(amountNum)) {
+      errs.amount = 'Hạn mức ngân sách phải là số nguyên (VNĐ không hỗ trợ số lẻ).';
     }
     if (!editingBudget && !formCategory) {
       errs.category = 'Vui lòng chọn danh mục chi tiêu.';
@@ -916,12 +918,17 @@ const Budgets = () => {
                 <span>Hạn mức ngân sách (VNĐ) <em>*</em></span>
                 <input
                   type="number"
-                  step="any"
-                  min="0"
+                  step="1"
+                  min="1"
                   value={formAmount}
                   onChange={(e) => {
                     setFormAmount(e.target.value);
                     if (formErrors.amount) setFormErrors((p) => ({ ...p, amount: '' }));
+                  }}
+                  onKeyDown={(e) => {
+                    if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) {
+                      e.preventDefault();
+                    }
                   }}
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="Ví dụ: 1000000"

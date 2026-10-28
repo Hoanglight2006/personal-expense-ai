@@ -105,7 +105,11 @@ class SavingService:
 
         progress = 0.0
         if target > Decimal("0"):
-            progress = float(round((current / target) * 100, 1))
+            calc = (current / target) * 100
+            if current < target:
+                progress = min(99.9, float(round(calc, 1)))
+            else:
+                progress = float(round(calc, 1))
 
         remaining = max(Decimal("0.00"), target - current)
 

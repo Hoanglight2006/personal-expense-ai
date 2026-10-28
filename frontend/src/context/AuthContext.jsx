@@ -26,7 +26,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const handleUnauthorized = () => setUser(null);
+    const handleUnauthorized = () => {
+      try {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('finai_chat_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch {
+        // ignore
+      }
+      setUser(null);
+    };
     window.addEventListener('auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
@@ -36,6 +47,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('finai_chat_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch {
+      // ignore
+    }
     localStorage.removeItem('access_token');
     setUser(null);
   };
