@@ -86,7 +86,7 @@ gantt
 * **Nội dung thực hiện**:
   * **Refactoring CSS**: Bóc tách file khổng lồ `index.css` (16.552 dòng) thành **28 file CSS module hóa** độc lập theo từng component/page, giữ nguyên 100% tính toàn vẹn giao diện.
   * **Tạo dữ liệu mẫu (Seed Data)**: Xây dựng script `seed_demo.py` khởi tạo tài khoản demo `demo@example.com` với 74 giao dịch trải dài 6 tháng.
-  * **Kiểm thử tự động**: Viết và chạy thành công 222 bài test tự động (165 backend + 57 frontend) trên frontend (Vitest) và backend (Pytest).
+  * **Kiểm thử tự động**: Viết và chạy thành công 222 bài test tự động (165 backend + 57 frontend) trên frontend (Vitest) và backend (Pytest), làm nền tảng vững chắc để mở rộng lên 238 tests ở Sprint 6.
   * **Tài liệu hóa**: Xây dựng bộ 5 file tài liệu kỹ thuật hoàn chỉnh trong `docs/`.
 * **Kết quả nghiệm thu**: Toàn bộ hệ thống vượt qua tất cả bài kiểm thử, build production thành công trong 428ms.
 
@@ -112,8 +112,18 @@ gantt
     * 3 tùy chọn phân tích: Toàn diện, Tối ưu tiết kiệm, Cảnh báo rủi ro & an toàn.
     * Nhận thức thời gian thực: Phân biệt chính xác ngày đầu tháng vs giữa/cuối tháng ít dữ liệu vs tháng đã chốt sổ.
     * Chỉ đích danh danh mục bị vượt hạn mức ngân sách và yêu cầu hành động cắt giảm khẩn cấp.
-  * **Kiểm thử tự động toàn diện**: Mở rộng bộ test lên **222 test cases (165 backend + 57 frontend)** với tỷ lệ pass 100%.
-* **Kết quả nghiệm thu**: Toàn bộ các tính năng mới hoạt động trơn tru, không phát sinh lỗi hồi quy, đáp ứng trọn vẹn 100% tài liệu `REQUIREMENTS.md`.
+  * **Tối ưu Giao diện Mobile & Trải nghiệm Người dùng**:
+    * Thiết kế lại các nút thao tác giao dịch (Xem/Sửa/Xóa) thành lưới 3 cột linh hoạt trên màn hình nhỏ (<= 420px), khắc phục triệt để hiện tượng tràn nút và co cụm chữ.
+    * Đồng bộ múi giờ Việt Nam (UTC+7) trên toàn bộ lịch giao dịch và báo cáo.
+    * Lưu trữ lịch sử phiên trò chuyện với FinAI Mascot trong LocalStorage, khôi phục liền mạch khi tải lại trang.
+  * **Hạ tầng Triển khai Docker Compose & Master .env**:
+    * Đóng gói trọn bộ 3 container: expense_mysql (MySQL 8.0 port 3307), expense_backend (FastAPI port 8000), expense_frontend (Vite Nginx port 5173).
+    * Tích hợp Healthcheck tự động giúp backend chỉ khởi động sau khi MySQL đã hoàn tất handshake.
+    * Hợp nhất cấu hình về file Master .env duy nhất tại thư mục gốc, loại bỏ hoàn toàn các file cấu hình trùng lặp.
+  * **Tự động hóa CI/CD Pipeline (GitHub Actions)**:
+    * Thiết lập luồng CI .github/workflows/ci.yml kiểm tra tự động mỗi khi commit/push: Linter, 168 tests Pytest backend, 70 tests Vitest frontend và kiểm tra hợp lệ cấu hình Docker Compose.
+  * **Kiểm thử tự động toàn diện**: Mở rộng bộ test lên **238 test cases (168 backend + 70 frontend trên 14 test suites)** với tỷ lệ pass 100% (Zero Regression).
+* **Kết quả nghiệm thu**: Toàn bộ hệ thống đạt độ sẵn sàng cao độ (Production-Ready), vượt qua 100% các bài test tự động và đáp ứng trọn vẹn mọi yêu cầu trong tài liệu REQUIREMENTS.md.
 
 ## 3. QUẢN LÝ RỦI RO & GIẢI PHÁP KỸ THUẬT (RISK MANAGEMENT)
 

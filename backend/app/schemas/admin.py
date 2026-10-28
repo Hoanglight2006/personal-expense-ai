@@ -25,6 +25,7 @@ class AdminUserItem(BaseModel):
     is_locked: bool
     created_at: datetime
     transaction_count: int = 0
+    transactions_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

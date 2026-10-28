@@ -23,8 +23,8 @@ from pathlib import Path
 # Cấu hình UTF-8 cho Windows console tránh lỗi UnicodeEncodeError
 if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
+        getattr(sys.stdout, "reconfigure", lambda **kw: None)(encoding="utf-8")
+        getattr(sys.stderr, "reconfigure", lambda **kw: None)(encoding="utf-8")
     except Exception:
         pass
 

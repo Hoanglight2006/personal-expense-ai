@@ -28,7 +28,7 @@ graph TD
     end
     
     subgraph Database["Database & Storage Layer"]
-        MySQL[("MySQL 8.0 / SQLite")]
+        MySQL[("MySQL 8.0 (Docker Port 3307 / expense_mysql)")]
         StaticStorage["Static Storage (Avatars / OCR Temp)"]
     end
 
@@ -53,41 +53,50 @@ Dự án được chuẩn hóa theo đúng cấu trúc tiêu chuẩn công nghi�
 
 ```text
 personal-expense-ai/
-├── 🌐 frontend/                # [FRONTEND] React 19 + Vite (Feature-Based Architecture)
+├── 🌐 frontend/                # [FRONTEND] React 19 + Vite (Component & Page Architecture)
 │   ├── src/
 │   │   ├── api/                # Axios API client modules
-│   │   ├── components/         # Reusable common UI (Modals, Popups, DatePicker, Mascot)
+│   │   ├── components/         # Reusable UI (Modals, Popups, DatePicker, FinAI Mascot)
 │   │   ├── constants/          # Application constants & presets
 │   │   ├── context/            # Global Auth & App State Context
-│   │   ├── features/           # Feature Modules (Co-located Page.jsx, Page.css, Page.test.jsx)
-│   │   │   ├── auth/           # Login, Register, Forgot/Reset Password pages
-│   │   │   ├── budgets/        # BudgetsPage & BudgetCard, BudgetFormModal + Co-located CSS & Test
-│   │   │   ├── categories/     # CategoriesPage & category management + Co-located CSS & Test
-│   │   │   ├── dashboard/      # DashboardPage & summary widgets + Co-located CSS
-│   │   │   ├── profile/        # ProfilePage & avatar/password management + Co-located CSS & Test
-│   │   │   ├── saving-goals/   # SavingGoalsPage & Modals + Co-located CSS & Test
-│   │   │   ├── statistics/     # StatisticsPage & trend/insight reports + Co-located CSS & Test
-│   │   │   └── transactions/   # TransactionsPage, TransactionTrashPage + Co-located CSS & Test
-│   │   ├── styles/             # Shared Design Tokens, Base Resets, Layout & Shared Component CSS
-│   │   ├── utils/              # Helper functions (Định dạng tiền tệ, ngày tháng)
-│   │   ├── App.jsx             # React Router & Navigation shell
+│   │   ├── hooks/              # Custom React Hooks
+│   │   ├── pages/              # Màn hình ứng dụng & Co-located Unit Tests
+│   │   │   ├── admin/          # AdminPage & Dashboard quản trị viên
+│   │   │   ├── Budgets.jsx     # Quản lý ngân sách & tiến độ chi tiêu (+ Budgets.test.jsx)
+│   │   │   ├── Categories.jsx  # Quản lý danh mục thu/chi (+ Categories.test.jsx)
+│   │   │   ├── Dashboard.jsx   # Tổng quan số dư ví & biểu đồ
+│   │   │   ├── Login.jsx, Register.jsx, ForgotPassword.jsx, ResetPassword.jsx # Xác thực
+│   │   │   ├── Profile.jsx     # Quản lý thông tin & mật khẩu (+ Profile.test.jsx)
+│   │   │   ├── SavingGoals.jsx # Mục tiêu tích lũy & nạp/rút (+ SavingGoals.test.jsx)
+│   │   │   ├── Statistics.jsx  # Báo cáo & phân tích AI (+ Statistics.test.jsx)
+│   │   │   └── Transactions.jsx, TransactionTrash.jsx # Quản lý giao dịch thu chi
+│   │   ├── styles/             # Hệ thống 28 file CSS module hóa (base, components, layout, pages)
+│   │   ├── test/               # Cấu hình kiểm thử Vitest & mocks
+│   │   ├── utils/              # Helper functions (Định dạng tiền tệ, ngày tháng UTC+7)
+│   │   ├── App.jsx             # React Router & ProtectedRoute
 │   │   ├── index.css           # Master CSS Hub (@import)
 │   │   └── main.jsx            # Entry point ứng dụng React
-│   ├── package.json            # Quản lý dependencies frontend
+│   ├── .env.example            # Vite frontend environment template
+│   ├── package.json            # Quản lý dependencies frontend (Vitest 70 tests)
 │   └── vite.config.js          # Cấu hình Vite & proxy
 │
 ├── ⚙️ backend/                 # [BACKEND] Kiến trúc 3 lớp (3-Tier) với FastAPI & SQLAlchemy
 │   ├── app/
 │   │   ├── api/routes/         # Thin Controllers: Tiếp nhận HTTP request & ủy quyền cho Service
-│   │   │   ├── auth.py         # Router xác thực & hồ sơ (< 150 dòng)
-│   │   │   ├── budgets.py      # Router ngân sách (< 150 dòng)
-│   │   │   ├── categories.py   # Router danh mục (< 130 dòng)
-│   │   │   ├── saving_goals.py # Router mục tiêu tiết kiệm (< 150 dòng)
-│   │   │   └── transactions.py # Router giao dịch thu/chi & thùng rác (< 150 dòng)
+│   │   │   ├── admin.py        # Router phân hệ quản trị viên (Admin Portal)
+│   │   │   ├── ai.py, chat.py, ocr.py # Router AI Báo cáo, Trợ lý FinAI & Quét hóa đơn OCR
+│   │   │   ├── auth.py         # Router xác thực JWT, OTP kích hoạt & đổi mật khẩu
+│   │   │   ├── budgets.py      # Router quản lý ngân sách tháng
+│   │   │   ├── categories.py   # Router danh mục thu/chi & Soft-hide
+│   │   │   ├── saving_goals.py # Router mục tiêu tiết kiệm, nạp/rút tiền (FIFO)
+│   │   │   └── transactions.py # Router giao dịch thu/chi, khóa dòng & thùng rác
 │   │   ├── services/           # Service Layer: Đóng gói 100% nghiệp vụ tài chính & tính toán
-│   │   │   ├── auth_service.py # Xử lý đăng ký, đăng nhập, token, đổi mật khẩu
+│   │   │   ├── admin_service.py # Xử lý khóa tài khoản, cấp pass tạm, telemetry AI
+│   │   │   ├── auth_service.py  # Xử lý đăng ký, đăng nhập, token, đổi mật khẩu
 │   │   │   ├── budget_service.py # Xử lý ngân sách, cảnh báo ngưỡng 80%, bội chi
 │   │   │   ├── category_service.py # Xử lý danh mục, gán preset icon, khôi phục
+│   │   │   ├── email_service.py # Gửi email cảnh báo ngân sách & OTP qua SMTP Gmail
+│   │   │   ├── financial_alert_service.py # Phát hiện cảnh báo hạn chót & vi phạm ngân sách
 │   │   │   ├── saving_service.py # Xử lý tích lũy, nạp/rút tiền, kiểm tra số dư ví
 │   │   │   └── transaction_service.py # Xử lý CRUD giao dịch, khóa dòng, phân bổ mục tiêu
 │   │   ├── core/               # Bảo mật, JWT, hashing, AI prompt logic
@@ -96,7 +105,7 @@ personal-expense-ai/
 │   │   ├── config.py           # Quản lý biến môi trường Pydantic Settings
 │   │   ├── database.py         # Kết nối DB Engine & Session factory
 │   │   └── main.py             # FastAPI Application initialization
-│   ├── tests/                  # Bộ kiểm thử tự động pytest (165 test cases)
+│   ├── tests/                  # Bộ kiểm thử tự động pytest (168 test cases)
 │   └── requirements.txt        # Danh sách thư viện Python
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data
@@ -105,8 +114,8 @@ personal-expense-ai/
 │   ├── seed_demo.py            # Script khởi tạo 74 giao dịch demo 6 tháng
 │   └── README.md               # Hướng dẫn quản trị và migration CSDL
 │
-├── 🔧 config/                  # [CONFIG] Quản lý cấu hình & biến môi trường
-│   ├── .env.example            # Master environment configuration template
+├── 🔧 config/                  # [CONFIG] Quản lý cấu hình & tài liệu biến môi trường
+│   ├── prompts.json            # Tập trung toàn bộ cấu hình Prompt AI & Guardrails
 │   └── README.md               # Hướng dẫn chi tiết từng biến môi trường
 │
 ├── 📖 docs/                    # [DOCS] Bộ tài liệu kỹ thuật toàn diện
@@ -117,11 +126,13 @@ personal-expense-ai/
 │   ├── API.md                  # Đặc tả chi tiết toàn bộ REST API
 │   ├── DATABASE.md             # Thiết kế CSDL, quy tắc khóa dòng & migration
 │   ├── database_design.md      # Thiết kế chi tiết CSDL
-│   ├── requirements.md         # Đặc tả yêu cầu kỹ thuật
+│   ├── requirements.md         # Đặc tả yêu cầu kỹ thuật (SRS)
 │   ├── use_cases.md            # Các ca sử dụng chi tiết
-│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (222 test cases: 165 backend + 57 frontend)
+│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (238 test cases: 168 backend + 70 frontend)
 │   └── reports/                # Thư mục chứa các tài liệu báo cáo học phần
 │
+├── 🐳 docker-compose.yml       # Điều phối triển khai trọn gói MySQL, Backend, Frontend
+├── 📄 .env.example             # Master Environment Configuration Template duy nhất
 └── README.md                   # Hướng dẫn tổng quan & cài đặt nhanh
 ```
 
@@ -218,7 +229,12 @@ erDiagram
         string email UK
         string password_hash
         string avatar_url
+        enum role "user, admin"
+        boolean is_locked
+        boolean is_verified
+        boolean must_change_password
         datetime created_at
+        datetime updated_at
     }
 
     CATEGORIES {

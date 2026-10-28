@@ -79,6 +79,7 @@ class AdminService:
                 is_locked=bool(u.is_locked),
                 created_at=u.created_at,
                 transaction_count=txn_counts.get(u.id, 0),
+                transactions_count=txn_counts.get(u.id, 0),
             )
             for u in users
         ]

@@ -145,6 +145,15 @@ class TestBudgetCreation:
         )
         assert resp.status_code == 422
 
+        # Fractional budget amount
+        resp_frac = client.post(
+            BUDGETS_URL,
+            json={"category_id": cat["id"], "amount": "50000.50", "month": 8, "year": 2026},
+            headers=user_a,
+        )
+        assert resp_frac.status_code == 422
+        assert "phải là số nguyên" in resp_frac.text
+
     def test_create_budget_other_user_category(self, client, user_a, user_b):
         cat_b = create_category(client, user_b, name="Mua sắm User B", type="expense")
         payload = {

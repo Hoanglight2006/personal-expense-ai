@@ -4,10 +4,11 @@ import enum
 
 
 class CategoryType(str, enum.Enum):
-    """Type of category / transaction: income or expense."""
+    """Type of category / transaction: income, expense or transfer."""
 
     INCOME = "income"
     EXPENSE = "expense"
+    TRANSFER = "transfer"
 
 
 class GoalStatus(str, enum.Enum):

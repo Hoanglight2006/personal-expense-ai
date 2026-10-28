@@ -1,6 +1,6 @@
 """Pydantic schemas for Transaction CRUD, filtering and import."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Literal
 
@@ -29,6 +29,8 @@ def _validate_amount(value) -> Decimal:
         raise ValueError("Số tiền không hợp lệ.")
     if amount <= 0:
         raise ValueError("Số tiền phải lớn hơn 0.")
+    if amount % Decimal("1") != Decimal("0"):
+        raise ValueError("Số tiền phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
     # Quantize to 2 decimal places
     amount = amount.quantize(Decimal("0.01"))
     if amount > MAX_AMOUNT:
@@ -62,7 +64,10 @@ class TransactionCreate(BaseModel):
     def validate_saving_goal_amount(cls, value) -> Decimal | None:
         if value is None or value == "":
             return None
-        return _validate_amount(value)
+        amt = _validate_amount(value)
+        if amt % Decimal("1") != Decimal("0"):
+            raise ValueError("Số tiền trích vào mục tiêu phải là số nguyên (VNĐ không hỗ trợ số lẻ).")
+        return amt
 
     @field_validator("description", mode="before")
     @classmethod
@@ -153,8 +158,19 @@ class TransactionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+    saving_goal_id: int | None = None
+    saving_goal_name: str | None = None
+    saving_goal_amount: Decimal | None = None
+    movement_type: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("created_at", "updated_at", "deleted_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime | None) -> datetime | None:
+        if v is not None and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 class TransactionListResponse(BaseModel):

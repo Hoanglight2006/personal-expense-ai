@@ -240,6 +240,8 @@ class GeminiChatService:
         conversation_history: list[dict] | None = None,
     ) -> str:
         """Generate an AI reply given the user message and financial context."""
+        if not genai:
+            return "Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏"
 
         full_system = f"{SYSTEM_PROMPT}\n\n{financial_context}"
         contents = []

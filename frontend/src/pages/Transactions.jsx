@@ -32,6 +32,7 @@ const TYPE_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: 'expense', label: 'Chi' },
   { value: 'income', label: 'Thu' },
+  { value: 'transfer', label: 'Tiết kiệm' },
 ];
 
 const SORT_OPTIONS = [
@@ -499,7 +500,7 @@ const Transactions = () => {
             <section className="txn-list" aria-label="Danh sách giao dịch">
               {transactions.map((txn) => (
                 <TransactionCard
-                  key={txn.id}
+                  key={`${txn.type || 'txn'}-${txn.id}`}
                   transaction={txn}
                   onEdit={openEdit}
                   onTrash={handleTrash}

@@ -24,23 +24,23 @@
 
 ### 🔹 Ca 1: Bảo vệ Dữ liệu Tài chính Cá nhân (PII Protection)
 * **Đầu vào thử nghiệm**: `Chuyển tiền ngày 10/09: 15,000,000 đ tới STK 0398472910 nội dung FT240987654321`
-* **Vòng 1 (V1)**: Gửi nguyên văn chuỗi chứa STK `0398472910` và mã `FT240987654321` tới Google API $ightarrow$ **Vi phạm nghiêm trọng chính sách bảo mật ngân hàng**.
-* **Vòng 2 (V2)**: Thêm câu lệnh *"Không được nhắc lại số tài khoản"* $ightarrow$ AI đôi khi vẫn trích xuất lại số tài khoản trong phần phân tích.
+* **Vòng 1 (V1)**: Gửi nguyên văn chuỗi chứa STK `0398472910` và mã `FT240987654321` tới Google API $\rightarrow$ **Vi phạm nghiêm trọng chính sách bảo mật ngân hàng**.
+* **Vòng 2 (V2)**: Thêm câu lệnh *"Không được nhắc lại số tài khoản"* $\rightarrow$ AI đôi khi vẫn trích xuất lại số tài khoản trong phần phân tích.
 * **Vòng 3 (V3 - Hiện tại)**: Module `mask_sensitive_data()` chặn ngay tại tầng Backend trước khi gửi Prompt:
   ```text
   Chuyển tiền ngày 10/09: 15,000,000 đ tới [STK_ĐÃ_ẨN] nội dung [MÃ_GD_ĐÃ_ẨN]
   ```
-  $ightarrow$ **Bảo vệ tuyệt đối thông tin định danh người dùng.**
+  $\rightarrow$ **Bảo vệ tuyệt đối thông tin định danh người dùng.**
 
 ---
 
 ### 🔹 Ca 2: Xử lý Câu hỏi Mua sắm Bốc đồng (Behavioral Nudge)
 * **Câu hỏi của người dùng**: *"Tôi thèm ăn lẩu Haidilao quá, có nên đi ăn không?"*
-* **Vòng 1 (V1)**: Trả lời: *"Haidilao rất ngon, bạn nên thử món lẩu cà chua và thịt bò!"* $ightarrow$ **Cổ xúy tiêu xài, đi ngược tôn chỉ ứng dụng**.
-* **Vòng 2 (V2)**: Trả lời: *"Tôi là trợ lý tài chính, tôi không trả lời về ẩm thực."* $ightarrow$ **Cứng nhắc, trải nghiệm người dùng kém**.
+* **Vòng 1 (V1)**: Trả lời: *"Haidilao rất ngon, bạn nên thử món lẩu cà chua và thịt bò!"* $\rightarrow$ **Cổ xúy tiêu xài, đi ngược tôn chỉ ứng dụng**.
+* **Vòng 2 (V2)**: Trả lời: *"Tôi là trợ lý tài chính, tôi không trả lời về ẩm thực."* $\rightarrow$ **Cứng nhắc, trải nghiệm người dùng kém**.
 * **Vòng 3 (V3 - Hiện tại)**: Trả lời:
   > *"Lẩu Haidilao rất hấp dẫn! 🍲 Tuy nhiên, ngân sách Ăn uống tháng này của bạn đã chạm mức 95% và số dư khả dụng chỉ còn 450.000 VNĐ. Hãy cân nhắc nấu ăn tại nhà để không bị âm ví nhé! 💪"*
-  $ightarrow$ **Vừa thân thiện, vừa bẻ lái thông minh về số dư thực tế.**
+  $\rightarrow$ **Vừa thân thiện, vừa bẻ lái thông minh về số dư thực tế.**
 
 ---
 
@@ -56,7 +56,7 @@
     "conclusion": "..."
   }
   ```
-  Tích hợp Regex làm sạch Markdown và Fallback tự động khi mô hình trả về dữ liệu lỗi $ightarrow$ **Độ tin cậy đạt 100%.**
+  Tích hợp Regex làm sạch Markdown và Fallback tự động khi mô hình trả về dữ liệu lỗi $\rightarrow$ **Độ tin cậy đạt 100%.**
 
 ---
 

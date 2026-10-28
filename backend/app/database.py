@@ -18,9 +18,9 @@ class Base(DeclarativeBase):
 def init_db():
     """Ensure static directories exist and database schema has all columns."""
     Path("static/avatars").mkdir(parents=True, exist_ok=True)
-    import app.models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
     try:
+        import app.models  # noqa: F401
+        Base.metadata.create_all(bind=engine)
         with engine.begin() as conn:
             inspector = inspect(conn)
             if "users" in inspector.get_table_names():

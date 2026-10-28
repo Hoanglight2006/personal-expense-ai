@@ -69,19 +69,19 @@ _FALLBACK_PROMPTS: dict[str, dict[str, str]] = {
     },
     "receipt_ocr": {
         "prompt_template": (
-            "You are an expert at extracting financial transaction details from receipts and invoices.\n"
-            "Extract the following information from the provided image and return ONLY a valid JSON object.\n"
-            "JSON Schema:\n"
+            "Bạn là chuyên gia phân tích và trích xuất thông tin giao dịch tài chính từ hóa đơn, biên lai và phiếu chuyển tiền.\n"
+            "Hãy trích xuất các thông tin sau từ hình ảnh được cung cấp và CHỈ trả về một đối tượng JSON hợp lệ duy nhất.\n\n"
+            "Cấu trúc JSON Schema:\n"
             "{{\n"
-            '    "amount": "The total amount of the transaction as a number without currency symbols (e.g. 150000.50). Ensure you extract the FINAL Total amount. Return null if not found.",\n'
-            '    "transaction_date": "The date of the transaction in YYYY-MM-DD format, or null if not found",\n'
-            '    "description": "A short, concise description of the transaction (max 100 characters), e.g., \'Ăn trưa tại nhà hàng X\', or null",\n'
-            '    "type_suggestion": "Must be either \'expense\' or \'income\'. For typical receipts (supermarkets, dining), it\'s \'expense\'. For salary/transfer in, it\'s \'income\'.",\n'
-            '    "payment_method_suggestion": "Must be one of \'cash\', \'bank_transfer\', \'credit_card\', \'e_wallet\', or null",\n'
-            '    "category_id": "The integer ID of the best matching category from the provided list, or null"\n'
+            '    "amount": "Tổng số tiền thanh toán thực tế (dạng số, không kèm ký hiệu tiền tệ, ví dụ: 150000.50). BẮT BUỘC lấy số tiền tổng cộng cuối cùng (Total/Tổng tiền/Thành tiền). Trả về null nếu không tìm thấy.",\n'
+            '    "transaction_date": "Ngày giao dịch theo định dạng YYYY-MM-DD (ví dụ: 2026-10-27), hoặc null nếu không tìm thấy.",\n'
+            '    "description": "Tên cửa hàng hoặc mô tả ngắn gọn về giao dịch (tối đa 100 ký tự), ví dụ: \'Highlands Coffee\', \'Ăn trưa tại nhà hàng X\', \'Siêu thị VinMart\', hoặc null.",\n'
+            '    "type_suggestion": "Bắt buộc là \'expense\' (chi tiêu) hoặc \'income\' (thu nhập). Hóa đơn mua sắm, ăn uống, dịch vụ thông thường là \'expense\'. Biên lai nhận tiền, lương, chuyển khoản đến là \'income\'.",\n'
+            '    "payment_method_suggestion": "Bắt buộc là \'cash\' (tiền mặt) hoặc \'bank_transfer\' (chuyển khoản, thẻ, ví điện tử), hoặc null nếu không rõ.",\n'
+            '    "category_id": "Số nguyên ID của danh mục phù hợp nhất từ danh sách được cung cấp, hoặc null nếu không xác định được."\n'
             "}}\n"
             "{categories_context}\n"
-            "Return ONLY the raw JSON without any markdown formatting or code blocks. Do not add any text before or after."
+            "CHỈ trả về chuỗi JSON thuần túy, tuyệt đối KHÔNG định dạng markdown hay bọc trong khối code (```json). Không thêm bất kỳ văn bản nào trước hoặc sau."
         )
     },
 }
@@ -107,7 +107,7 @@ def _find_config_file() -> Path | None:
 def get_all_prompts() -> dict[str, Any]:
     """Load and return all prompts from JSON configuration or fallback."""
     global _PROMPT_CACHE
-    if _PROMPT_CACHE is not None:
+    if isinstance(_PROMPT_CACHE, dict):
         return _PROMPT_CACHE
 
     config_path = _find_config_file()
@@ -115,13 +115,15 @@ def get_all_prompts() -> dict[str, Any]:
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                _PROMPT_CACHE = data.get("prompts", {})
-                logger.info("Loaded prompts successfully from %s", config_path)
-                return _PROMPT_CACHE
+                prompts = data.get("prompts")
+                if isinstance(prompts, dict):
+                    _PROMPT_CACHE = prompts
+                    logger.info("Loaded prompts successfully from %s", config_path)
+                    return prompts
         except Exception as e:
             logger.warning("Failed to parse %s: %s. Using fallback prompts.", config_path, e)
 
-    _PROMPT_CACHE = _FALLBACK_PROMPTS
+    _PROMPT_CACHE = dict(_FALLBACK_PROMPTS)
     return _PROMPT_CACHE
 
 
