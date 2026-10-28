@@ -16,6 +16,9 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       FRONTEND_BASE_URL: http://localhost:5173
+      GEMINI_API_KEY: test-ci-dummy-gemini-key
+      GEMINI_MODEL: gemini-3.5-flash-lite
+      CORS_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost", "http://127.0.0.1", "http://localhost:80"]'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,7 +68,7 @@ jobs:
         run: npm run lint
 
       - name: Run Vitest test suite (70 tests)
-        run: npm test
+        run: npm test -- --reporter=verbose
 
       - name: Run Production Build
         run: npm run build
@@ -78,9 +81,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Copy env template for docker compose
+        run: cp .env.example .env
+
       - name: Validate Docker Compose config
         run: docker compose config
 
       - name: Test Docker Compose build
         run: docker compose build
-

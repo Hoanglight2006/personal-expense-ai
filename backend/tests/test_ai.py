@@ -372,7 +372,8 @@ def test_finai_chat_message(client: TestClient):
     create_txn(db, user.id, cat_food.id, Decimal("500000"), CategoryType.EXPENSE, date.today())
 
     # We mock Gemini to return a predictable response
-    with patch("app.core.ai_chat.genai.GenerativeModel") as mock_model_cls:
+    with patch("app.core.ai_chat.genai.GenerativeModel") as mock_model_cls, \
+         patch("app.core.ai_chat.settings.GEMINI_API_KEY", "test-key"):
         mock_instance = mock_model_cls.return_value
         mock_response = AsyncMock()
         mock_response.text = "Tháng này bạn chi nhiều nhất vào Ăn uống với 500.000 VNĐ."

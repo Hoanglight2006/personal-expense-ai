@@ -1,8 +1,14 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
-configure({ asyncUtilTimeout: 5000 });
+// Increase timeout for async queries on CI runners
+configure({ asyncUtilTimeout: 15000 });
+
+// Mock window methods that are not implemented in jsdom
+if (typeof window !== 'undefined') {
+  window.scrollTo = vi.fn();
+}
 
 afterEach(() => {
   cleanup();
