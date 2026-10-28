@@ -45,7 +45,7 @@ jobs:
           pytest -v
 
   frontend-test:
-    name: Frontend Lint & Vitest (Node 20)
+    name: Frontend Lint & Vitest (Node 22 LTS)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,10 +54,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
