@@ -87,59 +87,85 @@ graph LR
 
 ```text
 personal-expense-ai/
-├── 🌐 frontend/                # [FRONTEND] React 19 + Vite (Feature-Based Architecture)
+├── 🌐 frontend/                # [FRONTEND] React 19 + Vite (Component & Page Architecture)
 │   ├── src/
 │   │   ├── api/                # Axios API client modules
-│   │   ├── components/         # Reusable UI components & Mascot 3D
+│   │   ├── components/         # Reusable UI (Modals, Popups, DatePicker, FinAI Mascot 3D)
 │   │   ├── constants/          # Application constants & presets
 │   │   ├── context/            # Global Auth & App State Context
-│   │   ├── features/           # Feature Modules (Co-located Page.jsx, Page.css, Page.test.jsx)
-│   │   │   ├── auth/           # Login, Register, Forgot/Reset Password
-│   │   │   ├── budgets/        # BudgetsPage & Modals + Co-located CSS & Test
-│   │   │   ├── categories/     # CategoriesPage + Co-located CSS & Test
-│   │   │   ├── dashboard/      # DashboardPage & summary widgets + Co-located CSS
-│   │   │   ├── profile/        # ProfilePage & avatar/password + Co-located CSS & Test
-│   │   │   ├── saving-goals/   # SavingGoalsPage & Modals + Co-located CSS & Test
-│   │   │   ├── statistics/     # StatisticsPage & biểu đồ + Co-located CSS & Test
-│   │   │   └── transactions/   # TransactionsPage, Trash + Co-located CSS & Test
-│   │   ├── styles/             # Shared Design Tokens, Base Resets, Layout & Shared Component CSS
-│   │   ├── utils/              # Helper functions (tiền tệ, ngày tháng)
-│   │   ├── App.jsx             # React Router & shell
-│   │   └── index.css           # Master CSS Hub gọn gàng
-│   └── package.json
+│   │   ├── hooks/              # Custom React Hooks
+│   │   ├── pages/              # Màn hình ứng dụng & Co-located Unit Tests
+│   │   │   ├── admin/          # AdminPage & Dashboard quản trị viên
+│   │   │   ├── Budgets.jsx     # Quản lý ngân sách & tiến độ chi tiêu (+ Budgets.test.jsx)
+│   │   │   ├── Categories.jsx  # Quản lý danh mục thu/chi (+ Categories.test.jsx)
+│   │   │   ├── Dashboard.jsx   # Tổng quan số dư ví & biểu đồ
+│   │   │   ├── Login.jsx, Register.jsx, ForgotPassword.jsx, ResetPassword.jsx # Xác thực
+│   │   │   ├── Profile.jsx     # Quản lý thông tin & mật khẩu (+ Profile.test.jsx)
+│   │   │   ├── SavingGoals.jsx # Mục tiêu tích lũy & nạp/rút (+ SavingGoals.test.jsx)
+│   │   │   ├── Statistics.jsx  # Báo cáo & phân tích AI (+ Statistics.test.jsx)
+│   │   │   └── Transactions.jsx, TransactionTrash.jsx # Quản lý giao dịch thu chi
+│   │   ├── styles/             # Hệ thống 28 file CSS module hóa (base, components, layout, pages)
+│   │   ├── test/               # Cấu hình kiểm thử Vitest & mocks
+│   │   ├── utils/              # Helper functions (Định dạng tiền tệ, ngày tháng UTC+7)
+│   │   ├── App.jsx             # React Router & ProtectedRoute
+│   │   ├── index.css           # Master CSS Hub (@import)
+│   │   └── main.jsx            # Entry point ứng dụng React
+│   ├── .env.example            # Vite frontend environment template
+│   ├── package.json            # Quản lý dependencies frontend (Vitest 70 tests)
+│   └── vite.config.js          # Cấu hình Vite & proxy
 │
-├── ⚙️ backend/                 # [BACKEND] Máy chủ FastAPI (Kiến trúc 3 lớp: Router -> Service -> Model)
+├── ⚙️ backend/                 # [BACKEND] Kiến trúc 3 lớp (3-Tier) với FastAPI & SQLAlchemy
 │   ├── app/
-│   │   ├── api/routes/         # Thin Controllers (/auth, /transactions, /budgets...)
-│   │   ├── services/           # Service Layer đóng gói 100% nghiệp vụ tài chính
-│   │   ├── core/               # Bảo mật, JWT, hashing, AI logic
-│   │   ├── models/             # SQLAlchemy ORM Models
-│   │   ├── schemas/            # Pydantic validation schemas
-│   │   ├── config.py           # Quản lý cấu hình môi trường
-│   │   └── main.py             # FastAPI App entry point
-│   ├── tests/                  # Bộ test tự động pytest (168 backend + 70 frontend test cases)
-│   └── requirements.txt
+│   │   ├── api/routes/         # Thin Controllers: Tiếp nhận HTTP request & ủy quyền cho Service
+│   │   │   ├── admin.py        # Router phân hệ quản trị viên (Admin Portal)
+│   │   │   ├── ai.py, chat.py, ocr.py # Router AI Báo cáo, Trợ lý FinAI & Quét hóa đơn OCR
+│   │   │   ├── auth.py         # Router xác thực JWT, OTP kích hoạt & đổi mật khẩu
+│   │   │   ├── budgets.py      # Router quản lý ngân sách tháng
+│   │   │   ├── categories.py   # Router danh mục thu/chi & Soft-hide
+│   │   │   ├── saving_goals.py # Router mục tiêu tiết kiệm, nạp/rút tiền (FIFO)
+│   │   │   └── transactions.py # Router giao dịch thu/chi, khóa dòng & thùng rác
+│   │   ├── services/           # Service Layer: Đóng gói 100% nghiệp vụ tài chính & tính toán
+│   │   │   ├── admin_service.py # Xử lý khóa tài khoản, cấp pass tạm, telemetry AI
+│   │   │   ├── auth_service.py  # Xử lý đăng ký, đăng nhập, token, đổi mật khẩu
+│   │   │   ├── budget_service.py # Xử lý ngân sách, cảnh báo ngưỡng 80%, bội chi
+│   │   │   ├── category_service.py # Xử lý danh mục, gán preset icon, khôi phục
+│   │   │   ├── email_service.py # Gửi email cảnh báo ngân sách & OTP qua SMTP Gmail
+│   │   │   ├── financial_alert_service.py # Phát hiện cảnh báo hạn chót & vi phạm ngân sách
+│   │   │   ├── saving_service.py # Xử lý tích lũy, nạp/rút tiền, kiểm tra số dư ví
+│   │   │   └── transaction_service.py # Xử lý CRUD giao dịch, khóa dòng, phân bổ mục tiêu
+│   │   ├── core/               # Bảo mật, JWT, hashing, AI prompt logic
+│   │   ├── models/             # SQLAlchemy ORM Models (User, Transaction, Category...)
+│   │   ├── schemas/            # Pydantic Schemas (Request/Response validation)
+│   │   ├── config.py           # Quản lý biến môi trường Pydantic Settings
+│   │   ├── database.py         # Kết nối DB Engine & Session factory
+│   │   └── main.py             # FastAPI Application initialization
+│   ├── tests/                  # Bộ kiểm thử tự động pytest (168 test cases)
+│   └── requirements.txt        # Danh sách thư viện Python
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data
-│   ├── migrations/             # Các file SQL Migration (001 -> 004)
-│   ├── schema.sql              # File DDL toàn vẹn CSDL MySQL 8.0
+│   ├── migrations/             # Các file SQL Migration (001 -> 006)
+│   ├── schema.sql              # File DDL toàn vẹn của CSDL MySQL 8.0
 │   ├── seed_demo.py            # Script khởi tạo 74 giao dịch demo 6 tháng
 │   └── README.md               # Hướng dẫn quản trị và migration CSDL
 │
-├── 🔧 config/                  # [CONFIG] Quản lý cấu hình & biến môi trường
-│   ├── .env.example            # Master environment configuration template
+├── 🔧 config/                  # [CONFIG] Quản lý cấu hình & tài liệu biến môi trường
+│   ├── prompts.json            # Tập trung toàn bộ cấu hình Prompt AI & Guardrails
 │   └── README.md               # Hướng dẫn chi tiết từng biến môi trường
 │
 ├── 📖 docs/                    # [DOCS] Toàn bộ tài liệu kiến trúc, quy trình, hướng dẫn & AI
 │   ├── USER_GUIDE.md           # Hướng dẫn sử dụng chi tiết A-Z
 │   ├── SYSTEM_ARCHITECTURE.md  # Kiến trúc hệ thống, bảo mật JWT & ERD
 │   ├── DEVELOPMENT_PROCESS.md  # Kế hoạch phát triển 6 Sprint Agile/Scrum
-│   ├── TEST_CASES.md           # Kịch bản kiểm thử 222 test cases toàn diện
+│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (238 test cases: 168 backend + 70 frontend)
 │   ├── AI_DEVELOPMENT_LOG.md   # Minh chứng Prompt AI 5 thành phần & BA
 │   ├── API.md                  # Đặc tả RESTful API chi tiết
-│   ├── DATABASE.md             # Thiết kế CSDL & quy tắc khóa dòng
-│   └── reports/                # Báo cáo học phần
+│   ├── DATABASE.md             # Thiết kế CSDL & quy tắc khóa dòng (001 -> 006)
+│   ├── PROMPT_BENCHMARK_REPORT.md # Báo cáo benchmark prompt AI
+│   └── reports/                # Thư mục chứa các tài liệu báo cáo học phần
 │
+├── 🐳 docker-compose.yml       # Điều phối triển khai trọn gói MySQL 8.0, Backend, Frontend
+├── 📄 .env.example             # Master Environment Configuration Template duy nhất
+├── 📜 CHANGELOG.md             # Lịch sử cập nhật và phát hành qua các Sprint
 └── README.md                   # Hướng dẫn tổng quan & cài đặt nhanh
 ```
 
@@ -189,10 +215,10 @@ docker compose up -d mysql
 ```
 
 #### Bước 2: Cấu hình môi trường (.env)
-`powershell
+```powershell
 # Sao chép file cấu hình mẫu ra file .env duy nhất ở thư mục gốc
 Copy-Item .env.example .env    # Linux/Mac/Git Bash: cp .env.example .env
-`
+```
 *(File .env duy nhất ở thư mục gốc được cả Backend FastAPI lẫn Docker Compose tự động nhận diện. File mẫu đã thiết lập sẵn chuỗi kết nối MySQL qua cổng 3307: mysql+pymysql://expense_user:expense_password@localhost:3307/personal_expense).*
 
 #### Bước 3: Khởi động Backend FastAPI & Nạp Dữ Liệu Demo
