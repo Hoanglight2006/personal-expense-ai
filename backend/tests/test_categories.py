@@ -440,3 +440,62 @@ def test_soft_deleted_category_cannot_be_accessed_or_modified(client: TestClient
     restore_res = client.post(f"/api/v1/categories/{cat_id}/restore", headers=headers)
     assert restore_res.status_code == 404
 
+
+
+def test_deleted_category_keeps_transactions_in_statistics_and_marks_is_deleted(client: TestClient):
+    headers, user_id = auth_headers(client)
+    food = create_category(client, headers, "Ăn uống", icon="food").json()
+    shopping = create_category(client, headers, "Mua sắm", icon="shopping").json()
+    unused_deleted = create_category(client, headers, "Không dùng", icon="other").json()
+
+    db = TestingSessionLocal()
+    try:
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user_id,
+                    category_id=food["id"],
+                    type=CategoryType.EXPENSE,
+                    amount=Decimal("200000.00"),
+                    transaction_date=date(2026, 8, 10),
+                ),
+                Transaction(
+                    user_id=user_id,
+                    category_id=shopping["id"],
+                    type=CategoryType.EXPENSE,
+                    amount=Decimal("300000.00"),
+                    transaction_date=date(2026, 8, 12),
+                ),
+            ]
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    assert client.delete(f"/api/v1/categories/{shopping['id']}", headers=headers).status_code == 204
+    assert client.delete(f"/api/v1/categories/{unused_deleted['id']}", headers=headers).status_code == 204
+
+    # 1. Categories management list must exclude deleted categories
+    cat_list = client.get("/api/v1/categories", headers=headers, params={"status": "all"}).json()["items"]
+    assert [item["id"] for item in cat_list] == [food["id"]]
+
+    # 2. Statistics must retain deleted categories that have transactions in the period
+    stats = client.get(
+        "/api/v1/categories/statistics",
+        headers=headers,
+        params={"start_date": "2026-08-01", "end_date": "2026-08-31"},
+    ).json()["items"]
+    stats_by_id = {item["id"]: item for item in stats}
+    assert shopping["id"] in stats_by_id
+    assert unused_deleted["id"] not in stats_by_id
+    assert stats_by_id[shopping["id"]]["expense_amount"] == "300000.00"
+    assert stats_by_id[shopping["id"]]["is_deleted"] is True
+    assert stats_by_id[shopping["id"]]["deleted_at"] is not None
+    total_stats_expense = sum(Decimal(item["expense_amount"]) for item in stats)
+    assert total_stats_expense == Decimal("500000.00")
+
+    # 3. Transactions list must expose category.is_deleted = True for UI badge "Đã xóa"
+    txns = client.get("/api/v1/transactions", headers=headers).json()["items"]
+    shopping_txn = next(t for t in txns if t["category_id"] == shopping["id"])
+    assert shopping_txn["category"]["is_deleted"] is True
+    assert shopping_txn["category"]["deleted_at"] is not None

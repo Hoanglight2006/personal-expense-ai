@@ -70,6 +70,7 @@ class MonthlyTrendResponse(BaseModel):
     """Comprehensive multi-month trend analytics, velocity, anomalies and predictions."""
 
     months_count: int
+    active_months_count: int = Field(default=0)
     items: list[MonthlyTrendItem]
     average_monthly_income: Decimal
     average_monthly_expense: Decimal
@@ -127,6 +128,10 @@ class MonthlyReportResponse(BaseModel):
     focus: str = Field(default="comprehensive", description="Trọng tâm phân tích báo cáo")
     total_saving_deposited: Decimal = Field(default=Decimal("0.00"), description="Tổng số tiền đã nạp vào các mục tiêu tiết kiệm trong tháng")
     active_goals_count: int = Field(default=0, description="Số lượng mục tiêu tiết kiệm đang hoạt động trong tháng")
+    rag_benchmarks: list[str] = Field(
+        default_factory=list,
+        description="Các tiêu chuẩn/nguyên tắc tài chính RAG được đối chiếu trong báo cáo",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -148,12 +153,16 @@ class BudgetRecommendationItem(BaseModel):
 
 
 class BudgetRecommendationResponse(BaseModel):
-    """List of AI budget recommendations for next/target period."""
+    """List of AI budget recommendations for next/target period with RAG benchmarks."""
 
     target_month: int
     target_year: int
     total_recommended: Decimal
     recommendations: list[BudgetRecommendationItem]
+    rag_benchmarks: list[str] = Field(
+        default_factory=list,
+        description="Các tiêu chuẩn/nguyên tắc tài chính RAG được đối chiếu khi đề xuất",
+    )
 
 
 class ApplyRecommendationItem(BaseModel):

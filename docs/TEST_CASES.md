@@ -1,7 +1,7 @@
 # 📋 BẢNG ĐẶC TẢ MA TRẬN TEST CASES HỆ THỐNG
 > **Dự án**: Hệ thống Quản lý Chi tiêu Cá nhân Tích hợp AI (Personal Expense AI)  
 > **Phiên bản tài liệu**: 1.0.0  
-> **Tổng số ca kiểm thử tự động**: 168 Pytest (Backend) + 70 Vitest (14 Suites Frontend) = 238 Tests  
+> **Tổng số ca kiểm thử tự động**: 189 Pytest (Backend) + 71 Vitest (14 Suites Frontend) = 260 Tests  
 > **Tỷ lệ vượt qua (Pass Rate)**: 100% (Zero Regression)
 
 ---
@@ -123,6 +123,27 @@ Hệ thống áp dụng mô hình kim tự tháp kiểm thử (**Testing Pyramid
 
 ---
 
+### 📚 Phân hệ 9: Tri Thức Tài Chính RAG & Tra Cứu Trực Tuyến (RAG & Live Web Search)
+*File kiểm thử*: [`backend/tests/test_rag.py`](../backend/tests/test_rag.py) *(18 test cases)*
+
+| Mã TC | Tên Kịch Bản Kiểm Thử | Điều Kiện Tiên Quyết | Dữ Liệu Đầu Vào & Các Bước | Kết Quả Kỳ Vọng | Loại Test |
+|:---:|---|---|---|---|:---:|
+| **TC-RAG-01** | Phân đoạn văn bản đệ quy (Recursive Chunking) | Tài liệu dài > 500 ký tự | Chia văn bản với chunk_size=500, overlap=50 | Các đoạn cắt đúng ranh giới đoạn văn / câu, giữ độ gối đầu 50 ký tự | Unit |
+| **TC-RAG-02** | Bảo toàn Metadata nguồn gốc văn bản | File raw .md / .pdf | Nạp tài liệu qua `load_knowledge_chunks()` | Mỗi chunk lưu đủ `id`, `title`, `source_name`, `source_url`, `chunk_index` | Data Pipeline |
+| **TC-RAG-03** | Lọc nhiễu Sibling Chunks (Sibling Noise Filter) | Văn bản có nhiều đoạn | Query khớp trực tiếp đoạn 2 | Đoạn 2 có điểm số cao nhất, các đoạn râu ria điểm thấp bị loại bỏ | Precision |
+| **TC-RAG-04** | Truy xuất chuẩn quy tắc 50/30/20 | Query: "Làm sao chia tiền theo quy tắc 50 30 20" | Gọi `retrieve_relevant_knowledge()` | Trả về trích đoạn từ bài viết Elizabeth Warren VnExpress | Retrieval |
+| **TC-RAG-05** | Truy xuất chuẩn 6 chiếc lọ JARS | Query: "Cách chia tiền 6 chiếc lọ JARS Harv Eker" | Gọi `retrieve_relevant_knowledge()` | Trả về trích đoạn 6 chiếc lọ Techcombank Blog | Retrieval |
+| **TC-RAG-06** | Truy xuất Quỹ dự phòng khẩn cấp | Query: "Cần chuẩn bị quỹ khẩn cấp bao nhiêu tiền phòng thân" | Gọi `retrieve_relevant_knowledge()` | Trả về tài liệu quỹ dự phòng VnExpress & Timo | Retrieval |
+| **TC-RAG-07** | Truy xuất Biểu thuế TNCN & Giảm trừ gia cảnh | Query: "Biểu thuế thu nhập cá nhân lũy tiến và mức giảm trừ" | Gọi `retrieve_relevant_knowledge()` | Trả về thông tin biểu thuế Cổng TTĐT Chính Phủ | Retrieval |
+| **TC-RAG-08** | Intent Gating: Chặn RAG khi chỉ hỏi số dư cá nhân | Query: "Tháng này tôi đã tiêu bao nhiêu tiền ăn uống" | Gọi `retrieve_relevant_knowledge()` | Trả về rỗng `[]`, không đính kèm bài viết ngoài lề | Security/Guardrail |
+| **TC-RAG-09** | So sánh đa phương pháp tài chính | Query: "So sánh phương pháp 50/30/20 và 6 chiếc lọ" | Gọi `retrieve_relevant_knowledge(top_k=2)` | Trả về đủ 2 nguồn từ 2 phương pháp khác nhau, không bị chiếm chỗ | Diversity |
+| **TC-RAG-10** | Trích xuất PDF chuyên sâu (ĐH Mở, ĐH Huế) | Query về nghiên cứu hành vi chi tiêu sinh viên | Gọi `retrieve_relevant_knowledge()` | Trích xuất chuẩn xác các chunk từ file PDF Tạp chí khoa học | PDF Ingestion |
+| **TC-RAG-11** | Tự động mở rộng Live Web Search khi tra cứu thị trường | Query: "Giá vàng hôm nay", "Lãi suất tiết kiệm mới nhất" | Gọi `retrieve_relevant_knowledge(enable_web_search=True)` | Tự động kích hoạt DuckDuckGo, trích xuất bài viết và kèm URL trực tiếp | Live Web RAG |
+| **TC-RAG-12** | RAG Động cho Báo cáo tài chính tháng | Metrics: tỷ lệ tiết kiệm thấp, bội chi ăn uống | Gọi `retrieve_contextual_report_knowledge()` | Trả về ngữ cảnh RAG và danh sách benchmark phù hợp đúng ngữ cảnh | Dynamic Context |
+| **TC-RAG-13** | RAG Động cho Đề xuất ngân sách tháng | Categories: Ăn uống, Đi lại, Nhà ở | Gọi `retrieve_contextual_budget_knowledge()` | Trả về tài liệu định mức ngân sách chuẩn và quy tắc phân bổ | Dynamic Context |
+
+---
+
 ### 📷 Phân hệ 8: Quét Hóa Đơn AI OCR
 *File kiểm thử*: [`backend/tests/test_ocr.py`](../backend/tests/test_ocr.py)
 
@@ -158,7 +179,7 @@ Hệ thống áp dụng mô hình kim tự tháp kiểm thử (**Testing Pyramid
 cd backend
 source venv/bin/activate  # Hoặc venv\Scripts\activate trên Windows
 
-# Chạy toàn bộ 168 bài test backend với thống kê chi tiết
+# Chạy toàn bộ 189 bài test backend với thống kê chi tiết
 pytest -v
 
 # Chạy riêng phân hệ AI
@@ -180,6 +201,6 @@ npm run test
 ```
 
 ### 3. Báo cáo Tóm tắt Kết quả Thực nghiệm
-* **Tổng số bài test tự động**: 168 Pytest (Backend) + 70 Vitest trong 14 Suites (Frontend) = 238 Test Cases
+* **Tổng số bài test tự động**: 189 Pytest (Backend) + 71 Vitest trong 14 Suites (Frontend) = 260 Test Cases
 * **Kết quả kiểm thử**: 100% PASSED (Không có bài test thất bại)
 * **Thời gian thực thi trung bình**: ~4.5 giây (Backend) và ~2.1 giây (Frontend)

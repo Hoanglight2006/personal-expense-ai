@@ -44,6 +44,9 @@ const CategoryInsights = ({ categories, viewType: externalViewType, onViewTypeCh
   const insights = useMemo(() => {
     const rows = categories.map((category) => ({
       ...category,
+      name: (category.is_deleted || category.deleted_at) && !String(category.name).includes('(Đã xóa)')
+        ? `${category.name} (Đã xóa)`
+        : category.name,
       expenseCents: decimalToCents(category.expense_amount),
       incomeCents: decimalToCents(category.income_amount),
     }));
@@ -154,7 +157,7 @@ const CategoryInsights = ({ categories, viewType: externalViewType, onViewTypeCh
                   <strong style={{ color: '#1e293b' }}>{insights.transactionCount}</strong>
                 </div>
                 <div className="balance-item balance-total">
-                  <span>Số dư (Thu - Chi)</span>
+                  <span>Chênh lệch Thu - Chi</span>
                   <strong className={insights.incomeTotal - insights.expenseTotal >= 0n ? 'text-success' : 'text-error'}>
                     {formatVndDecimal(centsToDecimal(insights.incomeTotal - insights.expenseTotal))}
                   </strong>

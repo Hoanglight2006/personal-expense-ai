@@ -133,7 +133,11 @@ def get_monthly_trend_data(
             )
         )
 
-    count = len(items) or 1
+    active_months_count = sum(
+        1 for item in items
+        if item.total_income > Decimal("0.00") or item.total_expense > Decimal("0.00")
+    )
+    count = active_months_count or 1
     avg_income = (total_income_all / count).quantize(Decimal("0.01"))
     avg_expense = (total_expense_all / count).quantize(Decimal("0.01"))
     avg_savings = avg_income - avg_expense
@@ -361,7 +365,14 @@ def get_monthly_trend_data(
         else:
             summary_parts.append("Mức chi tiêu tháng này tương đương tháng trước.")
     else:
-        summary_parts.append(f"Tổng quan xu hướng {len(items)} tháng gần nhất được tổng hợp đầy đủ.")
+        if active_months_count == 0:
+            summary_parts.append(f"Chưa ghi nhận giao dịch phát sinh trong {len(items)} tháng gần nhất.")
+        elif active_months_count < len(items):
+            summary_parts.append(
+                f"Hệ thống ghi nhận dữ liệu thực tế trong {active_months_count}/{len(items)} tháng gần nhất (chỉ tính trung bình trên các tháng có phát sinh giao dịch)."
+            )
+        else:
+            summary_parts.append(f"Tổng quan xu hướng {len(items)} tháng gần nhất được tổng hợp đầy đủ.")
 
     if is_overrun:
         summary_parts.append(
@@ -399,6 +410,7 @@ def get_monthly_trend_data(
 
     return MonthlyTrendResponse(
         months_count=len(items),
+        active_months_count=active_months_count,
         items=items,
         average_monthly_income=avg_income,
         average_monthly_expense=avg_expense,

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.ai_chat import mask_sensitive_data
 from app.core.prompts import format_prompt, get_prompt
+from app.core.rag import retrieve_contextual_report_knowledge
 from app.models.ai_report import AIReport
 from app.models.budget import Budget
 from app.models.saving_contribution import SavingContribution
@@ -441,7 +442,9 @@ async def generate_monthly_ai_report(
                 f"- Đánh giá dựa trên tổng kết thực tế đã ghi nhận của tháng này."
             )
 
+    rag_context, applied_benchmarks = retrieve_contextual_report_knowledge(summary, focus=focus)
     user_prompt = (
+        (f"{rag_context}\n\n" if rag_context else "") +
         f"{selected_directive}{budget_directive}{preliminary_notice}\n\n"
         + format_prompt("monthly_report", "user_prompt_template", summary_text=summary_text)
     )
@@ -606,6 +609,19 @@ async def generate_monthly_ai_report(
     except Exception:
         db.rollback()
 
+    # Dynamic applied_benchmarks are provided by retrieve_contextual_report_knowledge
+    _legacy_benchmarks = [
+        "VnExpress: Quy tắc quản lý tài chính 50/30/20 (https://vnexpress.net/quan-ly-tien-bang-quy-tac-50-30-20-4282825.html)",
+        "VnExpress: Khung tiêu chuẩn Sức khỏe tài chính & Quỹ dự phòng 3-6 tháng (https://vnexpress.net/can-de-danh-bao-nhieu-tien-phong-than-4908291.html)",
+    ]
+    if focus == "saving":
+        _legacy_benchmarks.append(
+            "Báo Dân Trí: Nguyên tắc kiểm soát chi tiêu ngẫu hứng - Trì hoãn 24 Giờ (https://dantri.com.vn/kinh-doanh/meo-don-gian-giup-ban-tranh-mua-sam-boc-dong-giu-tien-trong-tui-20260725083137900.htm)"
+        )
+
+    if not applied_benchmarks:
+        applied_benchmarks = _legacy_benchmarks
+
     return MonthlyReportResponse(
         month=f"{year:04d}-{month:02d}",
         financial_health_score=summary["health_score"],
@@ -624,4 +640,5 @@ async def generate_monthly_ai_report(
         focus=focus,
         total_saving_deposited=summary["total_saving_deposited"],
         active_goals_count=summary["active_goals_count"],
+        rag_benchmarks=applied_benchmarks,
     )

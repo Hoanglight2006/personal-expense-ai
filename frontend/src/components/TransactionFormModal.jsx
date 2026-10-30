@@ -146,7 +146,7 @@ const TransactionFormModal = ({
 
     const formatCatOption = (c) => ({
       value: c.id,
-      label: `${c.name}${!c.is_active ? ' (đã ẩn)' : ''}`,
+      label: `${c.name}${c.is_deleted || c.deleted_at ? ' (đã xóa)' : !c.is_active ? ' (đã ẩn)' : ''}`,
       icon: c.icon,
       color: c.color,
       type: c.type,
@@ -154,6 +154,16 @@ const TransactionFormModal = ({
 
     const isCurrentCategory = (c) => isEdit && transaction && String(c.id) === String(transaction.category_id);
     const visibleCats = categories.filter((c) => c.is_active || isCurrentCategory(c));
+    if (
+      isEdit
+      && transaction?.category
+      && !visibleCats.some((c) => String(c.id) === String(transaction.category.id))
+    ) {
+      visibleCats.push({
+        ...transaction.category,
+        type: transaction.type,
+      });
+    }
 
     if (form.type === 'expense') {
       return [

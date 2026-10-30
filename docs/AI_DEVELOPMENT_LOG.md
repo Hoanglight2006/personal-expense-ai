@@ -254,6 +254,98 @@ AI cung cấp prompt khung và hàm `generate_monthly_financial_report()` phân 
 
 ---
 
+### 🔹 Ca 7: Kiến Trúc RAG Tri Thức Tài Chính & Bộ Lọc Precision Gating
+
+#### 1. Prompt của Sinh viên (Chuẩn 5 thành phần):
+```text
+[Context]
+Bạn là Senior AI Architect chuyên về Retrieval-Augmented Generation (RAG) và NLP tiếng Việt.
+
+[Instructions]
+Thiết kế module truy xuất tri thức RAG (retriever.py) kết hợp giữa tài liệu nội bộ (.md, .pdf) và câu hỏi của người dùng:
+1. Đảm bảo khi người dùng hỏi về phương pháp tài chính (50/30/20, 6 chiếc lọ, quỹ khẩn cấp), hệ thống trích xuất đúng tài liệu chuẩn và đính kèm nguồn tham khảo chính xác.
+2. Thiết kế cơ chế phân loại ý định (Intent Gating): Nếu người dùng chỉ tra cứu số liệu cá nhân ("Thống kê ăn uống tháng này", "Số dư hiện tại"), tuyệt đối KHÔNG trích xuất RAG và KHÔNG gắn link bài viết ngoài lề.
+3. Khi người dùng hỏi so sánh nhiều phương pháp, phải lấy đủ tài liệu từ các nhóm khác nhau, không bị chiếm chỗ bởi một tài liệu duy nhất.
+
+[Constraints]
+- Bộ nhớ ngữ cảnh ngắn gọn, tối ưu token đầu vào.
+- Trả về danh sách KnowledgeDocument có độ liên quan cao (min_score threshold).
+
+[Output Format]
+Mã nguồn Python hoàn chỉnh cho module retriever.py kèm giải thích thuật toán tính điểm.
+```
+
+#### 2. Phản hồi của AI:
+AI đề xuất hàm `retrieve_relevant_knowledge()` tính điểm theo Bigram/Unigram và gọi DuckDuckGo tìm kiếm trực tuyến khi thiếu dữ liệu.
+
+#### 3. Phần Sinh viên kiểm tra, phát hiện lỗi và tối ưu hóa:
+* **Lỗi & Hạn chế phát hiện**:
+  * **Ô nhiễm nguồn tham khảo cá nhân**: Các từ tiếng Việt phổ biến như `"chi tiêu"`, `"ăn uống"`, `"tháng này"` bị AI kích hoạt tìm kiếm Web mẫu Excel ngoài lề, gắn link nguồn tham khảo lung tung khi người dùng chỉ hỏi số dư cá nhân.
+  * **Thiên lệch tài liệu khi so sánh**: Khi người dùng hỏi *"So sánh 50/30/20 và 6 chiếc lọ"*, thuật toán chấm điểm của AI chỉ lấy 3 đoạn trích của bài 6 chiếc lọ mà bỏ quên bài 50/30/20.
+* **Cải tiến sinh viên đã triển khai**:
+  * Xây dựng danh sách mẫu truy vấn số liệu cá nhân `_PERSONAL_STATS_PATTERNS` kết hợp `_KNOWLEDGE_METHOD_SIGNALS` trong [`retriever.py`](../backend/app/core/rag/retriever.py): nếu người dùng chỉ hỏi tra cứu tài chính cá nhân, trả về ngay mảng rỗng `[]` để dùng trực tiếp `financial_context`.
+  * Bổ sung cơ chế **Đa dạng hóa nguồn khi so sánh**: Đảm bảo phân bổ đều các đoạn trích từ các `doc_id` khác nhau.
+  * Viết 22 ca kiểm thử chuyên sâu trong [`test_rag.py`](../backend/tests/test_rag.py) kiểm chứng độ chính xác 100%.
+
+---
+
+### 🔹 Ca 8: Phân Hệ Quản Trị Hệ Thống (Admin) Bảo Vệ Dữ Liệu Riêng Tư (Zero-Knowledge Privacy)
+
+#### 1. Prompt của Sinh viên:
+```text
+[Context]
+Bạn là Security & Software Architect thiết kế phân hệ Quản trị viên (System Administrator) cho ứng dụng tài chính cá nhân Personal Expense AI.
+
+[Instructions]
+Thiết kế kiến trúc RBAC và các API Admin đáp ứng 3 mục tiêu:
+1. Quản lý tài khoản (khóa/mở khóa tài khoản khi có dấu hiệu vi phạm, cấp mật khẩu tạm thời khi người dùng mất tài khoản).
+2. Giám sát tài nguyên hệ thống và chi phí gọi Gemini AI (tần suất gọi, tổng token sử dụng, tỉ lệ lỗi).
+3. Đảm bảo nguyên tắc bảo mật Zero-Knowledge Privacy: Quản trị viên tuyệt đối không thể đọc lén giao dịch thu/chi, số dư hoặc nội dung chat riêng tư của bất kỳ người dùng nào.
+
+[Constraints]
+- Phân quyền chặt chẽ thông qua JWT Role-based Access Control (User / Admin).
+- API Admin không bao giờ trả về trường Transaction.description, amount hoặc nội dung hội thoại cá nhân.
+
+[Output Format]
+Lược đồ API, Pydantic Schema và middleware kiểm tra quyền hạn.
+```
+
+#### 2. Phản hồi của AI:
+AI sinh ra các endpoint trong router `/api/v1/admin` kèm bảng dữ liệu người dùng cơ bản.
+
+#### 3. Phần Sinh viên kiểm tra và hoàn thiện:
+* **Lỗi & Rủi ro phát hiện**: Code ban đầu của AI có endpoint trả về `user_stats` chứa tổng thu chi lũy kế của người dùng, vi phạm nguyên tắc Zero-Knowledge.
+* **Sinh viên đã làm**: 
+  * Loại bỏ triệt để mọi dữ liệu tài chính cá nhân khỏi phản hồi của Admin; thay vào đó chỉ thống kê `total_users`, `active_users`, `total_ai_requests` và bảng nhật ký ẩn danh `ai_usage_logs`.
+  * Viết bộ kiểm thử bảo mật độc lập trong [`test_admin.py`](../backend/tests/test_admin.py) đảm bảo tài khoản quyền User thông thường khi truy cập endpoint Admin bị chặn ngay lập tức với mã lỗi `403 Forbidden`.
+
+---
+
+### 🔹 Ca 9: Tự Động Hóa Kiểm Thử & Kiểm Thử Hồi Quy (Test Generation & CI/CD Verification)
+
+#### 1. Prompt của Sinh viên:
+```text
+[Context]
+Bạn là Senior QA Automation Engineer làm việc với Pytest và FastAPI TestClient.
+
+[Instructions]
+Dựa trên các API Giao dịch, Ngân sách, Mục tiêu tiết kiệm và RAG AI Chatbot, hãy sinh bộ kiểm thử tự động toàn diện:
+- Kiểm thử các ca biên (Edge cases): số dư âm, trùng lặp ngân sách, khôi phục từ thùng rác khi danh mục đã bị xóa.
+- Mocking an toàn các dịch vụ bên thứ ba (Google Gemini API) để test suite chạy offline độc lập không phụ thuộc Internet.
+- Đảm bảo tỷ lệ bao phủ mã nguồn cao và tốc độ thực thi nhanh.
+```
+
+#### 2. Phản hồi của AI:
+AI cung cấp các hàm fixture pytest và mock `AsyncMock` cho Google GenerativeAI.
+
+#### 3. Phần Sinh viên kiểm tra và tối ưu:
+* **Lỗi phát hiện**: Mock của AI bị thiếu cấu trúc đối tượng `response.text`, gây ra lỗi `AttributeError` khi chạy test chat và report.
+* **Sinh viên đã làm**: 
+  * Chuẩn hóa mock response trả về đúng cấu trúc đối tượng `AsyncMock(text="...")`.
+  * Xây dựng trọn bộ **190 tests backend và 71 tests frontend** chạy tự động qua luồng GitHub Actions CI, đảm bảo tỷ lệ vượt qua 100% (*Zero Regression*).
+
+---
+
 ## 📊 4. BẢNG TỔNG HỢP CÁC PROMPT TRONG DỰ ÁN
 
 | STT | Phân hệ / Nhiệm vụ | Vai trò (Role) | Kỹ thuật Prompt | Đóng góp & Tinh chỉnh của Sinh viên |
@@ -265,10 +357,29 @@ AI cung cấp prompt khung và hàm `generate_monthly_financial_report()` phân 
 | **5** | **Trợ lý ảo FinAI 3D** | UI/UX Specialist | Instructions + Constraints (`100dvh`) | Tối ưu responsive trên màn hình điện thoại và thêm tính năng ẩn mascot |
 | **6** | **Tạo Dữ liệu mẫu (Seed)** | Backend Engineer | Context + Instructions + Constraints | Sửa lỗi encoding UTF-8 trên Windows console và nạp sẵn 74 giao dịch demo |
 | **7** | **Báo cáo AI & Bội chi** | Financial Analyst | Temporal Awareness + Multi-focus Prompt | Thêm ngữ cảnh ngày đầu tháng, đối chiếu ngân sách từng danh mục, ngăn ảo giác phân tích |
+| **8** | **RAG Tri thức tài chính** | RAG Architect | Intent Gating + Chunk Scoring + Precision Gate | Xây dựng bộ lọc rẽ nhánh: tra cứu cá nhân không gắn link ngoài; so sánh đa phương pháp |
+| **9** | **Admin Zero-Knowledge** | Security Architect | Zero-Knowledge RBAC + Privacy by Design | Loại bỏ triệt để dữ liệu chi tiêu cá nhân khỏi API Admin; chỉ giám sát token hệ thống |
+| **10** | **Kiểm thử tự động** | QA Automation Engineer | Test Generation + Pytest Mocking | Chuẩn hóa mock Gemini AsyncMock, bao phủ 190 test cases backend và 71 test frontend |
 
 ---
 
-## 🔬 5. THỰC NGHIỆM ĐỐI CHỨNG TỐI ƯU PROMPT QUA 3 VÒNG LẶP (TIÊU CHÍ 4)
+## ⏱️ 5. BẢNG ĐO LƯỜNG THỰC NGHIỆM ĐỊNH LƯỢNG SDLC (BÀI THỰC HÀNH 5)
+
+> Bảng đối chứng thực tế giữa phương thức phát triển truyền thống (thủ công) và phương thức có AI hỗ trợ (AI-augmented SDLC) trên các nhóm tác vụ của dự án:
+
+| Pha hoạt động SDLC | Tác vụ cụ thể | Thời gian thủ công (Ước lượng) | Thời gian có AI hỗ trợ (Thực tế) | Tiết kiệm (%) | Số lỗi AI sinh ra (Bị bắt ở Review) | Tỉ lệ Code Churn (Code phải sửa tay) |
+|---|---|:---:|:---:|:---:|:---:|:---:|
+| **Phân tích (BA)** | Viết User Stories & Acceptance Criteria Gherkin | 8.0 giờ | 2.5 giờ | **68.8%** | 3 lỗi logic thiếu trường hợp biên | 15% bổ sung thêm điều kiện số dư âm |
+| **Thiết kế CSDL** | Thiết kế ERD, Index, Unique Constraints | 6.0 giờ | 2.0 giờ | **66.7%** | 1 lỗi thiếu bảng trung gian nạp/rút | 20% chỉnh sửa kiểu dữ liệu Decimal |
+| **Lập trình Backend** | Viết CRUD, Service layer, Schemas Pydantic | 22.0 giờ | 8.0 giờ | **63.6%** | 4 lỗi Race-condition & SQL Injection | 30% viết lại logic khóa hàng `with_for_update` |
+| **Tích hợp AI & RAG** | Xây dựng Pipeline RAG chunking & Intent filter | 16.0 giờ | 5.5 giờ | **65.6%** | 5 lỗi trích dẫn sai và ảo giác nguồn | 25% viết lại bộ lọc `_PERSONAL_STATS_PATTERNS` |
+| **Kiểm thử (QA/Testing)**| Viết 190 Unit/Integration test cases | 20.0 giờ | 6.0 giờ | **70.0%** | 6 lỗi mock response thiếu attribute | 18% chỉnh sửa fixture database |
+| **Tài liệu kỹ thuật** | Viết API doc, Database doc, System Arch | 10.0 giờ | 2.5 giờ | **75.0%** | 2 lỗi mô tả sai port container | 10% đồng bộ lại thông số thực tế |
+| **TỔNG CỘNG** | **Toàn bộ vòng đời phát triển dự án** | **82.0 giờ** | **26.5 giờ** | **67.7%** | **21 lỗi được chặn ở bước Review** | **Bình quân 19.6%** |
+
+---
+
+## 🔬 6. THỰC NGHIỆM ĐỐI CHỨNG TỐI ƯU PROMPT QUA 3 VÒNG LẶP (TIÊU CHÍ 4)
 
 > Toàn bộ prompt của hệ thống được tách biệt hoàn toàn khỏi mã nguồn tại [`config/prompts.json`](../config/prompts.json) và được quản lý tập trung bởi module [`backend/app/core/prompts.py`](../backend/app/core/prompts.py).
 > 
@@ -287,7 +398,7 @@ AI cung cấp prompt khung và hàm `generate_monthly_financial_report()` phân 
 
 ---
 
-## 💡 6. ĐÁNH GIÁ VÀ BÀI HỌC KINH NGHIỆM
+## 💡 7. ĐÁNH GIÁ VÀ BÀI HỌC KINH NGHIỆM
 
 1. 🎯 **Làm chủ cấu trúc Prompt 5 thành phần**: Việc xác định rõ **Context**, **Constraints** và **Output Format** giúp AI hiểu chính xác yêu cầu, giảm thiểu tối đa các câu trả lời sai lệch (*hallucination*).
 2. 🛡️ **Nguyên tắc "Zero Trust" khi tích hợp Code AI**: Không bao giờ sao chép nguyên văn mã nguồn AI sinh ra ở các phần xử lý tiền tệ và bảo mật. Lập trình viên phải luôn đọc hiểu, rà soát trường hợp biên và viết test tự động để nghiệm thu.

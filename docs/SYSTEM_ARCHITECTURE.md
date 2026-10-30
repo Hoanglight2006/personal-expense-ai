@@ -77,7 +77,7 @@ personal-expense-ai/
 │   │   ├── index.css           # Master CSS Hub (@import)
 │   │   └── main.jsx            # Entry point ứng dụng React
 │   ├── .env.example            # Vite frontend environment template
-│   ├── package.json            # Quản lý dependencies frontend (Vitest 70 tests)
+│   ├── package.json            # Quản lý dependencies frontend (Vitest 71 tests)
 │   └── vite.config.js          # Cấu hình Vite & proxy
 │
 ├── ⚙️ backend/                 # [BACKEND] Kiến trúc 3 lớp (3-Tier) với FastAPI & SQLAlchemy
@@ -100,12 +100,15 @@ personal-expense-ai/
 │   │   │   ├── saving_service.py # Xử lý tích lũy, nạp/rút tiền, kiểm tra số dư ví
 │   │   │   └── transaction_service.py # Xử lý CRUD giao dịch, khóa dòng, phân bổ mục tiêu
 │   │   ├── core/               # Bảo mật, JWT, hashing, AI prompt logic
+│   │   │   ├── rag/            # RAG Engine: loader, recursive chunking, retriever, web search
+│   │   │   └── ai/             # Core AI generators: report_generator, budget_suggester, trend_analyzer
 │   │   ├── models/             # SQLAlchemy ORM Models (User, Transaction, Category...)
 │   │   ├── schemas/            # Pydantic Schemas (Request/Response validation)
 │   │   ├── config.py           # Quản lý biến môi trường Pydantic Settings
 │   │   ├── database.py         # Kết nối DB Engine & Session factory
 │   │   └── main.py             # FastAPI Application initialization
-│   ├── tests/                  # Bộ kiểm thử tự động pytest (168 test cases)
+│   ├── data/knowledge_base/    # Kho tri thức tài chính chuẩn mực (.md, .pdf)
+│   ├── tests/                  # Bộ kiểm thử tự động pytest (189 test cases: 18 RAG + 8 AI)
 │   └── requirements.txt        # Danh sách thư viện Python
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data
@@ -121,14 +124,14 @@ personal-expense-ai/
 ├── 📖 docs/                    # [DOCS] Bộ tài liệu kỹ thuật toàn diện
 │   ├── USER_GUIDE.md           # Hướng dẫn sử dụng chi tiết A-Z
 │   ├── SYSTEM_ARCHITECTURE.md  # Tài liệu kiến trúc hệ thống (Tài liệu này)
-│   ├── DEVELOPMENT_PROCESS.md  # Kế hoạch và quy trình phát triển 6 Sprint
+│   ├── DEVELOPMENT_PROCESS.md  # Kế hoạch và quy trình phát triển 7 Sprint
 │   ├── AI_DEVELOPMENT_LOG.md   # Nhật ký và minh chứng sử dụng AI (Prompt 5 thành phần & BA)
 │   ├── API.md                  # Đặc tả chi tiết toàn bộ REST API
 │   ├── DATABASE.md             # Thiết kế CSDL, quy tắc khóa dòng & migration
 │   ├── database_design.md      # Thiết kế chi tiết CSDL
 │   ├── requirements.md         # Đặc tả yêu cầu kỹ thuật (SRS)
 │   ├── use_cases.md            # Các ca sử dụng chi tiết
-│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (238 test cases: 168 backend + 70 frontend)
+│   ├── TEST_CASES.md           # Kịch bản kiểm thử toàn diện (260 test cases: 189 backend + 71 frontend)
 │   └── reports/                # Thư mục chứa các tài liệu báo cáo học phần
 │
 ├── 🐳 docker-compose.yml       # Điều phối triển khai trọn gói MySQL, Backend, Frontend
@@ -315,3 +318,47 @@ erDiagram
         json meta_data
     }
 ```
+
+
+---
+
+## 6. KIẾN TRÚC TRÍ TUỆ NHÂN TẠO & RAG LAI (HYBRID RAG PIPELINE)
+
+Hệ thống ứng dụng kiến trúc **Retrieval-Augmented Generation (RAG) lai** kết hợp giữa tri thức chuẩn mực cục bộ (Local-First) và tra cứu trực tuyến thời gian thực (Live Web Search):
+
+```mermaid
+flowchart TD
+    UserQuery["User Input / Spending Signals"] --> IntentGate{"Intent Gating"}
+    
+    IntentGate -- "Tra cứu số liệu cá nhân thuần túy" --> DirectDB["Trả về trực tiếp từ Financial Context (Không RAG)"]
+    
+    IntentGate -- "Hỏi phương pháp / Cần chuẩn mực định mức" --> LocalSearch["1. Quét kho tri thức cục bộ (Markdown & PDF)"]
+    
+    LocalSearch --> ChunkScoring["2. Chấm điểm Chunk-level & Sibling Noise Filtering"]
+    
+    ChunkScoring --> CheckCount{"Số tài liệu phù hợp >= 2?"}
+    
+    CheckCount -- "Đã đủ >= 2 tài liệu" --> Deduplicate["3. Khử trùng lặp đa nguồn (Multi-document deduplication)"]
+    
+    CheckCount -- "Chưa đủ / Hỏi tin tức thị trường mới" --> WebFallback["4. Fallback Live Web Search qua DuckDuckGo"]
+    
+    WebFallback --> ExtractLive["Trích xuất toàn văn bài báo & Chunking thời gian thực"]
+    
+    ExtractLive --> Deduplicate
+    
+    Deduplicate --> PromptInject["5. Ghép ngữ cảnh RAG Context & Citations vào Prompt"]
+    
+    PromptInject --> GeminiEngine["6. Mô hình Google Gemini AI sinh phản hồi / báo cáo / ngân sách"]
+```
+
+### Các thành phần cốt lõi của Pipeline RAG:
+1. **Document Ingestion & Recursive Chunking (`document_loader.py`)**:
+   - Chia văn bản theo kích thước 500 ký tự với 50 ký tự gối đầu (overlap) theo các ranh giới tự nhiên (`\n\n`, `\n`, `. `, ` `).
+   - Nạp tự động các tài liệu Markdown chuyên khảo (50/30/20, 6 chiếc lọ JARS, Quỹ dự phòng khẩn cấp, Biểu thuế TNCN, Chi tiêu trì hoãn 24h) và các tài liệu nghiên cứu PDF (ĐH Mở TP.HCM, ĐH Huế).
+2. **Precision Scoring & Sibling Noise Filtering (`retriever.py`)**:
+   - Chấm điểm kết hợp Bigram, Unigram và từ khóa Metadata.
+   - Sibling Noise Filtering: Khi một đoạn trong bài viết đạt điểm cao, hệ thống tự động lọc bỏ các đoạn râu ria khác của cùng bài viết để dành chỗ cho các nguồn tri thức đa dạng khác.
+3. **Hybrid Live Web Expansion (`web_search.py`)**:
+   - Tự động tra cứu internet qua DuckDuckGo khi người dùng hỏi các thông tin thị trường biến động (giá vàng, lãi suất) hoặc khi chi tiêu của người dùng thuộc các danh mục đặc thù chưa có trong tài liệu nội bộ.
+4. **Intent Gating Guardrail**:
+   - Nhận diện các mẫu câu tra cứu số liệu cá nhân thuần túy để ngăn chặn tuyệt đối hiện tượng ô nhiễm nguồn tham khảo ngoài lề.

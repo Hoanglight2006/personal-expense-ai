@@ -6,7 +6,7 @@ Tài liệu ghi nhận toàn bộ quá trình lập kế hoạch, phân tích, t
 
 ## 1. TỔNG QUAN PHƯƠNG PHÁP LUẬN (METHODOLOGY)
 
-Dự án áp dụng mô hình **Agile / Scrum** chia thành **6 Sprint** phát triển liên tục (mỗi Sprint tập trung vào một nhóm giá trị nghiệp vụ cốt lõi), kết hợp với quy trình kiểm thử tự động (**CI & TDD/BDD**) để đảm bảo chất lượng phần mềm không bị hồi quy (*Zero Regression*).
+Dự án áp dụng mô hình **Agile / Scrum** chia thành **7 Sprint** phát triển liên tục (mỗi Sprint tập trung vào một nhóm giá trị nghiệp vụ cốt lõi), kết hợp với quy trình kiểm thử tự động (**CI & TDD/BDD**) để đảm bảo chất lượng phần mềm không bị hồi quy (*Zero Regression*).
 
 ```mermaid
 gantt
@@ -122,8 +122,31 @@ gantt
     * Hợp nhất cấu hình về file Master .env duy nhất tại thư mục gốc, loại bỏ hoàn toàn các file cấu hình trùng lặp.
   * **Tự động hóa CI/CD Pipeline (GitHub Actions)**:
     * Thiết lập luồng CI .github/workflows/ci.yml kiểm tra tự động mỗi khi commit/push: Linter, 168 tests Pytest backend, 70 tests Vitest frontend và kiểm tra hợp lệ cấu hình Docker Compose.
-  * **Kiểm thử tự động toàn diện**: Mở rộng bộ test lên **238 test cases (168 backend + 70 frontend trên 14 test suites)** với tỷ lệ pass 100% (Zero Regression).
+  * **Kiểm thử tự động toàn diện**: Mở rộng bộ test lên **260 test cases (189 backend + 71 frontend trên 14 test suites)** với tỷ lệ pass 100% (Zero Regression).
 * **Kết quả nghiệm thu**: Toàn bộ hệ thống đạt độ sẵn sàng cao độ (Production-Ready), vượt qua 100% các bài test tự động và đáp ứng trọn vẹn mọi yêu cầu trong tài liệu REQUIREMENTS.md.
+
+
+
+### 📌 SPRINT 7: Nâng Cấp RAG Tri Thức Tài Chính Lai, Chuẩn Hóa Đề Xuất Ngân Sách & Mở Rộng 260 Tests
+* **Mục tiêu**: Tối ưu hóa trí tuệ nhân tạo với kiến trúc RAG GenAI lai kết hợp Local-First và Fallback Live Web Search DuckDuckGo thời gian thực, khắc phục triệt để tình trạng dữ liệu sơ khai trong gợi ý ngân sách.
+* **Nội dung thực hiện**:
+  * **Kiến trúc RAG Tri thức Lai (Hybrid RAG Pipeline)**:
+    * Xây dựng pipeline chia nhỏ văn bản đệ quy 500 ký tự (overlap 50 ký tự), hỗ trợ xử lý cả Markdown và PDF nghiên cứu khoa học.
+    * Thuật toán chấm điểm chunk-level kết hợp lọc nhiễu Sibling Noise Filtering.
+    * Bộ lọc Intent Gating: ngăn ngừa ô nhiễm trích dẫn RAG khi người dùng chỉ hỏi về số dư và giao dịch cá nhân.
+    * Tự động mở rộng Live Web Search qua DuckDuckGo khi người dùng tra cứu thông tin thị trường biến động hoặc danh mục chi tiêu chuyên biệt.
+  * **Tối ưu hóa Thuật toán Đề xuất Ngân sách AI (`budget_suggester.py`)**:
+    * Sửa lỗi chia cứng lookback 3 tháng thành chia theo số tháng thực tế có dữ liệu (`active_prior`).
+    * Bổ sung công thức ngoại suy chi tiêu giữa tháng (`mid-month extrapolation`).
+    * Tiêu chuẩn độ chín dữ liệu (`Data Maturity`): Thu nhập tối thiểu 2.000.000 đ, tối thiểu 5 giao dịch và trải dài >= 7 ngày. Áp dụng định mức chi phí sinh hoạt đô thị chuẩn khi dữ liệu sơ khai.
+    * Bỏ giới hạn trần sinh viên hẹp (5 - 6.5 triệu) trong prompt.
+  * **Tích hợp RAG Động vào Báo cáo & Ngân sách**:
+    * Truy xuất động dựa trên danh mục chi tiêu lớn nhất và các tín hiệu tài chính thực tế.
+    * Khử trùng lặp đa nguồn (Multi-document deduplication) loại bỏ tình trạng cố định vào 2 bài báo mẫu.
+  * **Mở rộng kiểm thử tự động toàn diện**:
+    * Bổ sung 22 test cases tự động mới (trong đó có 18 bài test RAG `test_rag.py`).
+    * Nâng tổng số test cases lên **260 tests (189 backend + 71 frontend)**, đạt tỷ lệ pass 100% (Zero Regression).
+* **Kết quả nghiệm thu**: Hệ thống đạt độ linh hoạt tối đa, trích dẫn tài liệu minh bạch và phản hồi tài chính thông minh theo ngữ cảnh thực tế của người dùng.
 
 ## 3. QUẢN LÝ RỦI RO & GIẢI PHÁP KỸ THUẬT (RISK MANAGEMENT)
 

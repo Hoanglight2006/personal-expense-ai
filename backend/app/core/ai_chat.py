@@ -18,6 +18,7 @@ from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.rag import retrieve_relevant_knowledge, format_rag_context
 from app.models.budget import Budget
 from app.models.category import Category
 from app.models.enums import CategoryType, GoalStatus
@@ -233,17 +234,38 @@ class GeminiChatService:
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self._model_name = settings.GEMINI_MODEL
 
-    async def generate_reply(
+    async def generate_reply_with_sources(
         self,
         user_message: str,
         financial_context: str,
         conversation_history: list[dict] | None = None,
-    ) -> str:
-        """Generate an AI reply given the user message and financial context."""
+    ) -> tuple[str, list[str]]:
+        """Generate an AI reply and return deduplicated RAG knowledge source citations."""
         if not genai:
-            return "Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏"
+            return "Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏", []
 
-        full_system = f"{SYSTEM_PROMPT}\n\n{financial_context}"
+        # RAG Retrieval from hybrid financial knowledge base (Local Chunks & Live Web)
+        rag_docs = retrieve_relevant_knowledge(user_message, top_k=2)
+        sources: list[str] = []
+        for doc in rag_docs:
+            src_url = doc.get("source_url", "")
+            src_name = doc.get("source_name", "")
+            title = doc.get("title", "")
+            if src_url and src_url.startswith("http"):
+                label = f"{src_name}: {title} ({src_url})"
+            elif src_name:
+                label = f"{src_name}: {title}"
+            else:
+                label = title
+            if label and label not in sources:
+                sources.append(label)
+        rag_context = format_rag_context(rag_docs)
+
+        if rag_context:
+            full_system = f"{SYSTEM_PROMPT}\n\n{financial_context}\n\n{rag_context}"
+        else:
+            full_system = f"{SYSTEM_PROMPT}\n\n{financial_context}"
+
         contents = []
 
         if conversation_history:
@@ -261,7 +283,6 @@ class GeminiChatService:
             "gemini-flash-latest",
             "gemini-3.7-flash",
         ]
-        # Remove duplicates while preserving order
         candidate_models = list(dict.fromkeys(candidate_models))
 
         last_error = None
@@ -271,8 +292,8 @@ class GeminiChatService:
                     model_name,
                     system_instruction=full_system,
                     generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=1000,
-                        temperature=0.7,
+                        max_output_tokens=500,
+                        temperature=0.6,
                     ),
                 )
                 response = await asyncio.wait_for(
@@ -280,11 +301,24 @@ class GeminiChatService:
                     timeout=8.0,
                 )
                 if response and response.text:
-                    return response.text.strip()
+                    return response.text.strip(), sources
             except Exception as e:
                 last_error = e
                 continue
 
-        return f"Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏 ({type(last_error).__name__ if last_error else 'Unknown'})"
+        return (
+            f"Xin lỗi, mình đang gặp sự cố kết nối AI. Vui lòng thử lại sau! 🙏 ({type(last_error).__name__ if last_error else 'Unknown'})",
+            sources,
+        )
 
-
+    async def generate_reply(
+        self,
+        user_message: str,
+        financial_context: str,
+        conversation_history: list[dict] | None = None,
+    ) -> str:
+        """Backwards-compatible generate_reply returning only the reply text."""
+        reply, _ = await self.generate_reply_with_sources(
+            user_message, financial_context, conversation_history
+        )
+        return reply

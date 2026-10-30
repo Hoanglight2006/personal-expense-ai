@@ -239,12 +239,12 @@ class TransactionService:
             .filter(
                 Category.id == category_id,
                 Category.user_id == self.user.id,
-                Category.deleted_at.is_(None),
+
             )
             .with_for_update()
             .first()
         )
-        if category is None:
+        if category is None or (require_active and category.deleted_at is not None):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Không tìm thấy danh mục.",
@@ -270,6 +270,8 @@ class TransactionService:
                 icon=txn.category.icon,
                 color=txn.category.color,
                 is_active=txn.category.is_active,
+                is_deleted=txn.category.deleted_at is not None,
+                deleted_at=txn.category.deleted_at,
             )
         saving_goal_id = None
         saving_goal_name = None
@@ -1029,7 +1031,12 @@ class TransactionService:
             .filter(Category.id == txn.category_id, Category.user_id == self.user.id)
             .first()
         )
-        if category and not category.is_active:
+        if category and category.deleted_at is not None:
+            warning = (
+                f'Danh mục "{category.name}" hiện đã xóa. '
+                "Giao dịch được khôi phục nhưng bạn nên cập nhật danh mục."
+            )
+        elif category and not category.is_active:
             warning = (
                 f'Danh mục "{category.name}" hiện đã ẩn. '
                 "Giao dịch được khôi phục nhưng bạn nên cập nhật danh mục."

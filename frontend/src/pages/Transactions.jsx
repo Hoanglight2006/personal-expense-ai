@@ -317,7 +317,7 @@ const Transactions = () => {
     { value: '', label: 'Tất cả' },
     ...categories.map((c) => ({
       value: c.id,
-      label: `${c.name}${c.is_active ? '' : ' (đã ẩn)'}`,
+      label: `${c.name}${c.is_deleted || c.deleted_at ? ' (đã xóa)' : c.is_active ? '' : ' (đã ẩn)'}`,
     }))
   ], [categories]);
 
