@@ -332,6 +332,35 @@ const AiBudgetTab = ({ currentMonth, currentYear, onApplied }) => {
             </div>
           </div>
 
+          {/* RAG Financial Benchmarks Reference */}
+          {data.rag_benchmarks?.length > 0 && (
+            <div className="ai-benchmarks-card" style={{ marginBottom: '1.25rem' }}>
+              <div className="benchmarks-header">
+                <span className="box-icon">📚</span>
+                <h3>Cơ Sở Tiêu Chuẩn & Khung Chuẩn Mực Tham Chiếu (RAG)</h3>
+              </div>
+              <ul className="benchmarks-list">
+                {data.rag_benchmarks.map((bm, idx) => {
+                  const urlMatch = bm.match(/\((https?:\/\/[^\s)]+)\)/);
+                  const url = urlMatch ? urlMatch[1] : null;
+                  const cleanText = url ? bm.replace(/\s*\(https?:\/\/[^\s)]+\)/, '') : bm;
+                  return (
+                    <li key={idx} className="benchmark-item">
+                      <span className="bm-check">✓</span>
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="rag-source-link">
+                          {cleanText} ↗
+                        </a>
+                      ) : (
+                        <span>{bm}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           {successMsg && <div className="message message-success">{successMsg}</div>}
           {error && <div className="message message-error">{error}</div>}
 

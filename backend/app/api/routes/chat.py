@@ -31,9 +31,13 @@ class ChatMessageRequest(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    """AI-generated reply."""
+    """AI-generated reply with optional RAG knowledge sources."""
 
     reply: str
+    rag_sources: list[str] = Field(
+        default_factory=list,
+        description="Danh sách tài liệu tri thức tài chính được truy xuất (RAG)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -67,8 +71,8 @@ async def send_chat_message(
     # Build financial context from real user data (aggregated & masked)
     financial_context = build_financial_context(db, current_user.id)
 
-    # Generate AI reply
-    reply = await service.generate_reply(
+    # Generate AI reply with RAG financial knowledge sources
+    reply, rag_sources = await service.generate_reply_with_sources(
         user_message=safe_message,
         financial_context=financial_context,
         conversation_history=body.conversation_history,
@@ -90,4 +94,4 @@ async def send_chat_message(
     except Exception:
         db.rollback()
 
-    return ChatMessageResponse(reply=reply)
+    return ChatMessageResponse(reply=reply, rag_sources=rag_sources)

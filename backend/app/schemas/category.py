@@ -127,6 +127,8 @@ class CategoryUpdate(BaseModel):
 class CategoryResponse(CategoryBase):
     id: int
     is_active: bool
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
     is_default: bool
     created_at: datetime
     updated_at: datetime

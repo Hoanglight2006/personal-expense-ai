@@ -69,4 +69,58 @@ describe('TransactionCard saving allocation display and timestamp formatting', (
     expect(screen.getByText(/−500\.000/i)).toBeInTheDocument();
     expect(screen.getByText(/28\/10\/2026 12:48/i)).toBeInTheDocument();
   });
+
+  it('distinguishes between deleted category ("Đã xóa") and hidden category ("Ẩn")', () => {
+    const deletedCatTxn = {
+      id: 201,
+      amount: '300000.00',
+      type: 'expense',
+      category_id: 9,
+      category: {
+        id: 9,
+        name: 'Mua sắm',
+        icon: 'shopping',
+        color: '#ef4444',
+        is_active: false,
+        is_deleted: true,
+        deleted_at: '2026-10-30T02:00:00Z',
+      },
+      transaction_date: '2026-10-29',
+      created_at: '2026-10-29T05:00:00Z',
+      description: 'Mua quần áo',
+      payment_method: 'cash',
+      is_deleted: false,
+    };
+
+    const hiddenCatTxn = {
+      id: 202,
+      amount: '150000.00',
+      type: 'expense',
+      category_id: 10,
+      category: {
+        id: 10,
+        name: 'Giải trí',
+        icon: 'entertainment',
+        color: '#8b5cf6',
+        is_active: false,
+        is_deleted: false,
+        deleted_at: null,
+      },
+      transaction_date: '2026-10-29',
+      created_at: '2026-10-29T06:00:00Z',
+      description: 'Xem phim',
+      payment_method: 'cash',
+      is_deleted: false,
+    };
+
+    render(
+      <MemoryRouter>
+        <TransactionCard transaction={deletedCatTxn} />
+        <TransactionCard transaction={hiddenCatTxn} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Đã xóa')).toBeInTheDocument();
+    expect(screen.getByText('Ẩn')).toBeInTheDocument();
+  });
 });

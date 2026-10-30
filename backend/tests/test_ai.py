@@ -176,7 +176,10 @@ def test_get_monthly_trend(client: TestClient):
     assert Decimal(str(current_item["net_savings"])) == Decimal("10000000.00")
     assert current_item["savings_rate"] == 66.7
     assert current_item["top_category"] == "Ăn uống"
-    assert data["average_monthly_income"] is not None
+    assert data["active_months_count"] == 1
+    assert Decimal(str(data["average_monthly_income"])) == Decimal("15000000.00")
+    assert Decimal(str(data["average_monthly_expense"])) == Decimal("5000000.00")
+    assert "1/6 tháng" in data["smart_summary"]
     db.close()
 
 
@@ -355,6 +358,90 @@ def test_budget_recommendations_and_apply(client: TestClient):
     )
     assert food_budget is not None
     assert food_budget.amount == Decimal(str(rec_food["recommended_amount"]))
+    db.close()
+
+
+def test_budget_recommendations_with_income_adaptive_50_30_20(client: TestClient):
+    """Test AI budget suggestions adapt to user income via 50/30/20 and calculate true average when under 3 months."""
+    db = TestingSessionLocal()
+    user, token = create_user_and_auth(client, db, "income_budget_user@example.com")
+
+    cat_food = create_cat(db, user.id, "Ăn uống", CategoryType.EXPENSE)
+    cat_rent = create_cat(db, user.id, "Tiền nhà trọ", CategoryType.EXPENSE)
+    cat_shop = create_cat(db, user.id, "Mua sắm", CategoryType.EXPENSE)
+    cat_salary = create_cat(db, user.id, "Lương", CategoryType.INCOME)
+
+    today = date.today()
+    # 1. User has 20,000,000 VND monthly income
+    create_txn(db, user.id, cat_salary.id, Decimal("20000000"), CategoryType.INCOME, today)
+
+    # 2. User has only 1 month of prior history in Mua sắm (e.g. 3,000,000 VND)
+    next_month = today.month + 1 if today.month < 12 else 1
+    next_year = today.year if today.month < 12 else today.year + 1
+    create_txn(db, user.id, cat_shop.id, Decimal("3000000"), CategoryType.EXPENSE, today)
+
+    with patch("app.core.ai.gemini_client.settings.GEMINI_API_KEY", ""):
+        res = client.get(
+            f"/api/v1/ai/budget-recommendations?target_month={next_month}&target_year={next_year}&lookback_months=3",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert res.status_code == 200
+    data = res.json()
+
+    rec_food = next(r for r in data["recommendations"] if r["category_id"] == cat_food.id)
+    rec_rent = next(r for r in data["recommendations"] if r["category_id"] == cat_rent.id)
+    rec_shop = next(r for r in data["recommendations"] if r["category_id"] == cat_shop.id)
+
+    # Food & Rent have no history -> adapt to 20,000,000 income via 50/30/20
+    # 22% of 20,000,000 = 4,400,000
+    assert Decimal(str(rec_food["recommended_amount"])) >= Decimal("4400000")
+    assert "50/30/20" in rec_food["reason"] or "thu nhập" in rec_food["reason"]
+
+    # 20% of 20,000,000 = 4,000,000
+    assert Decimal(str(rec_rent["recommended_amount"])) >= Decimal("4000000")
+    assert "50/30/20" in rec_rent["reason"] or "thu nhập" in rec_rent["reason"]
+
+    # Shopping had 1 month of 3,000,000 VND. Average should be 3,000,000 (divided by 1 active month, NOT divided by 3)
+    assert Decimal(str(rec_shop["avg_spent"])) == Decimal("3000000.00")
+    assert "1 tháng có dữ liệu" in rec_shop["reason"]
+
+    db.close()
+
+
+def test_budget_recommendations_sparse_data_uses_standard_baseline(client: TestClient):
+    """Test AI budget suggestions return standard baseline (>= 5,000,000 VND) when income is small (< 2m) and transactions are sparse."""
+    db = TestingSessionLocal()
+    user, token = create_user_and_auth(client, db, "sparse_user@example.com")
+
+    cat_food = create_cat(db, user.id, "Ăn uống", CategoryType.EXPENSE)
+    cat_rent = create_cat(db, user.id, "Nhà ở", CategoryType.EXPENSE)
+    cat_trans = create_cat(db, user.id, "Đi lại", CategoryType.EXPENSE)
+    cat_inc = create_cat(db, user.id, "Thu nhập phụ", CategoryType.INCOME)
+
+    today = date.today()
+    # User only has small test income 370,000 VND and 1 small expense of 10,000 VND
+    create_txn(db, user.id, cat_inc.id, Decimal("370000"), CategoryType.INCOME, today)
+    create_txn(db, user.id, cat_food.id, Decimal("10000"), CategoryType.EXPENSE, today)
+
+    with patch("app.core.ai.gemini_client.settings.GEMINI_API_KEY", ""):
+        res = client.get(
+            "/api/v1/ai/budget-recommendations",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert res.status_code == 200
+    data = res.json()
+
+    # Total recommended budget must NOT collapse to 460k; must be >= 5,000,000 VND
+    assert Decimal(str(data["total_recommended"])) >= Decimal("5000000")
+
+    rec_food = next(r for r in data["recommendations"] if r["category_id"] == cat_food.id)
+    rec_rent = next(r for r in data["recommendations"] if r["category_id"] == cat_rent.id)
+
+    # Food should be standard baseline (2,500,000) not 80k
+    assert Decimal(str(rec_food["recommended_amount"])) >= Decimal("2500000")
+    # Rent should be standard baseline (2,000,000) not 70k
+    assert Decimal(str(rec_rent["recommended_amount"])) >= Decimal("2000000")
+
     db.close()
 
 

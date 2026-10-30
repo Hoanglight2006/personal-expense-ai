@@ -449,6 +449,45 @@ Tài liệu ghi lại chi tiết các mốc phát triển dự án **Personal Ex
 
 ---
 
+### 📅 29/10 – 30/10/2026: Tích Hợp Kiến Trúc RAG Lai (Local-First + Live Web Search), Chuẩn Hóa Đề Xuất Ngân Sách & Nâng Lên 260 Test Cases
+* **Việc cần làm:**
+  - Xây dựng kiến trúc RAG GenAI hoàn chỉnh cho dự án theo chuẩn Retrieval-Augmented Generation:
+    - Recursive Chunking: phân đoạn tài liệu 500 ký tự với độ gối đầu 50 ký tự (overlap), bảo toàn metadata nguồn gốc (Lineage Preservation) cho cả file Markdown (.md) và PDF (.pdf).
+    - Bộ chấm điểm đa tầng (Multi-tier Chunk Scoring): chấm điểm Unigram/Bigram có trọng số, bộ lọc Sibling Noise Filtering ngăn ngừa nhiễu giữa các đoạn trong cùng một bài viết.
+    - Cơ chế Live Web Search Expansion: mở rộng tra cứu thời gian thực qua DuckDuckGo khi người dùng hỏi các thông tin thị trường biến động (giá vàng, lãi suất, tỷ giá) hoặc khi danh mục chi tiêu đặc thù chưa có trong kho tài liệu nội bộ.
+  - Tích hợp RAG động vào Báo cáo Tài chính Tháng (`report_generator.py`) và Gợi ý Ngân sách (`budget_suggester.py`):
+    - Động hóa câu query RAG dựa trên chỉ số tài chính (tỷ lệ tiết kiệm, danh mục bội chi, top chi tiêu).
+    - Khử trùng lặp đa nguồn (Multi-document deduplication): đảm bảo mỗi trích dẫn RAG trên giao diện trỏ tới các bài viết/nguồn tài liệu hoàn toàn khác nhau, xóa bỏ triệt để hiện tượng bị khóa cứng vào 2 bài báo mẫu cũ.
+  - Chuẩn hóa thuật toán Đề xuất Ngân sách AI khi dữ liệu người dùng còn sơ khai / chưa đủ 3 tháng:
+    - Sửa lỗi chia cứng lookback 3 tháng thành chia theo số tháng thực tế có dữ liệu (`active_prior`).
+    - Bổ sung công thức ngoại suy chi tiêu giữa tháng (`mid-month extrapolation`) cho tháng hiện tại đang diễn ra.
+    - Thiết lập Tiêu chuẩn Độ chín Dữ liệu (`Data Maturity`): Thu nhập tối thiểu 2.000.000 đ, tối thiểu 5 giao dịch và trải dài ít nhất 7 ngày. Nếu dữ liệu sơ khai hoặc thu nhập quá thấp, hệ thống kích hoạt định mức chi phí sinh hoạt đô thị chuẩn (~5.8M - 6.75M) thay vì co cụm ngân sách phi thực tế.
+    - Gỡ bỏ trần ngân sách sinh viên gán cứng hẹp (5 - 6.5 triệu) trong prompts.
+  - Mở rộng bộ kiểm thử tự động lên **260 tests (189 backend + 71 frontend)** với 100% tỷ lệ pass.
+* **Minh chứng sử dụng AI:**
+  - *Prompt:*
+    ```text
+    [Context]
+    Tôi đang phát triển hệ thống RAG và thuật toán gợi ý ngân sách cho ứng dụng tài chính cá nhân Personal Expense AI.
+    
+    [Instructions]
+    1. Thiết kế module retriever.py kết hợp Local-First và Fallback Live Web Search qua DuckDuckGo khi kho cục bộ chưa đủ 2 nguồn chuẩn khớp.
+    2. Sửa lỗi thuật toán gợi ý ngân sách khi người dùng mới chỉ có 1-2 tháng dữ liệu hoặc thu nhập rất thấp (370k) không bị co cụm ngân sách tổng về 460k.
+    
+    [Input Data / Constraints]
+    - RAG: chunk size 500, overlap 50, phân đoạn đệ quy theo dấu ngắt đoạn.
+    - Gợi ý ngân sách: ngoại suy chi tiêu giữa tháng, xác thực Data Maturity và áp dụng định mức chi phí sinh hoạt chuẩn.
+    
+    [Output Format]
+    Mã nguồn Python cho retriever.py, budget_suggester.py và bộ test cases tương ứng.
+    ```
+  - *AI phản hồi:* AI đề xuất hàm chunking đệ quy và gợi ý công thức tính trung bình chi tiêu.
+* **Phát hiện lỗi và sửa:**
+  - Lỗi chia bình quân sai mẫu số: AI chia tổng chi tiêu 3 tháng cho hằng số 3 dù người dùng mới chỉ có 1 tháng giao dịch, làm ngân sách bị giảm 3 lần một cách vô lý. Nhóm sửa lại: chỉ chia cho số tháng thực tế có phát sinh chi tiêu (`len(active_prior)`).
+  - Lỗi RAG trùng lặp nguồn: Khi truy xuất, AI lấy 2 đoạn trích trong cùng 1 bài báo khiến giao diện hiển thị 2 gạch đầu dòng trùng tên bài viết. Nhóm bổ sung bước deduplication theo `doc_id` và bổ sung lead chunks nếu còn thiếu nguồn độc lập.
+
+---
+
 ## 🎯 TỔNG KẾT BÀI HỌC KINH NGHIỆM KHI SỬ DỤNG AI
 
 1. **Không copy nguyên văn code AI ở các phần xử lý tiền bạc:** AI thường mắc lỗi tính toán làm tròn (dùng `float` thay vì `Decimal`), quên các khoản trích lũy phụ và không để ý đến các trường hợp race condition khi có nhiều request đồng thời.

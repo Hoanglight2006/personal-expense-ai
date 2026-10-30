@@ -71,6 +71,12 @@ const MonthlyTrendChart = () => {
   const prediction = trendData?.prediction_data;
   const anomalies = trendData?.anomaly_items || [];
   const items = trendData?.items || [];
+  const activeMonthsCount = trendData?.active_months_count ?? items.filter(
+    (item) => Number(item.total_income) > 0 || Number(item.total_expense) > 0
+  ).length;
+  const avgSubtitleText = activeMonthsCount > 0 && activeMonthsCount < monthCount
+    ? `BQ ${activeMonthsCount}/${monthCount} tháng có dữ liệu`
+    : `BQ ${monthCount} tháng qua`;
 
   return (
     <div className="monthly-trend-container fade-in">
@@ -190,7 +196,7 @@ const MonthlyTrendChart = () => {
                 <strong className="metric-number text-emerald">
                   {formatCurrency(trendData.average_monthly_income)}
                 </strong>
-                <span className="metric-subtitle">BQ {monthCount} tháng qua</span>
+                <span className="metric-subtitle">{avgSubtitleText}</span>
               </div>
 
               <div className="hero-metric-item">
@@ -213,7 +219,7 @@ const MonthlyTrendChart = () => {
                 <strong className="metric-number text-rose">
                   {formatCurrency(trendData.average_monthly_expense)}
                 </strong>
-                <span className="metric-subtitle">BQ {monthCount} tháng qua</span>
+                <span className="metric-subtitle">{avgSubtitleText}</span>
               </div>
 
               <div className="hero-metric-item">

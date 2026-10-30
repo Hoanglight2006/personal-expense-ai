@@ -26,7 +26,7 @@ Nếu bạn là người mới tiếp cận dự án hoặc là Giảng viên/Ng
 1. 🎯 **Bắt đầu từ file này ([docs/USER_GUIDE.md](USER_GUIDE.md))**: Để cấu hình môi trường, chạy demo và trải nghiệm các tính năng trên web.
 2. 🏛️ **Đọc [docs/SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)**: Để đánh giá kiến trúc phần mềm, luồng xác thực JWT, sơ đồ ERD và cơ chế khóa dòng chống Race-condition.
 3. 🤖 **Đọc [docs/AI_DEVELOPMENT_LOG.md](AI_DEVELOPMENT_LOG.md)**: Để chấm điểm tiêu chí sử dụng AI (nhật ký Prompt 5 thành phần, phân tích BA và phần code sinh viên rà soát).
-4. 🚀 **Đọc [docs/DEVELOPMENT_PROCESS.md](DEVELOPMENT_PROCESS.md)**: Để nắm toàn bộ tiến độ 6 Sprint phát triển theo Agile/Scrum.
+4. 🚀 **Đọc [docs/DEVELOPMENT_PROCESS.md](DEVELOPMENT_PROCESS.md)**: Để nắm toàn bộ tiến độ 7 Sprint phát triển theo Agile/Scrum.
 5. 📡 **Tra cứu [docs/API.md](API.md) & [docs/DATABASE.md](DATABASE.md)**: Khi cần tra cứu chi tiết tham số API và bảng CSDL.
 
 ---

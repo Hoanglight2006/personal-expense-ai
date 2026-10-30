@@ -73,8 +73,10 @@ const TransactionCard = ({
               {getTypeBadgeText()}
             </span>
             <span className="txn-category-name">{cat?.name || '—'}</span>
-            {cat && !cat.is_active && (
-              <span className="txn-category-hidden-badge">Ẩn</span>
+            {cat && (!cat.is_active || cat.is_deleted || cat.deleted_at) && (
+              <span className={cat.is_deleted || cat.deleted_at ? 'txn-category-deleted-badge' : 'txn-category-hidden-badge'}>
+                {cat.is_deleted || cat.deleted_at ? 'Đã xóa' : 'Ẩn'}
+              </span>
             )}
             {transaction.saving_goal_name && (
               <span

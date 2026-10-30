@@ -128,6 +128,7 @@ class CategoryService:
         category_status: CategoryStatusFilter = "active",
         sort: CategorySort = "amount_desc",
         category_id: int | None = None,
+        include_deleted_with_transactions: bool = False,
     ) -> list[CategoryResponse]:
         stats = (
             self.db.query(
@@ -184,7 +185,14 @@ class CategoryService:
                 )
 
         # Always filter out soft-deleted categories
-        query = query.filter(Category.deleted_at.is_(None))
+        if include_deleted_with_transactions:
+            query = query.filter(
+                (Category.deleted_at.is_(None))
+                | (func.coalesce(stats.c.transaction_count, 0) > 0)
+            )
+        else:
+            # Always filter out soft-deleted categories
+            query = query.filter(Category.deleted_at.is_(None))
 
         if category_status == "active":
             query = query.filter(Category.is_active.is_(True))
@@ -232,6 +240,8 @@ class CategoryService:
                 ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             response = CategoryResponse.model_validate(category).model_copy(
                 update={
+                    "is_deleted": category.deleted_at is not None,
+                    "deleted_at": category.deleted_at,
                     "total_amount": amount,
                     "income_amount": category_income,
                     "expense_amount": category_expense,
@@ -310,6 +320,7 @@ class CategoryService:
             period_end,
             category_status="all",
             sort="amount_desc",
+            include_deleted_with_transactions=True,
         )
         return CategoryListResponse(start_date=period_start, end_date=period_end, items=items)
 

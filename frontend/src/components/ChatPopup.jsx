@@ -11,9 +11,11 @@ const WELCOME_MESSAGE = {
 
 const QUICK_SUGGESTIONS = [
   'Tháng này tôi chi nhiều nhất vào đâu?',
+  'Quy tắc 50/30/20 là gì?',
+  'Cách chia tiền 6 chiếc lọ?',
+  'Quỹ khẩn cấp nên để bao nhiêu?',
   'Tình hình ngân sách tháng này?',
   'Gợi ý cách tiết kiệm tiền',
-  'Tóm tắt thu chi tháng này',
 ];
 
 const getChatStorageKey = (userId) => (userId ? `finai_chat_${userId}` : 'finai_chat_guest');
@@ -114,7 +116,11 @@ const ChatPopup = ({ isOpen, onClose }) => {
 
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: data.reply },
+        {
+          role: 'assistant',
+          content: data.reply,
+          sources: data.rag_sources || [],
+        },
       ]);
     } catch {
       setMessages((prev) => [
@@ -182,7 +188,41 @@ const ChatPopup = ({ isOpen, onClose }) => {
               </div>
             )}
             <div className="chat-message-bubble">
-              {msg.content}
+              <div className="chat-message-text">{msg.content}</div>
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="chat-rag-sources">
+                  <span className="rag-sources-label">📚 Tham chiếu RAG:</span>
+                  <div className="rag-sources-tags">
+                    {msg.sources.map((src, sIdx) => {
+                      const urlMatch = typeof src === 'string' && src.match(/(https?:\/\/[^\s)]+)/);
+                      if (urlMatch) {
+                        const url = urlMatch[1];
+                        const label = src
+                          .replace(/\(https?:\/\/[^\s)]+\)/, '')
+                          .replace(/\[(.*?)\]\(.*?\)/, '$1')
+                          .trim() || url;
+                        return (
+                          <a
+                            key={sIdx}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rag-source-tag rag-source-link"
+                            title={`Mở bài viết gốc: ${url}`}
+                          >
+                            🔗 {label} ↗
+                          </a>
+                        );
+                      }
+                      return (
+                        <span key={sIdx} className="rag-source-tag">
+                          {src}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}

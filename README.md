@@ -7,7 +7,7 @@
 [![Vite](https://img.shields.io/badge/Bundler-Vite_8-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev)
 [![MySQL](https://img.shields.io/badge/Database-MySQL_8.0-4479A1.svg?logo=mysql&logoColor=white)](https://www.mysql.com)
 [![CI Pipeline](https://github.com/Hoanglight2006/personal-expense-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Hoanglight2006/personal-expense-ai/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-238%20Passed-success.svg)](docs/DEVELOPMENT_PROCESS.md)
+[![Tests](https://img.shields.io/badge/Tests-260%20Passed-success.svg)](docs/DEVELOPMENT_PROCESS.md)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -31,7 +31,7 @@ graph LR
 3. 🤖 **Bước 3 — Đánh giá Minh chứng Ứng dụng AI khi Lập trình**:
    👉 Đọc **[docs/AI_DEVELOPMENT_LOG.md](docs/AI_DEVELOPMENT_LOG.md)**: Tổng hợp Prompt chuẩn 5 thành phần, phân tích BA, phần code AI sinh ra và phần sinh viên trực tiếp rà soát, sửa lỗi.
 4. 🚀 **Bước 4 — Đánh giá Kế hoạch & Quy trình Phát triển Phần mềm**:
-   👉 Đọc **[docs/DEVELOPMENT_PROCESS.md](docs/DEVELOPMENT_PROCESS.md)**: Báo cáo 6 Sprint theo mô hình Agile/Scrum và kết quả kiểm thử 238/238 test cases.
+   👉 Đọc **[docs/DEVELOPMENT_PROCESS.md](docs/DEVELOPMENT_PROCESS.md)**: Báo cáo 6 Sprint theo mô hình Agile/Scrum và kết quả kiểm thử 260/260 test cases.
 5. 📡 **Bước 5 — Tra cứu Kỹ thuật Chuyên sâu**:
    👉 Xem **[docs/API.md](docs/API.md)** (Đặc tả RESTful API) và **[docs/DATABASE.md](docs/DATABASE.md)** (Cấu trúc bảng CSDL & Migration).
 
@@ -43,9 +43,10 @@ graph LR
 |---|---|
 | 📖 [**USER_GUIDE.md**](docs/USER_GUIDE.md) | **Hướng dẫn sử dụng chi tiết A-Z**: Thao tác từng bước trên giao diện, quét hóa đơn AI, nạp/rút tiết kiệm, thiết lập ngân sách, cấu hình API Key. |
 | 🏛️ [**SYSTEM_ARCHITECTURE.md**](docs/SYSTEM_ARCHITECTURE.md) | **Kiến trúc hệ thống toàn diện**: Phân tầng, luồng bảo mật JWT, sơ đồ ERD, cơ chế khóa dòng chống Race-condition. |
-| 🤖 [**AI_DEVELOPMENT_LOG.md**](docs/AI_DEVELOPMENT_LOG.md) | **Minh chứng sử dụng AI**: Nhật ký Prompt 5 thành phần, phân tích BA, code AI sinh ra, quá trình rà soát và kiểm thử của sinh viên. |
+| 🤖 [**AI_DEVELOPMENT_LOG.md**](docs/AI_DEVELOPMENT_LOG.md) | **Minh chứng sử dụng AI**: Nhật ký Prompt 5 thành phần, 10 Ca thực tế, code AI sinh ra, quá trình rà soát và kiểm thử của sinh viên. |
+| 📑 [**AI_SDLC_INTEGRATION_REPORT.md**](docs/AI_SDLC_INTEGRATION_REPORT.md) | **Báo cáo thực hành Bài 5**: Tích hợp AI vào SDLC, sơ đồ trước/sau, ma trận kiểm soát Human Gate, đo lường định lượng và tự chấm 10/10 điểm. |
 | 🚀 [**DEVELOPMENT_PROCESS.md**](docs/DEVELOPMENT_PROCESS.md) | **Quy trình & Lộ trình phát triển**: Kế hoạch 6 Sprint Agile/Scrum, quản lý rủi ro và kết quả kiểm thử. |
-| 🧪 [**TEST_CASES.md**](docs/TEST_CASES.md) | **Ma trận kiểm thử tự động**: 238 bài test chi tiết (168 backend + 70 frontend) bao phủ toàn diện 7 phân hệ nghiệp vụ. |
+| 🧪 [**TEST_CASES.md**](docs/TEST_CASES.md) | **Ma trận kiểm thử tự động**: 260 bài test chi tiết (189 backend + 71 frontend) bao phủ toàn diện 7 phân hệ nghiệp vụ. |
 | 📡 [**API.md**](docs/API.md) | Đặc tả chi tiết toàn bộ các RESTful API endpoints, request/response models. |
 | 🗄️ [**DATABASE.md**](docs/DATABASE.md) | Thiết kế bảng cơ sở dữ liệu, quan hệ khóa ngoại, index và hướng dẫn migration. |
 | 📝 [**CHANGELOG.md**](CHANGELOG.md) | Lịch sử cập nhật và các mốc phát hành tính năng. |
@@ -74,7 +75,7 @@ graph LR
 * **5 Chỉ số Sức khỏe Tài chính Toàn diện**: Tổng Thu Nhập, Tổng Chi Tiêu, Tiết Kiệm Ròng, Tỷ Lệ Tiết Kiệm, và **🎯 Tích Lũy Mục Tiêu (Nạp - Rút)**.
 * **Báo cáo Tài chính AI Đa Trọng Tâm**: Hỗ trợ 3 tùy chọn phân tích chuyên sâu (*Toàn diện 360 độ*, *Tối ưu tiết kiệm & cắt giảm chi phí*, *Cảnh báo rủi ro & an toàn tài chính*).
 * **Nhận thức Thời gian Thực & Bắt lỗi Vượt Hạn mức**: AI phân biệt chính xác thời gian thực (đầu tháng vs cuối tháng ít giao dịch vs tháng đã qua), tự động phát hiện và chỉ đích danh danh mục bị vượt trần ngân sách, đưa ra hành động cắt giảm khẩn cấp.
-* **Đề xuất Ngân sách AI**: Tự động tính toán và gợi ý hạn mức chi tiêu tối ưu cho tháng tiếp theo bám sát thói quen tiêu dùng.
+* **Đề xuất Ngân sách & Báo cáo Tích hợp RAG Lai**: Tự động tính toán và gợi ý hạn mức chi tiêu tối ưu bám sát thói quen tiêu dùng kết hợp hệ thống RAG tri thức tài chính lai (Local-First 500-char Chunking + Fallback Live Web Search DuckDuckGo thời gian thực) kèm trích dẫn nguồn chuẩn mực minh bạch.
 
 ### 4. 🛡️ Phân Hệ Quản Trị Hệ Thống (System Administration)
 * **Giám sát Tài nguyên & Chi phí AI**: Dashboard quản trị viên theo dõi tổng người dùng, tổng giao dịch, tần suất gọi mô hình Gemini AI và lượng Token API tiêu thụ.
@@ -111,7 +112,7 @@ personal-expense-ai/
 │   │   ├── index.css           # Master CSS Hub (@import)
 │   │   └── main.jsx            # Entry point ứng dụng React
 │   ├── .env.example            # Vite frontend environment template
-│   ├── package.json            # Quản lý dependencies frontend (Vitest 70 tests)
+│   ├── package.json            # Quản lý dependencies frontend (Vitest 71 tests)
 │   └── vite.config.js          # Cấu hình Vite & proxy
 │
 ├── ⚙️ backend/                 # [BACKEND] Kiến trúc 3 lớp (3-Tier) với FastAPI & SQLAlchemy
@@ -134,12 +135,16 @@ personal-expense-ai/
 │   │   │   ├── saving_service.py # Xử lý tích lũy, nạp/rút tiền, kiểm tra số dư ví
 │   │   │   └── transaction_service.py # Xử lý CRUD giao dịch, khóa dòng, phân bổ mục tiêu
 │   │   ├── core/               # Bảo mật, JWT, hashing, AI prompt logic
+│   │   │   └── rag/            # RAG Engine: loader, recursive chunking, retriever, live web search
+│   ├── data/knowledge_base/    # Kho tri thức tài chính chuẩn mực (.md, .pdf)
+│   │   │   └── rag/            # RAG Engine: loader, recursive chunking, retriever, live web search
+│   ├── data/knowledge_base/    # Kho tri thức tài chính chuẩn mực (.md, .pdf)
 │   │   ├── models/             # SQLAlchemy ORM Models (User, Transaction, Category...)
 │   │   ├── schemas/            # Pydantic Schemas (Request/Response validation)
 │   │   ├── config.py           # Quản lý biến môi trường Pydantic Settings
 │   │   ├── database.py         # Kết nối DB Engine & Session factory
 │   │   └── main.py             # FastAPI Application initialization
-│   ├── tests/                  # Bộ kiểm thử tự động pytest (168 test cases)
+│   ├── tests/                  # Bộ kiểm thử tự động pytest (189 test cases: 18 RAG + 8 AI)
 │   └── requirements.txt        # Danh sách thư viện Python
 │
 ├── 🗄️ database/                # [DATABASE] Toàn bộ mã DDL, Migration & Seed data

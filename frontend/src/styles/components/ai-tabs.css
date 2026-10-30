@@ -1443,3 +1443,99 @@
 .btn-reconfigure-bottom:active {
   transform: translateY(0);
 }
+
+
+
+
+/* RAG Financial Benchmarks Card in AI Report */
+
+.ai-benchmarks-card {
+
+  padding: 16px 20px;
+
+  border: 1px solid #c7d2fe;
+
+  border-radius: 18px;
+
+  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+
+}
+
+
+
+.ai-benchmarks-card .benchmarks-header {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  margin-bottom: 10px;
+
+}
+
+
+
+.ai-benchmarks-card .benchmarks-header h3 {
+
+  margin: 0;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  color: #3730a3;
+
+}
+
+
+
+.ai-benchmarks-card .benchmarks-list {
+
+  list-style: none;
+
+  margin: 0;
+
+  padding: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 6px;
+
+}
+
+
+
+.ai-benchmarks-card .benchmark-item {
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 8px;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+
+  color: #4338ca;
+
+  font-weight: 500;
+
+}
+
+
+
+.ai-benchmarks-card .bm-check {
+
+  color: #4f46e5;
+
+  font-weight: 700;
+
+  flex-shrink: 0;
+
+}
+
